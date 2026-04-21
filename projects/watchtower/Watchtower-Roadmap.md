@@ -32,8 +32,8 @@ This project grew out of a conversation mapping the full homelab. The Asus VM40B
 
 ### Naming
 
-- **Monolith** — the AMD tower running k3s. Named for its role as the single heavy node.
-- **Watchtower** — the VM40B monitoring/DNS node. Named for its role: sees everything, never sleeps.
+- **monolith** — the AMD tower running k3s. Named for its role as the single heavy node.
+- **watchtower** — the VM40B monitoring/DNS node. Named for its role: sees everything, never sleeps.
 - **apex** — the MacBook Air M4. All authoring, config, and remote ops originate here.
 - **Little Wolf Acres** — the family Slack workspace receiving Grafana alerts.
 
@@ -65,18 +65,11 @@ At this scale Alertmanager adds operational surface area without meaningful bene
 
 PSU on the VM40B needs replacing before any hands-on work begins. Phase 0 (repo housekeeping + Terraform Cloud setup) can be done on apex immediately while waiting for hardware. The file server for family backups (daughter's iPad art, wife's crochet notes) is the next Monolith project after Watchtower is stable — noted in the repo README already.
 
-### Owner notes
-
-- 4.0 GPA, 16 credits into BS in CS with AI focus — lab decisions are made with an eye toward what's relevant to coursework and interviews, not just what works
-- IT veteran + unemployed DevOps Engineer — this lab is both a learning environment and a portfolio
-- Aced CS102, currently taking US History 1945–present (more overlap with computing history than expected — Cold War funding, ARPANET, semiconductor investment)
-
 --------------
 
 ## Repo Structure (Target State)
 
-> `projects/` is being renamed to `services/` — permanent infrastructure belongs there, not projects.
-> Watchtower moves from `projects/watchtower/` to `services/watchtower/`.
+`projects/` is being renamed to `services/` — permanent infrastructure belongs there, not projects. Watchtower moves from `projects/watchtower/` to `services/watchtower/`.
 
 ```
 homelab/
@@ -110,6 +103,17 @@ homelab/
 │       └── Watchtower-Roadmap.md
 ├── network/omada/
 ├── docs/
+├── ansible/
+│   └── monolith/
+│       ├── inventory.ini
+│       ├── playbooks/
+│       │   ├── bootstrap.yml
+│       │   └── node.yml
+│       └── roles/
+│           ├── common/       ← baseline packages, UFW, unattended-upgrades
+│           ├── k3s/          ← replaces curl one-liner in Terraform
+│           ├── node_exporter/← so Watchtower can scrape it
+│           └── runner/       ← GitHub Actions runner as systemd service
 └── .github/
     └── workflows/
         ├── provision-k3s.yml       ← existing (monolith label)
@@ -142,10 +146,11 @@ apex (MacBook Air M4)
               └── GitHub Actions
                     ├── deploy-watchtower.yml
                     │     runs-on: [self-hosted, watchtower]
-                    │     └── Ansible playbooks → configure services
+                    │     └── Ansible playbooks → configure Watchtower services
                     └── deploy-k8s-config.yml
                           runs-on: [self-hosted, monolith]
-                          └── kubectl apply → k3s cluster
+                          ├── kubectl apply → k3s cluster
+                          └── Ansible playbooks → configure Monolith node
 ```
 
 ---
