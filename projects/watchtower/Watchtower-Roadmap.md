@@ -1,9 +1,10 @@
-# VM40B Homelab — Monitoring & DNS Stack Roadmap
+# Watchtower — Monitoring & DNS Stack Roadmap
 
-> **Hardware:** Asus VM40B · 8GB RAM · 1TB SSD (repurposed)
+> **Hardware:** Asus VM40B · 8GB RAM · 1TB SSD (repurposed from Monolith)
+> **Hostname:** `watchtower` · **Dev machine:** `apex` (MacBook Air M4)
 > **Role:** Always-on DNS resolver + full-stack monitoring node
-> **Dev machine:** MacBook Air M4 — all authoring, config, and remote ops from here
-> **IaC:** Terraform + GitHub Actions (shared workflow with K8s lab)
+> **IaC:** Terraform (Terraform Cloud state) + Ansible + GitHub Actions
+> **Alerts:** Slack → Little Wolf Acres workspace
 
 ---
 
@@ -14,189 +15,347 @@
 | Unbound | Recursive DNS resolver (upstream) | 5335 |
 | AdGuard Home | DNS frontend, ad/tracker filtering | 53, 3000 |
 | Prometheus | Metrics scraping + TSDB | 9090 |
-| node_exporter | VM40B host metrics | 9100 |
+| node_exporter | Watchtower host metrics | 9100 |
 | blackbox_exporter | Endpoint / ICMP probing | 9115 |
 | snmp_exporter | Omada network gear metrics | 9116 |
 | AdGuard exporter | AGH metrics → Prometheus | 9617 |
 | Netdata | Real-time host observability | 19999 |
-| Grafana | Dashboards + alerting | 3001 |
+| Grafana | Dashboards + alerting → Slack | 3001 |
+
+---
+
+## Repo Structure (Target State)
+
+> `projects/` is being renamed to `services/` — permanent infrastructure belongs there, not projects.
+> Watchtower moves from `projects/watchtower/` to `services/watchtower/`.
+
+```
+homelab/
+├── nodes/
+│   ├── macbook/          ← apex (dev machine)
+│   ├── amd-tower/        ← Monolith (k3s worker)
+│   └── vm40b/            ← Watchtower (new)
+├── kubernetes/           ← k3s cluster config, manifests, storage
+├── terraform/
+│   ├── monolith/         ← existing
+│   ├── cluster/          ← existing
+│   └── watchtower/       ← new
+│       ├── main.tf
+│       └── variables.tf
+├── services/             ← renamed from projects/
+│   ├── navidrome/        ← moved from projects/audio-server/
+│   └── watchtower/       ← moved from projects/watchtower/
+│       ├── ansible/
+│       │   ├── inventory.ini
+│       │   ├── playbooks/
+│       │   │   ├── dns.yml
+│       │   │   ├── monitoring.yml
+│       │   │   └── exporters.yml
+│       │   └── roles/
+│       │       ├── unbound/
+│       │       ├── adguard/
+│       │       ├── prometheus/
+│       │       ├── exporters/
+│       │       ├── netdata/
+│       │       └── grafana/
+│       └── Watchtower-Roadmap.md
+├── network/omada/
+├── docs/
+└── .github/
+    └── workflows/
+        ├── provision-k3s.yml       ← existing (monolith label)
+        ├── deploy-k8s-config.yml   ← existing (monolith label)
+        └── deploy-watchtower.yml   ← new (watchtower label)
+```
+
+---
+
+## Runner Security Model
+
+> Each node manages itself. No runner crosses node boundaries via pipeline.
+
+| Runner Label | Installed On | Manages |
+|---|---|---|
+| `monolith` | Monolith (AMD tower) | k3s cluster, Navidrome |
+| `watchtower` | Watchtower (VM40B) | DNS, monitoring stack |
+
+Watchtower is bootstrapped **manually via SSH from apex** — install OS, harden, install GitHub Actions runner. After that, all config changes go through GitHub Actions using `runs-on: [self-hosted, watchtower]`. Monolith's runner never touches Watchtower and vice versa.
 
 ---
 
 ## Workflow Architecture
 
 ```
-MacBook Air M4 (dev)
+apex (MacBook Air M4)
   └── VS Code / Obsidian / Terminal
-        ├── Terraform (local state or remote backend)
-        │     └── Provisions VM40B config, firewall rules
+        ├── Terraform → Terraform Cloud (remote state)
         └── Git push → GitHub
-              └── GitHub Actions CI/CD
-                    ├── Lint / validate Terraform + Ansible
-                    └── SSH deploy → VM40B
-                          ├── systemd units
-                          ├── Prometheus config
-                          └── AdGuard Home config
+              └── GitHub Actions
+                    ├── deploy-watchtower.yml
+                    │     runs-on: [self-hosted, watchtower]
+                    │     └── Ansible playbooks → configure services
+                    └── deploy-k8s-config.yml
+                          runs-on: [self-hosted, monolith]
+                          └── kubectl apply → k3s cluster
 ```
-
-> **Deviation note:** Ansible is recommended here alongside Terraform.
-> Terraform owns *infrastructure* (firewall rules, DNS records, future cloud resources).
-> Ansible owns *configuration management* on the VM40B itself (packages, systemd units, config files).
-> GitHub Actions orchestrates both. This mirrors real-world DevOps practice and maps directly to your BS/CS + AI coursework trajectory.
 
 ---
 
-## Phase 0 — Mac Dev Environment Setup
+## Phase 0 — Repo Housekeeping & Dev Environment
 
-> I have most, just need verifying and/or updating
+> Do this before any Watchtower work begins. Gets the house in order.
 
-- [ ] Install MacPort if not present
-- [ ] `port install terraform ansible git gh`
-- [ ] `port install --cask visual-studio-code`
-- [ ] Configure SSH key pair — add public key to VM40B `authorized_keys`
+### Repo reorganization (on apex)
+
+- [ ] Rename `projects/` → `services/`
+- [ ] Move `projects/audio-server/` → `services/navidrome/`
+- [ ] Move `projects/watchtower/` → `services/watchtower/`
+- [ ] Create `nodes/vm40b/` with `hardware.md`
+- [ ] Create `terraform/watchtower/` stub
+- [ ] Update `README.md` to reflect new structure and both nodes
+- [ ] Update `docs/homelab-overview.md` — replace old drive list with current `df -h` reality
+- [ ] Commit and push — verify nothing breaks in existing workflows
+
+### Terraform Cloud setup
+
+- [ ] Create account at [app.terraform.io](https://app.terraform.io) (free tier)
+- [ ] Create organization (e.g. `speddling-homelab`)
+- [ ] Create two workspaces: `monolith` and `watchtower`
+  - Execution mode: **Local** (runner executes, Terraform Cloud stores state)
+- [ ] Generate Terraform Cloud API token
+- [ ] Add token as GitHub Actions secret: `TF_API_TOKEN`
+- [ ] Add backend block to `terraform/monolith/main.tf`:
+
+```hcl
+terraform {
+  cloud {
+    organization = "speddling-homelab"
+    workspaces {
+      name = "monolith"
+    }
+  }
+}
+```
+
+- [ ] Add backend block to new `terraform/watchtower/main.tf`:
+
+```hcl
+terraform {
+  cloud {
+    organization = "speddling-homelab"
+    workspaces {
+      name = "watchtower"
+    }
+  }
+}
+```
+
+- [ ] Run `terraform init` in both directories — verify state migrates cleanly
+- [ ] Confirm Terraform Cloud UI shows both workspaces with state
+
+### GitHub Actions secrets audit
+
+- [ ] Confirm existing secrets still valid: `SSH_PRIVATE_KEY`, `VM40B_HOST`, `VM40B_USER`
+- [ ] Add `TF_API_TOKEN` (Terraform Cloud)
+- [ ] Add `SLACK_WEBHOOK_URL` (Grafana alert channel — see Phase 8)
+- [ ] **Do not commit Slack URLs, webhook URLs, or IPs to the repo**
+
+### apex dev environment
+
+- [ ] Verify: `terraform`, `ansible`, `git`, `gh`, `k9s` installed via MacPorts
+- [ ] Verify SSH config has both `monolith` and `watchtower` host aliases
 - [ ] Install VS Code extensions: `HashiCorp Terraform`, `Ansible`, `Remote-SSH`
-- [ ] Configure `~/.ssh/config` with VM40B host alias
-- [ ] Create GitHub file structurein Homelab repo
-- [ ] Set GitHub Actions secrets: `VM40B_HOST`, `VM40B_USER`, `SSH_PRIVATE_KEY`
 
 ---
 
 ## Phase 1 — Hardware & OS Prep
 
-- [ ] Install Ubuntu Server 24.04 LTS 
-- [ ] minimal install, with SSH
-- [ ] Set MAC bond IP via Omada controller DHCP reservation
-- [ ] Enable and harden SSH
+> Physical access to VM40B required. Done manually from apex via SSH after install.
+
+- [ ] Install 1TB SSD into VM40B (2.5" SATA bay) — confirm BIOS detects it
+- [ ] Download Ubuntu Server 24.04 LTS — flash to USB (Balena Etcher or `dd`)
+- [ ] Boot and install — minimal install, OpenSSH server checked, no snaps
+- [ ] Set hostname during install: `watchtower`
+- [ ] Set static DHCP reservation in Omada controller by MAC address (do this before first boot if possible)
+- [ ] Harden SSH immediately after first login:
   - [ ] `PasswordAuthentication no`
   - [ ] `PermitRootLogin no`
-  - [ ] Copy public key from Mac
-- [ ] Set hostname: `watchtower
+  - [ ] `AllowUsers <your-user>`
+  - [ ] Copy public key from apex: `ssh-copy-id watchtower`
 - [ ] `sudo apt update && sudo apt upgrade -y`
 - [ ] Install baseline packages: `curl wget git htop ufw`
-- [ ] Configure UFW — allow SSH, DNS (53/udp+tcp), and monitoring ports from LAN only
-- [ ] Enable `unattended-upgrades` for security patches
-- [ ] Verify connectivity from MacBook Air via SSH alias
+- [ ] Configure UFW — LAN only, no public exposure
+
+```bash
+sudo ufw default deny incoming
+sudo ufw default allow outgoing
+sudo ufw allow from 192.168.x.0/24 to any port 22 proto tcp
+sudo ufw allow from 192.168.x.0/24 to any port 53
+sudo ufw allow from 192.168.x.0/24 to any port 3000 proto tcp
+sudo ufw allow from 192.168.x.0/24 to any port 3001 proto tcp
+sudo ufw allow from 192.168.x.0/24 to any port 9090 proto tcp
+sudo ufw allow from 192.168.x.0/24 to any port 19999 proto tcp
+sudo ufw enable
+```
+
+- [ ] Enable `unattended-upgrades`: `sudo apt install unattended-upgrades -y`
+- [ ] Verify SSH from apex: `ssh watchtower`
+- [ ] Add `nodes/vm40b/hardware.md` to repo with confirmed specs and `df -h` output
 
 ---
 
-## Phase 2 — IaC Scaffold (Terraform + GitHub Actions)
+## Phase 2 — GitHub Actions Runner (Watchtower)
 
-> Authored on MacBook Air · executed via GitHub Actions
+> Bootstrap manually. After this, GitHub Actions takes over.
 
-### Repo Structure
+- [ ] SSH into Watchtower from apex
+- [ ] In GitHub repo → Settings → Actions → Runners → New self-hosted runner
+- [ ] Select Linux x64 — follow the generated install commands
+- [ ] When prompted for labels, add: `self-hosted,watchtower`
+- [ ] Install runner as a systemd service:
 
-```
-homelab-iac/
-├── vm40b/
-│   ├── main.tf               # Provider config, SSH provisioner
-│   ├── variables.tf
-│   ├── outputs.tf
-│   └── ansible/
-│       ├── inventory.ini
-│       ├── playbooks/
-│       │   ├── dns.yml
-│       │   ├── monitoring.yml
-│       │   └── exporters.yml
-│       └── roles/
-│           ├── unbound/
-│           ├── adguard/
-│           ├── prometheus/
-│           ├── exporters/
-│           ├── netdata/
-│           └── grafana/
-├── k8s-lab/                  # Existing or future K8s Terraform
-└── .github/
-    └── workflows/
-        ├── vm40b-deploy.yml
-        └── k8s-deploy.yml
+```bash
+sudo ./svc.sh install
+sudo ./svc.sh start
+systemctl status actions.runner.*
 ```
 
-### GitHub Actions Pipeline — `vm40b-deploy.yml`
+- [ ] Verify runner shows as **Idle** in GitHub → Settings → Actions → Runners
+- [ ] Write `.github/workflows/deploy-watchtower.yml` on apex:
 
 ```yaml
-name: VM40B Deploy
+name: Deploy Watchtower Config
+
 on:
   push:
+    branches: [master]
     paths:
-      - 'vm40b/**'
+      - 'services/watchtower/**'
+      - 'terraform/watchtower/**'
   workflow_dispatch:
 
 jobs:
   deploy:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, watchtower]
     steps:
       - uses: actions/checkout@v4
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
+        with:
+          cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
 
       - name: Terraform Init & Apply
-        working-directory: vm40b
+        working-directory: terraform/watchtower
         run: |
           terraform init
           terraform apply -auto-approve
-        env:
-          TF_VAR_vm40b_host: ${{ secrets.VM40B_HOST }}
 
-      - name: Run Ansible Playbooks
-        uses: dawidd6/action-ansible-playbook@v2
-        with:
-          playbook: vm40b/ansible/playbooks/dns.yml
-          inventory: vm40b/ansible/inventory.ini
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
+      - name: Run Ansible — DNS
+        run: |
+          ansible-playbook \
+            -i services/watchtower/ansible/inventory.ini \
+            services/watchtower/ansible/playbooks/dns.yml
+
+      - name: Run Ansible — Monitoring
+        run: |
+          ansible-playbook \
+            -i services/watchtower/ansible/inventory.ini \
+            services/watchtower/ansible/playbooks/monitoring.yml
+
+      - name: Run Ansible — Exporters
+        run: |
+          ansible-playbook \
+            -i services/watchtower/ansible/inventory.ini \
+            services/watchtower/ansible/playbooks/exporters.yml
 ```
 
-- [ ] Scaffold repo structure locally on MacBook Air
-- [ ] Write `inventory.ini` with VM40B static IP
-- [ ] Write stub `main.tf` with SSH null_resource provisioner
-- [ ] Commit and push — verify GitHub Actions runner reaches VM40B (installed on Monolith)
-- [ ] Confirm Terraform state strategy: local (simple) vs Terraform Cloud (recommended for multi-machine lab)
+- [ ] Push workflow — verify it appears in GitHub Actions tab
+- [ ] Run manually via `workflow_dispatch` with a no-op playbook to confirm runner picks it up
 
 ---
 
-## Phase 3 — DNS Layer (Unbound + AdGuard Home)
+## Phase 3 — Ansible Scaffold
 
-> Ansible role: `unbound`, `adguard` · Deployed via GitHub Actions
+> Authored on apex · roles deployed to Watchtower via GitHub Actions
 
-### Unbound
+- [ ] Install Ansible on apex: `sudo port install ansible`
+- [ ] Create `services/watchtower/ansible/inventory.ini`:
 
-- [ ] Install via apt: `sudo apt install unbound`
-- [ ] Configure `/etc/unbound/unbound.conf.d/pi-hole.conf`
+```ini
+[watchtower]
+watchtower ansible_host=192.168.x.x ansible_user=<your-user> ansible_ssh_private_key_file=~/.ssh/id_ed25519
+
+[watchtower:vars]
+ansible_python_interpreter=/usr/bin/python3
+```
+
+- [ ] Create role scaffolds using `ansible-galaxy role init`:
+
+```bash
+cd services/watchtower/ansible/roles
+ansible-galaxy role init unbound
+ansible-galaxy role init adguard
+ansible-galaxy role init prometheus
+ansible-galaxy role init exporters
+ansible-galaxy role init netdata
+ansible-galaxy role init grafana
+```
+
+- [ ] Write `playbooks/dns.yml` — applies `unbound` and `adguard` roles
+- [ ] Write `playbooks/monitoring.yml` — applies `prometheus`, `netdata`, `grafana` roles
+- [ ] Write `playbooks/exporters.yml` — applies `exporters` role
+- [ ] Test locally from apex before committing: `ansible-playbook -i inventory.ini playbooks/dns.yml --check`
+
+---
+
+## Phase 4 — DNS Layer (Unbound + AdGuard Home)
+
+> Ansible roles: `unbound`, `adguard`
+
+### Unbound role
+
+- [ ] Task: install via apt (`unbound`)
+- [ ] Template: `/etc/unbound/unbound.conf.d/watchtower.conf`
   - Listen on `127.0.0.1:5335`
   - Root hints enabled
   - DNSSEC validation on
-  - Cache tuning (rrset-cache-size, msg-cache-size)
-- [ ] Disable and mask `systemd-resolved` stub listener
+  - Cache tuning: `rrset-cache-size: 256m`, `msg-cache-size: 128m`
+- [ ] Task: disable and mask `systemd-resolved` stub listener
+- [ ] Handler: restart unbound on config change
 - [ ] Verify: `dig @127.0.0.1 -p 5335 google.com`
 
-### AdGuard Home
+### AdGuard Home role
 
-- [ ] Download and run AGH installer script
-- [ ] Complete web setup wizard (port 3000 initially → move to 53 post-setup)
-- [ ] Set upstream DNS → `127.0.0.1:5335` (Unbound)
-- [ ] Configure bootstrap DNS
-- [ ] Add blocklists (Hagezi, OISD, Steven Black recommended)
+- [ ] Task: download and run AGH installer script
+- [ ] Task: complete initial setup via AGH API (automate wizard)
+- [ ] Template: AGH config — upstream DNS `127.0.0.1:5335`
+- [ ] Blocklists to configure: Hagezi Multi Normal, OISD Big, Steven Black
 - [ ] Enable DNSSEC
-- [ ] Configure local DNS rewrites for homelab hostnames (e.g. `grafana.local`, `k3s.local`)
-- [ ] Lock down AGH web UI to LAN CIDR only
+- [ ] Local DNS rewrites for homelab:
+  - `watchtower.local` → Watchtower IP
+  - `grafana.local` → Watchtower IP
+  - `navidrome.local` → Monolith IP
+  - `monolith.local` → Monolith IP
+- [ ] Lock AGH web UI to LAN CIDR only
 
-### Omada Integration
+### Omada integration
 
-- [ ] In OC200 controller: set primary DNS to VM40B static IP
-- [ ] Set secondary DNS to a fallback (e.g. `1.1.1.1`) in case VM40B is down
+- [ ] In OC200: set primary DNS to Watchtower static IP
+- [ ] Set secondary DNS to `1.1.1.1` (fallback if Watchtower is down)
 - [ ] Verify DNS resolution from a LAN client
-- [ ] Verify ad blocking is functioning
+- [ ] Verify ad blocking is active
 
 ---
 
-## Phase 4 — Prometheus
+## Phase 5 — Prometheus
 
-> Ansible role: `prometheus` · Binary install (no Docker — keeps it simple on this hardware)
+> Ansible role: `prometheus` · Native binary, no Docker
 
-- [ ] Download Prometheus binary from GitHub releases (arm64 if needed — VM40B is x86_64)
-- [ ] Create `prometheus` system user (no login shell)
-- [ ] Install to `/usr/local/bin/prometheus`
-- [ ] Create `/etc/prometheus/prometheus.yml`
+- [ ] Task: create `prometheus` system user (no login shell, no home)
+- [ ] Task: download Prometheus binary (x86_64) from GitHub releases
+- [ ] Task: install to `/usr/local/bin/prometheus`
+- [ ] Template: `/etc/prometheus/prometheus.yml`
 
 ```yaml
 global:
@@ -204,7 +363,7 @@ global:
   evaluation_interval: 15s
 
 scrape_configs:
-  - job_name: 'vm40b'
+  - job_name: 'watchtower'
     static_configs:
       - targets: ['localhost:9100']
 
@@ -216,9 +375,9 @@ scrape_configs:
     static_configs:
       - targets: ['localhost:9617']
 
-  - job_name: 'k3s-nodes'
+  - job_name: 'monolith'
     static_configs:
-      - targets: ['<k3s-node-ip>:9100']
+      - targets: ['monolith.local:9100']
 
   - job_name: 'snmp-omada'
     static_configs:
@@ -233,80 +392,80 @@ scrape_configs:
         replacement: localhost:9116
 ```
 
-- [ ] Create systemd unit `/etc/systemd/system/prometheus.service`
+- [ ] Template: `/etc/systemd/system/prometheus.service`
   - `--storage.tsdb.retention.time=30d`
   - `--storage.tsdb.retention.size=50GB`
   - `--storage.tsdb.path=/var/lib/prometheus`
-- [ ] `systemctl enable --now prometheus`
-- [ ] Verify UI at `http://vm40b-ip:9090`
+- [ ] Handler: daemon-reload and restart on config change
+- [ ] Verify UI at `http://watchtower.local:9090`
 
 ---
 
-## Phase 5 — Exporters
+## Phase 6 — Exporters
 
 > Ansible role: `exporters`
 
-### node_exporter (VM40B host metrics)
+### node_exporter — Watchtower
 
-- [ ] Install binary, create system user
-- [ ] Systemd unit — default collectors are sufficient to start
+- [ ] Task: install binary, create system user
+- [ ] Template: systemd unit
 - [ ] Verify: `curl localhost:9100/metrics`
 
-### node_exporter (K8s lab node)
+### node_exporter — Monolith
 
-- [ ] Add to existing K8s lab Ansible playbook or deploy via Terraform
-- [ ] Add scrape target to `prometheus.yml`
+- [ ] Add to Monolith via existing Terraform/pipeline or manual install
+- [ ] Confirm `monolith.local:9100` is reachable from Watchtower
+- [ ] Add scrape target already in `prometheus.yml` above
 
 ### blackbox_exporter
 
-- [ ] Install binary + systemd unit
-- [ ] Configure modules: `http_2xx`, `icmp`, `tcp_connect`
-- [ ] Add probe targets to `prometheus.yml`: router, APs, Navidrome, Grafana, GitHub
-- [ ] Verify endpoint probing
+- [ ] Task: install binary + systemd unit
+- [ ] Configure probe modules: `http_2xx`, `icmp`, `tcp_connect`
+- [ ] Probe targets: ER605, EAP245s, Navidrome, Grafana, GitHub, apex
+- [ ] Verify endpoint probing in Prometheus
 
-### snmp_exporter (Omada gear)
+### snmp_exporter
 
-- [ ] Install binary + systemd unit
-- [ ] Enable SNMP on ER605 and EAP245s via Omada controller
-- [ ] Use `generator.yml` to build MIB-specific config (TP-Link OIDs)
-- [ ] Verify interface counters scraping
+- [ ] Task: install binary + systemd unit
+- [ ] Enable SNMP v2c on ER605 and EAP245s via Omada controller
+- [ ] Build MIB config with `generator.yml` for TP-Link OIDs
+- [ ] Verify interface counter scraping
 
 ### AdGuard Home exporter
 
-- [ ] Install `adguard_exporter` (GitHub: ebrianne/adguard-exporter)
-- [ ] Configure AGH API credentials
-- [ ] Systemd unit on VM40B
-- [ ] Verify metrics endpoint
+- [ ] Install `adguard_exporter` (ebrianne/adguard-exporter)
+- [ ] Configure AGH API credentials — store as Ansible vault variable, not plaintext
+- [ ] Systemd unit
+- [ ] Verify metrics endpoint: `curl localhost:9617/metrics`
 
 ---
 
-## Phase 6 — Netdata
+## Phase 7 — Netdata
 
-> Ansible role: `netdata` · Real-time complement to Prometheus
+> Ansible role: `netdata` · Real-time host metrics complement to Prometheus
 
-- [ ] Install via official script: `bash <(curl -Ss https://my-netdata.io/kickstart.sh) --dont-start-it`
-- [ ] Configure `/etc/netdata/netdata.conf`
+- [ ] Task: install via official kickstart script (`--dont-start-it` flag)
+- [ ] Template: `/etc/netdata/netdata.conf`
   - Bind to LAN IP only
-  - Disable cloud features if preferred (on-prem only)
-- [ ] Enable Prometheus metrics endpoint on Netdata (`exporting.conf`)
-  - Optionally scrape Netdata from Prometheus as an additional source
-- [ ] `systemctl enable --now netdata`
-- [ ] Verify dashboard at `http://vm40b-ip:19999`
-- [ ] Add Netdata data source to Grafana (optional — Netdata has its own UI)
+  - Disable Netdata Cloud (on-prem only)
+- [ ] Task: `systemctl enable --now netdata`
+- [ ] Verify dashboard: `http://watchtower.local:19999`
+- [ ] Optional: enable Prometheus exporting endpoint in `exporting.conf`
 
 ---
 
-## Phase 7 — Grafana
+## Phase 8 — Grafana
 
 > Ansible role: `grafana`
 
-- [ ] Install via apt (Grafana OSS repo)
-- [ ] Configure `/etc/grafana/grafana.ini`
+- [ ] Task: add Grafana OSS apt repo, install `grafana`
+- [ ] Template: `/etc/grafana/grafana.ini`
   - Bind to LAN IP
-  - Disable anonymous access
-  - Change default admin password
-- [ ] `systemctl enable --now grafana-server`
-- [ ] Add Prometheus data source
+  - `disable_gravatar = true`
+  - `allow_sign_up = false`
+  - Change default admin password (store in Ansible vault)
+- [ ] Task: `systemctl enable --now grafana-server`
+- [ ] Add Prometheus data source (can be automated via Grafana API in Ansible)
 - [ ] Import community dashboards
 
 | Dashboard | Grafana ID |
@@ -314,103 +473,121 @@ scrape_configs:
 | Node Exporter Full | 1860 |
 | Blackbox Exporter | 7587 |
 | AdGuard Home | 13330 |
-| Kubernetes cluster | 15661 |
-| SNMP Stats | 11169 |
+| Kubernetes / k3s cluster | 15661 |
+| SNMP Interface Stats | 11169 |
 
-- [ ] Build custom homelab overview dashboard
+- [ ] Build custom homelab overview dashboard:
   - DNS query rate + block rate (AGH)
-  - VM40B CPU / RAM / disk / network
-  - K8s node health
-  - Uptime probes (blackbox)
+  - Watchtower CPU / RAM / disk / network
+  - Monolith node health
+  - Uptime probes — ER605, APs, Navidrome, GitHub
   - Omada AP client counts + throughput
 
 ---
 
-## Phase 8 — Alerting
+## Phase 9 — Alerting (Grafana → Slack)
 
-> Configured in Grafana (no Alertmanager needed at this scale)
+> Slack workspace: Little Wolf Acres
+> Webhook URL stored as GitHub secret `SLACK_WEBHOOK_URL` — never committed to repo
 
-- [ ] Define alert rules in Grafana
-  - VM40B CPU > 80% sustained 5m
-  - Disk > 85% used
-  - DNS resolver down (blackbox probe)
-  - K8s node unreachable
-  - Any monitored endpoint down > 2m
-- [ ] Configure notification channel
-  - Recommended: Telegram bot (free, instant, no app required)
-  - Alternatives: Slack webhook, email (SMTP), Ntfy (self-hosted)
-- [ ] Test alert firing + recovery notifications
+- [ ] In Slack: create `#homelab-alerts` channel
+- [ ] Create Incoming Webhook for that channel (Slack App Directory → Incoming Webhooks)
+- [ ] In Grafana → Alerting → Contact Points: add Slack contact point
+  - Webhook URL: paste from secret (entered manually in Grafana UI, not in repo)
+  - Channel: `#homelab-alerts`
+- [ ] Create notification policy — route all alerts to Slack contact point
+- [ ] Define alert rules:
+
+| Alert | Condition |
+|---|---|
+| Watchtower CPU high | > 80% sustained 5m |
+| Watchtower disk high | > 85% used |
+| DNS resolver down | blackbox probe fails > 2m |
+| Monolith unreachable | node_exporter scrape fails > 2m |
+| Any endpoint down | blackbox probe fails > 2m |
+| Prometheus scrape gap | any target missing > 5m |
+
+- [ ] Test alert: temporarily set a threshold to trigger, confirm Slack message arrives in `#homelab-alerts`
+- [ ] Test recovery: confirm Slack sends resolved notification
 
 ---
 
-## Phase 9 — Ongoing Maintenance
+## Phase 10 — Ongoing Maintenance
 
-- [ ] Verify `unattended-upgrades` is running: `systemctl status unattended-upgrades`
-- [ ] Set up log rotation for Prometheus, Grafana, AGH under `/etc/logrotate.d/`
-- [ ] Schedule monthly Prometheus storage size check
-- [ ] Keep Ansible roles version-pinned — bump intentionally, not automatically
-- [ ] Back up configs to GitHub repo on change (Ansible handles this via idempotent playbooks)
-- [ ] Document any manual config deviations in this note
+- [ ] Verify `unattended-upgrades` active: `systemctl status unattended-upgrades`
+- [ ] Set up logrotate for Prometheus, Grafana, AGH: `/etc/logrotate.d/`
+- [ ] Monthly: check Prometheus storage size — `du -sh /var/lib/prometheus`
+- [ ] Keep Ansible role package versions pinned — bump intentionally via PR, not automatically
+- [ ] All config changes go through GitHub Actions — no manual edits on Watchtower directly
+- [ ] Any manual deviation gets documented immediately in this file
 
 ---
 
 ## Reference
 
-### Useful Commands (from MacBook Air)
+### Useful commands from apex
 
 ```bash
-# SSH to VM40B
-ssh monitoring
+# SSH to nodes
+ssh watchtower
+ssh monolith
 
-# Check all monitoring services
-ssh monitoring "systemctl status prometheus grafana-server netdata adguardhome unbound"
+# Check all Watchtower services
+ssh watchtower "systemctl status prometheus grafana-server netdata adguardhome unbound"
 
-# Tail Prometheus logs
-ssh monitoring "journalctl -fu prometheus"
+# Tail a service log
+ssh watchtower "journalctl -fu prometheus"
+ssh watchtower "journalctl -fu adguardhome"
 
-# Run Ansible playbook manually
-ansible-playbook -i vm40b/ansible/inventory.ini vm40b/ansible/playbooks/monitoring.yml
+# Run a single Ansible playbook manually
+ansible-playbook -i services/watchtower/ansible/inventory.ini \
+  services/watchtower/ansible/playbooks/dns.yml
 
-# Terraform plan
-cd vm40b && terraform plan
+# Ansible dry run (check mode)
+ansible-playbook -i services/watchtower/ansible/inventory.ini \
+  services/watchtower/ansible/playbooks/monitoring.yml --check
+
+# Terraform plan for Watchtower
+cd terraform/watchtower && terraform plan
 ```
 
-### Port Reference (UFW rules)
+### Port reference — UFW rules on Watchtower
 
-| Port | Protocol | Service | Source |
+| Port | Protocol | Service | Allowed from |
 |---|---|---|---|
-| 22 | TCP | SSH | Mac IP only |
+| 22 | TCP | SSH | apex IP only |
 | 53 | TCP+UDP | AdGuard Home DNS | LAN |
 | 3000 | TCP | AdGuard Home UI | LAN |
 | 3001 | TCP | Grafana | LAN |
 | 9090 | TCP | Prometheus | LAN |
 | 19999 | TCP | Netdata | LAN |
-| 9100 | TCP | node_exporter | VM40B only |
-| 9115 | TCP | blackbox_exporter | VM40B only |
-| 9116 | TCP | snmp_exporter | VM40B only |
-| 9617 | TCP | AGH exporter | VM40B only |
+| 9100 | TCP | node_exporter | Watchtower only |
+| 9115 | TCP | blackbox_exporter | Watchtower only |
+| 9116 | TCP | snmp_exporter | Watchtower only |
+| 9617 | TCP | AGH exporter | Watchtower only |
 
-### Related Notes
+### Ansible vault note
 
-- [[K8s Lab — Terraform Setup]]
-- [[Omada Network Config]]
-- [[Navidrome — Music Server]]
-- [[GitHub Actions — Homelab Pipelines]]
-- [[MacBook Air M4 — Dev Environment]]
+Sensitive values (AGH API credentials, Grafana admin password) go in an encrypted Ansible vault file, not plaintext in vars. To edit:
+
+```bash
+ansible-vault edit services/watchtower/ansible/group_vars/all/vault.yml
+```
+
+Store the vault password in macOS Keychain or a local `.vault_pass` file excluded via `.gitignore`.
 
 ---
 
-A few decisions worth calling out explicitly:
+## Related Notes
 
-**Ansible added to the stack** — Terraform alone is awkward for ongoing config management of a single Linux box. Terraform handles infrastructure declarations; Ansible handles what's actually installed and configured on the machine. GitHub Actions drives both. This is the standard real-world pattern and directly relevant to DevOps interviews.
+- [[Monolith — K3s Cluster]]
+- [[Omada Network Config]]
+- [[Navidrome — Audio Server]]
+- [[GitHub Actions — Homelab Pipelines]]
+- [[apex — MacBook Air M4 Dev Environment]]
+- [[Terraform Cloud — State Management]]
 
-**Self-hosted GitHub Actions runner** — hosted runners are off your LAN and can't SSH into the VM40B without punching a hole in your network. Running a self-hosted runner on your existing K8s lab node solves this cleanly. It also means your runner has direct access to both the VM40B and the K8s cluster from the same pipeline.
+---
 
-**No Docker on the VM40B** — everything is installed as native binaries with systemd units. Docker adds overhead and complexity that isn't justified on 8GB of RAM when all these services run fine as binaries. Keeps it debuggable too.
-
-**Grafana alerting instead of Alertmanager** — at your scale, Alertmanager is overkill. Grafana's built-in alerting covers everything you need with less operational surface area.
-
-
-
-*Last updated: {{date}}*
-*Status: 🟡 In Progress*
+*Last updated: 2026-04-21*
+*Status: 🟡 In Progress — awaiting hardware (PSU replacement)*
