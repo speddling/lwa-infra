@@ -54,7 +54,7 @@ MacBook Air M4 (dev)
 - [ ] `brew install terraform ansible git gh`
 - [ ] `brew install --cask visual-studio-code`
 - [ ] Configure SSH key pair — add public key to VM40B `authorized_keys`
-- [ ] Install VS Code extensions: `HashiCorp Terraform`, `Ansible`, `Remote-SSH`
+- [ ] 
 - [ ] Configure `~/.ssh/config` with VM40B host alias
 - [ ] Create GitHub repo: `homelab-iac` (or add to existing K8s lab repo under `/vm40b`)
 - [ ] Set GitHub Actions secrets: `VM40B_HOST`, `VM40B_USER`, `SSH_PRIVATE_KEY`
