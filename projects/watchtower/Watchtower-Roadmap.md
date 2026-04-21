@@ -415,8 +415,6 @@ A few decisions worth calling out explicitly:
 
 **Grafana alerting instead of Alertmanager** — at your scale, Alertmanager is overkill. Grafana's built-in alerting covers everything you need with less operational surface area.
 
-The `[[wikilinks]]` at the bottom are Obsidian-native — drop it straight into your vault and they'll be live links once you create the related notes.
-
 
 
 *Last updated: {{date}}*
