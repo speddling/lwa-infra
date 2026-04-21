@@ -65,15 +65,14 @@ MacBook Air M4 (dev)
 
 > Hands-on — physical access to VM40B required.
 
-- [ ] Physically install 1TB SSD into VM40B (2.5" SATA bay)
-- [ ] Download Ubuntu Server 24.04 LTS — flash to USB (`dd` or Balena Etcher)
-- [ ] Boot and install — minimal install, no snaps, LVM optional
-- [ ] Set static IP via Omada controller DHCP reservation (MAC binding preferred over static `/etc/netplan`)
+- [ ] Install Ubuntu Server 24.04 LTS 
+- [ ] minimal install, with SSH
+- [ ] Set MAC bond IP via Omada controller DHCP reservation
 - [ ] Enable and harden SSH
   - [ ] `PasswordAuthentication no`
   - [ ] `PermitRootLogin no`
   - [ ] Copy public key from Mac
-- [ ] Set hostname: `monitoring` or similar
+- [ ] Set hostname: `watchtower
 - [ ] `sudo apt update && sudo apt upgrade -y`
 - [ ] Install baseline packages: `curl wget git htop ufw`
 - [ ] Configure UFW — allow SSH, DNS (53/udp+tcp), and monitoring ports from LAN only
@@ -152,10 +151,8 @@ jobs:
 - [ ] Scaffold repo structure locally on MacBook Air
 - [ ] Write `inventory.ini` with VM40B static IP
 - [ ] Write stub `main.tf` with SSH null_resource provisioner
-- [ ] Commit and push — verify GitHub Actions runner reaches VM40B (VPN/tunnel may be needed if not on LAN)
+- [ ] Commit and push — verify GitHub Actions runner reaches VM40B (installed on Monolith)
 - [ ] Confirm Terraform state strategy: local (simple) vs Terraform Cloud (recommended for multi-machine lab)
-
-> **Note on remote runners:** GitHub Actions hosted runners are off your LAN. Either use a self-hosted runner on the K8s lab node, or use a Tailscale / WireGuard tunnel to expose VM40B to the runner. Self-hosted runner on the existing K8s node is the cleaner choice — it keeps sensitive SSH keys off GitHub's infrastructure.
 
 ---
 
