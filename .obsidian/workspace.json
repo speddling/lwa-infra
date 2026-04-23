@@ -186,6 +186,7 @@
   },
   "active": "165dadc935b0cab3",
   "lastOpenFiles": [
+    "kubernetes/cluster/storage/Storage Setup.md",
     "services/navidrome/namespace.yaml",
     "services/navidrome/pvc.yaml",
     "services/navidrome/configmap.yaml",
@@ -200,7 +201,6 @@
     "services/minecraft/ansible/playbooks/import-world.yml",
     "services/minecraft/ansible/playbooks",
     "services/minecraft/kubernetes/service.yaml",
-    "services/minecraft/kubernetes/pvc.yaml",
     "network/omada/hardware.md",
     "nodes/vm40b/hardware.md",
     "terraform/README.md",
@@ -209,7 +209,6 @@
     "docs/homelab-setup-notes.md",
     "docs/homelab-overview.md",
     "nodes/macbook/hardware.md",
-    "kubernetes/cluster/storage/Storage Setup.md",
     "nodes/amd-tower/hardware.md",
     "docs/DEPRECIATED --- homelab-technical-walkthru.md",
     "Untitled.md"

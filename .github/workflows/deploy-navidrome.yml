@@ -5,8 +5,7 @@ on:
 
 jobs:
   deploy:
-    runs-on: self-hosted
-    labels: [monolith]
+    runs-on: [self-hosted, monolith]
 
     steps:
       - uses: actions/checkout@v4
