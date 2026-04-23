@@ -3,6 +3,6 @@
 # Then move samba_user and samba_password into vault.yml and reference here
 
 samba_user: vault
-samba_password: "changeme"      # ← replace before deploying
+samba_password: "bubbie"      # ← replace before deploying
 samba_share_name: vault
 samba_share_path: /mnt/ssd-b/vault

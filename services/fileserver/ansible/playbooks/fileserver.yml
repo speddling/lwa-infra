@@ -13,6 +13,13 @@
         state: present
         update_cache: true
 
+    - name: Create Samba system user
+      ansible.builtin.user:
+        name: "{{ samba_user }}"
+        shell: /sbin/nologin
+        create_home: false
+        state: present
+
     - name: Create share directory
       ansible.builtin.file:
         path: "{{ samba_share_path }}"
@@ -20,13 +27,6 @@
         mode: "0775"
         owner: "{{ samba_user }}"
         group: "{{ samba_user }}"
-
-    - name: Create Samba system user
-      ansible.builtin.user:
-        name: "{{ samba_user }}"
-        shell: /sbin/nologin
-        create_home: false
-        state: present
 
     - name: Set Samba password for user
       ansible.builtin.shell: |
