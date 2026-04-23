@@ -184,8 +184,9 @@
       "obsidian-git:Open Git source control": false
     }
   },
-  "active": "165dadc935b0cab3",
+  "active": "bffb361906a7587a",
   "lastOpenFiles": [
+    "docs/minecraft-bedrock-k3s.md",
     "README.md",
     "services/minecraft/ansible/playbooks/import-world.yml",
     "services/minecraft/ansible/playbooks",
