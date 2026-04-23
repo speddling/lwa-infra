@@ -1,0 +1,44 @@
+name: Deploy Watchtower Config
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'services/watchtower/**'
+      - 'terraform/watchtower/**'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, monolith]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
+
+      - name: Terraform Init & Apply
+        working-directory: terraform/watchtower
+        run: |
+          terraform init
+          terraform apply -auto-approve
+
+      - name: Run Ansible — DNS
+        run: |
+          ansible-playbook \
+            -i services/watchtower/ansible/inventory.ini \
+            services/watchtower/ansible/playbooks/dns.yml
+
+      - name: Run Ansible — Monitoring
+        run: |
+          ansible-playbook \
+            -i services/watchtower/ansible/inventory.ini \
+            services/watchtower/ansible/playbooks/monitoring.yml
+
+      - name: Run Ansible — Exporters
+        run: |
+          ansible-playbook \
+            -i services/watchtower/ansible/inventory.ini \
+            services/watchtower/ansible/playbooks/exporters.yml
