@@ -12,6 +12,13 @@
         name: samba
         state: present
         update_cache: true
+    - name: Install Samba and dependencies
+      ansible.builtin.apt:
+        name:
+          - samba
+          - expect
+        state: present
+        update_cache: true
 
     - name: Create Samba system user
       ansible.builtin.user:
@@ -29,10 +36,12 @@
         group: "{{ samba_user }}"
 
     - name: Set Samba password for user
-      ansible.builtin.shell: |
-        echo -e "{{ samba_password }}\n{{ samba_password }}" | smbpasswd -a -s {{ samba_user }}
+      ansible.builtin.expect:
+        command: smbpasswd -a {{ samba_user }}
+        responses:
+          "New SMB password:": "{{ samba_password }}"
+          "Retype new SMB password:": "{{ samba_password }}"
       no_log: true
-      changed_when: false
 
     - name: Enable Samba user
       ansible.builtin.shell: smbpasswd -e {{ samba_user }}
