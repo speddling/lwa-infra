@@ -186,6 +186,7 @@
   },
   "active": "bffb361906a7587a",
   "lastOpenFiles": [
+    "homelab-dump.txt",
     "docs/minecraft-bedrock-k3s.md",
     "README.md",
     "services/minecraft/ansible/playbooks/import-world.yml",

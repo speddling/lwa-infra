@@ -1,0 +1,2080 @@
+=== ./.github/workflows/deploy-k8s-config.yml ===
+name: Deploy Kubernetes Config
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'kubernetes/**'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure Storage Engine
+        run: |
+          # 1. Apply the paths config (Idempotent)
+          sudo k3s kubectl apply -f ${{ github.workspace }}/kubernetes/cluster/storage/local-path-config.yaml
+          
+          # 2. We only restart the provisioner if the config actually changed. 
+          # Bouncing it every time can cause temporary volume detachments.
+          # Removing the 'delete pod' unless you are specifically troubleshooting the provisioner itself.
+
+      - name: Clean Stale Resources
+        run: |
+          # FIX: Removed 'delete pvc'. 
+          # In a DevOps workflow, PVCs should be persistent lifecycle objects.
+          # We only delete the deployment to ensure the new image/config is pulled.
+          sudo k3s kubectl delete deployment navidrome --ignore-not-found
+
+      - name: Deploy Storage Classes
+        run: |
+          # 3. Apply StorageClass definitions. 
+          # If they exist and haven't changed, K8s will return "unchanged".
+          sudo k3s kubectl apply -f ${{ github.workspace }}/kubernetes/cluster/storage/
+
+      - name: Deploy Navidrome
+        run: |
+          # 4. Re-apply Navidrome.
+          # Because we didn't delete the PVCs in the 'Clean' step, 
+          # K8s will bind the new Pods to the EXISTING persistent volumes.
+          sudo k3s kubectl apply -f ${{ github.workspace }}/kubernetes/apps/navidrome/
+
+      - name: Verify Deployment
+        run: |
+          echo "Checking volume binding status..."
+          sudo k3s kubectl get pvc
+          echo "Checking pod status..."
+          sudo k3s kubectl get pods
+=== ./.github/workflows/deploy-minecraft.yml ===
+name: Deploy Minecraft
+
+on:
+  workflow_dispatch:
+    inputs:
+      import_world:
+        description: "Stage a new .mcworld import?"
+        type: boolean
+        default: false
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+    labels: [monolith]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Stage world import (optional)
+        if: ${{ inputs.import_world }}
+        run: |
+          ansible-playbook \
+            -i services/minecraft/ansible/inventory.ini \
+            services/minecraft/ansible/playbooks/import-world.yml
+
+      - name: Apply Kubernetes manifests
+        run: |
+          kubectl apply -f services/minecraft/kubernetes/namespace.yaml
+          kubectl apply -f services/minecraft/kubernetes/pvc.yaml
+          kubectl apply -f services/minecraft/kubernetes/configmap.yaml
+          kubectl apply -f services/minecraft/kubernetes/deployment.yaml
+          kubectl apply -f services/minecraft/kubernetes/service.yaml
+=== ./.github/workflows/deploy-watchtower.yml ===
+
+=== ./.github/workflows/provision-k3s.yml ===
+name: Provision K3s Cluster
+
+on:
+  workflow_dispatch: # This gives you a manual "Play" button in GitHub
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, monolith]
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Install Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform Init
+        working-directory: ./terraform/monolith
+        run: terraform init
+
+      - name: Terraform Apply
+        working-directory: ./terraform/monolith
+        run: terraform apply -auto-approve
+=== ./ansible/monolith/playbooks/bootstrap.yml ===
+
+=== ./ansible/monolith/playbooks/node.yml ===
+
+=== ./docs/ab350_pro4_upgrade_summary.md ===
+# ASRock AB350 Pro4 — Upgrade Summary
+**Use case:** k3s Kubernetes lab · Navidrome audio server · LAN fileshare/backup (3 users) · CS degree coursework (Python → Front End → Back End/DB) · Occasional small AI/ML school projects
+
+---
+
+## System Context
+
+| Item | Detail |
+|---|---|
+| Motherboard | ASRock AB350 Pro4 (AM4, B350 chipset) |
+| Current CPU | Ryzen 3 1200 (Summit Ridge / "A10" — Raven Ridge APU) |
+| Max RAM | 64GB DDR4 (4 slots) |
+| Max RAM speed | DDR4-3200 (native, no OC needed with Zen 3) |
+| OS | Ubuntu (headless) |
+| Orchestration | k3s |
+
+---
+
+## ⚠️ Critical: BIOS Update Sequence
+
+Before installing any Ryzen 5000 (Vermeer) CPU, you **must** update the BIOS incrementally using your existing CPU. Skipping steps risks a non-booting system or bricked BIOS.
+
+**Required update path:**
+```
+3.40 → 5.40 → 7.00 → 8.02
+```
+
+- Download each version from the [ASRock AB350 Pro4 BIOS page](https://www.asrock.com/mb/AMD/AB350%20Pro4/)
+- Do **not** skip intermediate versions — the BIOS chip is small and updates are incremental by design
+- Complete all updates with your **current CPU in place**, then swap
+
+> The B350 chipset officially supports up to Matisse (Ryzen 3000). Ryzen 5000 (Vermeer) works on BIOS 8.02 but is community-confirmed, not officially listed by ASRock for this board.
+
+---
+
+## Option 1 — Recommended: Ryzen 5 5600G + 64GB DDR4
+
+### CPU: AMD Ryzen 5 5600G
+| Spec | Value |
+|---|---|
+| Architecture | Zen 3 (Cezanne) |
+| Cores / Threads | 6c / 12t |
+| Base / Boost | 3.9 GHz / 4.4 GHz |
+| TDP | 65W |
+| iGPU | Radeon Vega 7 (no discrete GPU needed) |
+| Estimated price | ~$120–140 |
+
+**Why this wins for your use case:**
+- Integrated Vega 7 GPU satisfies the board's display requirement — no throwaway GPU purchase
+- 65W TDP keeps the system cool and quiet 24/7
+- Zen 3 IPC is a major generational leap over your current Raven Ridge
+- 6c/12t handles k3s, Navidrome, fileshare, and Python coursework simultaneously without strain
+- No GPU means one fewer component to manage/fail
+
+**iGPU gotcha — RAM sharing:**
+- The Vega 7 iGPU carves out system RAM as VRAM (default 512MB–2GB)
+- Since you're headless, **set iGPU memory allocation to 512MB in BIOS** to minimize the reservation
+- With 64GB total, this is a negligible tradeoff
+
+---
+
+## Option 2 — Alternative: Ryzen 7 5700X + GT 710
+
+### CPU: AMD Ryzen 7 5700X
+| Spec | Value |
+|---|---|
+| Architecture | Zen 3 |
+| Cores / Threads | 8c / 16t |
+| Base / Boost | 3.4 GHz / 4.6 GHz |
+| TDP | 65W |
+| iGPU | None — discrete GPU required |
+| Estimated price | ~$140–180 |
+
+### GPU: NVIDIA GeForce GT 710 (display placeholder only)
+| Spec | Value |
+|---|---|
+| TDP | ~15–25W |
+| Power | Bus-powered (no PCIe power cable needed) |
+| Fanless options | Yes |
+| Estimated price | ~$25–45 |
+| Purpose | POST / BIOS access only — completely idle headless |
+
+**Why you might choose this instead:**
+- 2 extra cores (16 threads vs 12) if you ever run multi-hour training jobs or many simultaneous k3s pods
+- Zero RAM shared to GPU — full 64GB available to workloads
+- Still 65W TDP on the CPU
+
+**Honest assessment:** For your actual roadmap (Python coursework → front-end → back-end/DB, with cloud migration when projects outgrow local), the extra 2 cores are unlikely to matter. The 5600G is the cleaner, simpler, and slightly cheaper path.
+
+---
+
+## RAM: 64GB DDR4-3200 CL16 (both options)
+
+**Configuration:** 4×16GB across all 4 slots (preferred over 2×32GB)
+
+**Why 4×16GB over 2×32GB:**
+- Populates all slots for maximum memory bandwidth — meaningful for CPU-bound ML inference
+- Leaves no slots unused
+- Slightly better dual-channel interleaving
+
+**Recommended kits:**
+- G.Skill RipjawsV 4×16GB DDR4-3200 CL16 (~$80–100)
+- Kingston Fury Beast 4×16GB DDR4-3200 CL16 (~$80–100)
+- Corsair Vengeance LPX 4×16GB DDR4-3200 CL16 (~$85–105)
+
+**Why 64GB for this use case:**
+- k3s overhead + Navidrome + fileshare + a DB container + app server container + dev tooling adds up quickly
+- 64GB lets you set generous resource limits without careful tuning — important quality of life in a home lab
+- Future-proofed for back-end/DB coursework where running Postgres, Redis, and app servers simultaneously is normal
+
+> **Note:** DDR4-3200 is the official rated speed for Zen 3 on this board. No XMP/overclocking needed — it just works at spec.
+
+---
+
+## Workload Fit Assessment
+
+| Workload | CPU demand | RAM demand | Notes |
+|---|---|---|---|
+| k3s base overhead | Low | ~1–2GB | k3s is much lighter than full k8s |
+| Navidrome | Very low | ~256MB | Basically idle |
+| LAN fileshare/backup (3 users) | Very low (I/O bound) | Low | Network and disk are the bottleneck, not CPU |
+| Python coursework | Low–Medium | Low | Bursts during script runs |
+| Front-end dev (upcoming) | Low | Low | Node/npm dev servers are light |
+| Back-end + DB (upcoming) | Medium | Medium | Multiple containers — where 64GB earns its keep |
+| Small ML school projects | Medium (bursts) | Medium | CPU inference only; no GPU compute needed |
+| AI image / music generation | N/A | N/A | Hard pass — not in scope |
+
+---
+
+## Migration Strategy
+
+Given AWS DevOps experience:
+- Run everything locally through front-end and early back-end coursework
+- When projects need more compute (GPU ML, large DB datasets, load testing), migrate to AWS — EKS, RDS, EC2 as appropriate
+- k3s manifests translate reasonably well to EKS with minor adjustments
+- Local lab remains the fast-iteration, zero-cost environment; cloud is for scale
+
+---
+
+## Total Upgrade Cost Estimate
+
+| Option | CPU | RAM | GPU | Total |
+|---|---|---|---|---|
+| **Option 1 (recommended)** | 5600G ~$130 | 4×16GB ~$90 | None | **~$220** |
+| Option 2 | 5700X ~$160 | 4×16GB ~$90 | GT 710 ~$35 | **~$285** |
+
+---
+
+## Quick Checklist
+
+- [ ] Download BIOS versions 3.40, 5.40, 7.00, and 8.02 from ASRock before ordering CPU
+- [ ] Update BIOS incrementally with current CPU installed
+- [ ] Order CPU + RAM kit
+- [ ] Set iGPU VRAM to 512MB in BIOS after install (Option 1 only)
+- [ ] Verify DDR4-3200 is detected correctly in BIOS (should be automatic with Zen 3)
+- [ ] Enjoy the upgrade
+
+=== ./docs/homelab-setup-notes.md ===
+---
+title: Kubernetes Homelab Setup Notes
+date: 2026-04-15
+tags: [homelab, kubernetes, k3s, terraform, navidrome, devops, bios]
+---
+
+# Kubernetes Homelab Setup Notes
+
+Personal notes from planning a k3s-based homelab with Navidrome and Terraform, based on hardware at [github.com/speddling/homelab](https://github.com/speddling/homelab).
+
+---
+
+## Hardware
+
+| Component | Spec |
+|---|---|
+| Control Plane / Dev Machine | MacBook Air M4, 16GB RAM, macOS |
+| Worker Node | AMD A10, 16GB RAM, Fractal Design Define R4 |
+| Network | TP-Link Omada — OC200, ER605, TL-SG1210P PoE switch, 2× EAP245 APs |
+| OS (Worker) | Ubuntu Server 24.04 LTS |
+| Kubernetes | k3s |
+| Primary Project | Navidrome audio server, ~1TB FLAC/MP3 library |
+
+---
+
+## Hardware Assessment
+
+### Control Plane — MacBook Air M4
+
+Solid and unconventional choice. The M4 is extremely efficient, and running k3s control-plane duties on macOS is well-supported. The 16GB unified memory is comfortable for control-plane-only work.
+
+**Watch out for:** macOS sleep/wake can occasionally disrupt etcd or the k3s API server. Configure *"prevent sleep when display is off"* or keep the Mac tethered while the cluster is active.
+
+### Worker Node — AMD A10 / 16GB RAM
+
+The A10 is an older APU (Piledriver/Steamroller, ~2013–2015 era). For this use case it is **perfectly adequate**:
+
+- Navidrome is extremely lightweight — 3 concurrent streams is trivial for any modern multi-core chip
+- 16GB RAM gives plenty of headroom for k3s, Navidrome, and supporting pods
+- The Define R4 has excellent thermals and drive mounting — ideal for a ~1TB music library
+
+**Weak spots:** The A10's single-threaded performance is dated. For CPU-heavier future workloads (video transcoding, ML inference), you'll feel it. For Navidrome, you're fine.
+
+### Navidrome Fitness
+
+For 3 concurrent FLAC/MP3 streams, the worker node is more than sufficient. Navidrome typically runs under 200MB RAM and barely registers on CPU unless actively transcoding. Expect the initial library scan to take 10–30 minutes on a spinning HDD, but subsequent startups are fast.
+
+---
+
+## BIOS Settings — AMD A10 Worker Node
+
+### Virtualization & CPU
+
+| Setting | Value | Priority | Notes |
+|---|---|---|---|
+| AMD-V / SVM Mode | Enable | **Required** | Needed for container runtimes. Under Advanced → CPU Configuration. |
+| IOMMU (AMD-Vi) | Enable | Recommended | Good practice; needed for hardware passthrough later. |
+| C-States (C6/C7) | Disable deep states, set C1E max | Recommended | Deep sleep causes latency spikes and "Not Ready" events under low load. |
+| Hyper-Threading / SMT | Enable | Recommended | More logical cores = more scheduling headroom for pods. |
+
+### Memory
+
+| Setting | Value | Priority | Notes |
+|---|---|---|---|
+| XMP / EXPO Profile | Enable if available | Optional | Runs RAM at rated speed. Verify stability on older A10 platforms. |
+| ECC | N/A | — | A10 consumer APUs don't support ECC. |
+
+### Storage & Boot
+
+| Setting | Value | Priority | Notes |
+|---|---|---|---|
+| SATA Mode | AHCI | **Required** | Do not use IDE or RAID — breaks Ubuntu disk detection. |
+| Boot Mode | UEFI (disable CSM/Legacy) | Recommended | Ubuntu 24.04 strongly prefers pure UEFI. |
+| Secure Boot | Disable | Recommended | Can conflict with unsigned k3s kernel modules (Flannel/WireGuard). Re-enable later with enrolled keys if desired. |
+
+### Power & Availability
+
+| Setting | Value | Priority | Notes |
+|---|---|---|---|
+| Restore on AC Power Loss | Power On | **Required** | Ensures the worker comes back up after any outage. |
+| Wake on LAN | Enable | Recommended | Lets you wake the node remotely from the Mac. |
+| Spread Spectrum | Disable | Optional | No benefit for a server; can cause subtle timing instability. |
+
+### Display & Onboard Peripherals
+
+| Setting | Value | Priority | Notes |
+|---|---|---|---|
+| Primary Display | iGPU | Optional | A10 uses integrated graphics. Disable POST display output after setup if running headless. |
+| Serial / Parallel Ports | Disable if unused | Optional | Reduces IRQ noise. |
+
+---
+
+## GitOps Workflow — Mac as Dev Platform
+
+### The Key Nuance: GitHub Actions Runners
+
+GitHub's hosted runners (`ubuntu-latest`) **cannot reach inside your home network**. Deployment to the worker node requires one of two approaches:
+
+**Option A — Self-hosted runner (recommended)**
+Install the GitHub Actions runner agent directly on the AMD A10 node. When a workflow triggers, GitHub sends the job to your node rather than a cloud VM. The runner makes outbound connections to GitHub — no inbound firewall rules needed.
+
+**Option B — Outbound tunnel**
+Use Cloudflare Tunnel or Tailscale to allow GitHub Actions to SSH into the node through a persistent outbound connection. More complex; useful if you can't install a runner.
+
+For a homelab learning DevOps patterns, **Option A is the right call** — simpler, free, and directly translates to enterprise GitOps patterns (ArgoCD, Flux).
+
+### Workflow Architecture
+
+```
+MacBook Air M4 (dev)
+  └── author Terraform configs, k8s manifests, workflow YAML
+  └── git push → GitHub repo (source of truth)
+        └── GitHub Actions workflow triggers
+              └── job dispatched to self-hosted runner (AMD A10)
+                    ├── terraform apply  (infra layer)
+                    └── kubectl apply    (app layer)
+                          └── k3s cluster → Navidrome pod
+```
+
+### What Runs Where
+
+**MacBook (dev tooling):**
+- `kubectl` — pointed at k3s cluster via kubeconfig
+- `terraform`
+- `helm`
+- `k9s` — cluster visibility TUI
+
+You never need Docker Desktop. k3s uses `containerd` and workloads run on the worker.
+
+**Worker node (persistent services):**
+- `k3s` agent
+- GitHub Actions self-hosted runner (installed as a `systemd` service)
+
+### Terraform — Two-Layer Pattern
+
+Split Terraform into two layers for clean separation:
+
+**Layer 1 — Infrastructure**
+- Static IP reservation in ER605
+- DNS records in Omada
+- kubeconfig provisioning
+
+**Layer 2 — Application**
+- Navidrome Helm release
+- PersistentVolumeClaim for music library mount
+- k3s namespace
+
+This lets you `plan`/`apply` the app layer independently without touching network config.
+
+**State file:** Store in a remote backend — Cloudflare R2 (free tier) works well as an S3-compatible backend. Do not store state locally on the Mac.
+
+### Example GitHub Actions Workflow
+
+```yaml
+name: Deploy to homelab
+
+on:
+  push:
+    branches: [master]
+
+jobs:
+  deploy:
+    runs-on: self-hosted   # targets your AMD A10 runner
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Terraform init & apply
+        working-directory: terraform/
+        run: |
+          terraform init
+          terraform apply -auto-approve
+
+      - name: Apply Kubernetes manifests
+        run: kubectl apply -f kubernetes/
+```
+
+### ARM vs x86 — Image Build Note
+
+The MacBook M4 builds `arm64` images locally. The AMD A10 worker is `amd64`. For Navidrome this is irrelevant (pull the official image). For any custom images you build locally, specify `--platform linux/amd64` or use GitHub Actions hosted runners (which are `amd64`) to build and push to a registry before deploying.
+
+---
+
+## Practical First Steps
+
+Get these working in order before building anything else:
+
+1. **Install k3s** on the AMD A10 worker node
+2. **Copy kubeconfig** to the Mac — verify `kubectl get nodes` works from macOS
+3. **Assign a static IP** to the worker via the ER605 (do this early — kubeconfig embeds the IP)
+4. **Install self-hosted runner** on the worker as a systemd service
+5. **Write a minimal workflow** that runs `kubectl get nodes` — prove the pipeline end-to-end
+6. **Add Terraform** once the loop is proven
+7. **Deploy Navidrome** via Helm as your first real workload
+
+One working loop beats a perfect architecture you haven't validated yet.
+
+---
+## Upgrade Thoughts
+
+| **Component** | **Choice**                | **Reason for K8s**                                                                                                             |
+| ------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| **CPU**       | **Ryzen 9 5900X**         | Highest core count that the VRMs can safely handle.                                                                            |
+| **RAM**       | **64GB DDR4-3200**        | Critical for running multiple nodes and namespaces.                                                                            |
+| **Cooling**   | **Down-draft Air Cooler** | A cooler like the _Noctua NH-L12S_ or _Be Quiet! Shadow Rock LP_ blows air onto the VRMs, which is vital for this motherboard. |
+| **Storage**   | **NVMe Gen3 (Slot 1)**    | Use the Ultra M.2 slot for your `etcd` store and boot drive to keep latency low.                                               |
+
+
+---
+
+### 1. The Storage Architecture (K3s + Navidrome)
+
+Since you have a mix of NVMe, SATA SSDs, and a mechanical HDD, here is the most efficient way to map them in your Kubernetes lab:
+
+- **Boot Drive / Control Plane (Samsung 512GB NVMe):** * Install your OS (likely Ubuntu Server or Debian) here.
+    
+    - K3s stores its `etcd` database in `/var/lib/rancher/k3s`. The low latency of your NVMe is crucial for preventing "database leader election" timeouts as your cluster grows.
+        
+- **Media Library SSD (Crucial 1TB SSD):** * Mount this specifically for your **Navidrome** music library.
+    
+    - **Pro Tip:** Format this with **XFS** or **Ext4**. If you use K3s with **Local Path Provisioner**, you can point a Persistent Volume (PV) directly to this SSD to keep Navidrome’s scanning fast.
+        
+- **Application Data SSD (Crucial 512GB & 256GB SSD):** * Use this for other lightweight containers (AdGuard Home, Home Assistant, etc.). It keeps your OS drive clean and your media drive dedicated to throughput.
+    
+- **Backup & Cold Storage (2TB HDD):** * Mount this for long-term backups or large file storage that doesn't require speed. You can also use this as a "Bulk Storage" class in K3s for non-essential pods.
+    
+
+---
+
+
+
+## Network Stack Reference
+
+| Device | Role |
+|---|---|
+| OC200 | Omada cloud controller |
+| ER605 | Router / gateway |
+| TL-SG1210P | PoE switch |
+| EAP245 (×2) | Access points |
+
+---
+
+## References
+
+- [speddling/homelab on GitHub](https://github.com/speddling/homelab)
+- [k3s documentation](https://docs.k3s.io)
+- [Navidrome documentation](https://www.navidrome.org/docs/)
+- [GitHub Actions self-hosted runners](https://docs.github.com/en/actions/hosting-your-own-runners/managing-self-hosted-runners/about-self-hosted-runners)
+- [Terraform Kubernetes provider](https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs)
+- [Terraform Helm provider](https://registry.terraform.io/providers/hashicorp/helm/latest/docs)
+
+
+
+
+
+-------------------
+New info / conversations:
+
+## 1. The "Must-Have" Dashboard: Lens or k9s
+
+If you are still typing `kubectl get pods` every 30 seconds, you're working too hard.
+
+- **[k9s](https://k9scli.io/):** (Terminal-based) This is the "gold standard" for power users. It’s a lightning-fast TUI (Terminal User Interface) that lets you view logs, shell into containers, and delete pods with single keystrokes.
+    
+    - _Install:_ `brew install derailed/k9s/k9s`
+        
+- **[OpenLens](https://github.com/lensapp/lens):** (GUI-based) If you want a visual overview of your node health, storage usage, and networking.
+    
+
+## 2. Infrastructure as Code: Terraform / OpenTofu
+
+Since you mentioned Terraform, the real question is: **Is Terraform managing the Monolith's OS/Virtualization, or just the K8s resources?**
+
+- **ProxMox Provider:** If you ever move from bare-metal Ubuntu to a hypervisor like Proxmox, Terraform can spin up your VMs automatically.
+    
+- **Cloudflare Provider:** If you decide to expose Navidrome to the web, use Terraform to manage your DNS records and Tunnels. This keeps your "homelab-as-code" goal alive.
+    
+
+## 3. The Secret Weapon: Talos Linux or Flux/ArgoCD
+
+Since you are already using GitHub Actions, you are 90% of the way to a "Pull-based" deployment model.
+
+- **FluxCD or ArgoCD:** Instead of GitHub Actions "pushing" the YAML to the Monolith, these tools live _inside_ your cluster. They watch your GitHub repo; the moment you commit a change to a YAML, the cluster "pulls" it and updates itself.
+    
+    - _Why?_ It fixes "Configuration Drift." If someone manually changes a setting on the Monolith, Flux will automatically revert it to match your GitHub repo.
+        
+
+## 4. Local Development: Tilt or Skaffold
+
+If you ever start writing your own code or custom manifests and hate waiting for a GitHub Action to run just to see a small change:
+
+- **[Tilt](https://tilt.dev/):** It watches your local directory on your Mac. The second you save a file, it syncs the change directly into the Kubernetes cluster on the Monolith. It makes remote K8s feel like local development.
+    
+
+## 5. Better Mac Terminal Experience
+
+- **[Kubectx & Kubens](https://github.com/ahmetb/kubectx):** Essential if you eventually add more clusters or namespaces. Switch contexts (`kubectx monolith`) and namespaces (`kubens navidrome`) instantly.
+    
+- **[Starship Prompt](https://starship.rs/):** A customizable shell prompt that will show you exactly which K8s context and namespace you are currently targeting, so you never accidentally delete something in the wrong place.
+    
+
+---
+
+### My Recommendation for Right Now:
+
+Don't over-tool yet. Start with **k9s**. It will give you a "god-view" of your Monolith from your Mac terminal while that 800GB transfer is running. You can watch the Navidrome logs in real-time to see when it starts scanning those new folders.
+
+**Are you planning on keeping the Monolith as a single "all-in-one" node, or are you thinking about adding more hardware later?** That usually dictates which orchestrator (Terraform vs. Ansible vs. Flux) wins.
+
+
+
+-------------------------
+
+k9s sound like a logical step, is it on MacPort?
+Terraform provisioned Monolith and deployed the K3s
+#3 sound cool, but is a 'later' addition.
+
+  
+
+For now, Monolith is the hardware I own. I think next steps will be grabbing an 8TB HDD to replace the vintage 2TB HDD and replacing my A10 cpu with a best I can get cheap Ryzen upgrade and possibly max out the ram with speed and spec to match the A10 -> Ryzen move
+
+Yes, **k9s** is on MacPorts. You can grab it with: `sudo port install k9s`
+
+It’s the perfect "cockpit" for your Mac terminal. While that 800GB rsync is chugging along, you can open k9s, hit `:pods`, and watch the Navidrome logs in real-time to see if it starts freaking out (or successfully scanning) as the music files land.
+
+---
+
+### The "A10 to Ryzen" Upgrade Path
+
+Since you’re on an A10 (likely an A10-9700), you’re on the **AM4 socket**. This is great news because you have a massive upgrade path, but there are two major "gotchas" for a Homelab build:
+
+#### 1. The "Cheap but Powerful" Sweet Spot
+
+The **Ryzen 5 5600G** is currently the king of budget server upgrades for your board.
+
+- **Why the "G"?** Since your Monolith is a headless server, having integrated graphics (APU) is a lifesaver for troubleshooting. More importantly, Navidrome/Plex/Jellyfin can use that integrated GPU for **hardware transcoding**, which keeps your CPU usage at 1% even when streaming high-bitrate video.
+    
+- **Performance:** You go from 4 weak cores to 6 very fast cores (12 threads). It will handle K3s and Navidrome without breaking a sweat.
+    
+
+#### 2. The RAM Trap
+
+- **Speed:** Ryzen _loves_ fast RAM. Your A10 probably has 2133MHz or 2400MHz DDR4. If you stick with that, you’ll bottleneck the Ryzen. Aim for **3200MHz CL16**—it’s the "sweet spot" for price and performance.
+    
+- **Spec:** Ensure it's non-ECC unbuffered DDR4 (standard desktop RAM). Maxing out at **32GB** (2x16GB) is usually plenty for a Monolith running K3s and a large media library.
+    
+
+#### 3. The BIOS Warning (Critical!)
+
+**Do not swap the CPUs until you update the BIOS.** Your current motherboard BIOS was written before Ryzen 5000 existed. You must:
+
+1. Keep the A10 installed.
+    
+2. Download the latest BIOS from your motherboard manufacturer.
+    
+3. Flash it.
+    
+4. _Then_ swap in the Ryzen. _(Note: Some older boards actually drop support for the A10 once you flash the "Ryzen-ready" BIOS, so once you flash it, you might be committed to the swap immediately.)_
+    
+
+---
+
+### The Storage Move
+
+Replacing the "vintage" 2TB with an **8TB HDD** is a solid move. When that time comes, since you’re already comfortable with `rsync`, you’ll just:
+
+1. Mount the new 8TB as `/mnt/lab-backups-new`.
+    
+2. Rsync everything from the 2TB to the 8TB.
+    
+3. Update your Terraform/Kubernetes `hostPath` to point to the new disk.
+
+
+
+
+----------------
+
+Asus VM40B 8gb + 1tb SSD  
+  
+
+- **AdGuard Home:**
+- **Unbound:**
+- **Netdata:**
+- **Prometheus:**
+- **Grafana:**
+- **Exporters:**
+
+--------------------------
+
+- **Hot storage** (NVMe) — active model weights, datasets being trained on
+- **Warm storage** (SSD) — projects, code, containers
+- **Cold storage** (HDD) — audio library, backups, archived models
+=== ./docs/minecraft-bedrock-k3s.md ===
+# Minecraft Bedrock Server — K3s Homelab Reference
+
+## Overview
+
+A Bedrock-only Minecraft server for 2–3 LAN players, running on the `amd-tower` (Monolith) worker node via K3s. World data is imported from a Realm backup and persisted via a PersistentVolumeClaim.
+
+---
+
+## Stack
+
+| Layer | Tool |
+|---|---|
+| Container runtime | K3s (k3s.io) |
+| Server image | `itzg/minecraft-bedrock-server:latest` |
+| IaC | Terraform |
+| Config management | Ansible |
+| CI/CD | GitHub Actions (self-hosted runner on Monolith) |
+| OS | Ubuntu Server 24.04 LTS |
+
+---
+
+## Networking
+
+| Detail | Value |
+|---|---|
+| Protocol | **UDP** (not TCP) |
+| Port | `19132` |
+| Service type | `LoadBalancer` (k3s servicelb) |
+| Client connection | Node LAN IP on port `19132` |
+
+> ⚠️ The UDP protocol must be explicitly declared in the Service manifest — k3s servicelb supports it but defaults to TCP.
+
+---
+
+## Directory Structure
+
+```
+homelab/
+├── services/
+│   └── minecraft/
+│       ├── ansible/
+│       │   ├── inventory.ini
+│       │   └── playbooks/
+│       │       └── import-world.yml
+│       ├── kubernetes/
+│       │   ├── namespace.yaml
+│       │   ├── pvc.yaml
+│       │   ├── configmap.yaml
+│       │   ├── deployment.yaml
+│       │   └── service.yaml
+│       └── files/
+│           └── .gitkeep          ← .mcworld files go here, gitignored
+└── .github/
+    └── workflows/
+        └── deploy-minecraft.yml
+```
+
+---
+
+## Kubernetes Manifests
+
+### `namespace.yaml`
+```yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: minecraft
+```
+
+### `pvc.yaml`
+```yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: minecraft-data
+  namespace: minecraft
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 10Gi
+```
+
+### `configmap.yaml`
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: minecraft-config
+  namespace: minecraft
+data:
+  EULA: "TRUE"
+  LEVEL_NAME: "my-realm"        # must match extracted world folder name
+  GAMEMODE: "survival"
+  DIFFICULTY: "normal"
+  MAX_PLAYERS: "3"
+  SERVER_NAME: "Homelab SMP"
+  ALLOW_CHEATS: "false"
+```
+
+### `deployment.yaml`
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: minecraft-bedrock
+  namespace: minecraft
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: minecraft-bedrock
+  template:
+    metadata:
+      labels:
+        app: minecraft-bedrock
+    spec:
+      initContainers:
+        - name: world-import
+          image: busybox
+          command:
+            - sh
+            - -c
+            - |
+              WORLD_DIR="/data/worlds/my-realm"
+              MARKER="/data/worlds/.imported"
+
+              if [ -f "$MARKER" ]; then
+                echo "World already imported, skipping."
+                exit 0
+              fi
+
+              if [ -f "/world-import/realm.mcworld" ]; then
+                echo "Importing realm backup..."
+                mkdir -p "$WORLD_DIR"
+                unzip /world-import/realm.mcworld -d "$WORLD_DIR"
+                touch "$MARKER"
+                echo "Import complete."
+              else
+                echo "No .mcworld file found, starting fresh."
+              fi
+          volumeMounts:
+            - name: minecraft-data
+              mountPath: /data
+            - name: world-import
+              mountPath: /world-import
+
+      containers:
+        - name: minecraft-bedrock
+          image: itzg/minecraft-bedrock-server:latest
+          envFrom:
+            - configMapRef:
+                name: minecraft-config
+          ports:
+            - containerPort: 19132
+              protocol: UDP
+          volumeMounts:
+            - name: minecraft-data
+              mountPath: /data
+          resources:
+            requests:
+              memory: "1Gi"
+              cpu: "500m"
+            limits:
+              memory: "3Gi"
+              cpu: "2000m"
+
+      volumes:
+        - name: minecraft-data
+          persistentVolumeClaim:
+            claimName: minecraft-data
+        - name: world-import
+          hostPath:
+            path: /opt/minecraft/import   # Ansible stages the .mcworld here
+            type: DirectoryOrCreate
+```
+
+### `service.yaml`
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: minecraft-bedrock
+  namespace: minecraft
+spec:
+  type: LoadBalancer
+  selector:
+    app: minecraft-bedrock
+  ports:
+    - port: 19132
+      targetPort: 19132
+      protocol: UDP
+```
+
+---
+
+## Ansible
+
+### `import-world.yml`
+```yaml
+---
+- name: Stage Minecraft world import
+  hosts: monolith
+  become: true
+
+  vars:
+    import_dir: /opt/minecraft/import
+    mcworld_local_path: "{{ playbook_dir }}/../../files/realm.mcworld"
+
+  tasks:
+    - name: Create import staging directory
+      ansible.builtin.file:
+        path: "{{ import_dir }}"
+        state: directory
+        mode: "0755"
+
+    - name: Copy .mcworld file to node
+      ansible.builtin.copy:
+        src: "{{ mcworld_local_path }}"
+        dest: "{{ import_dir }}/realm.mcworld"
+        mode: "0644"
+
+    - name: Confirm file staged
+      ansible.builtin.debug:
+        msg: "realm.mcworld staged at {{ import_dir }} — deploy the manifest to trigger import"
+```
+
+---
+
+## GitHub Actions
+
+### `deploy-minecraft.yml`
+```yaml
+name: Deploy Minecraft
+
+on:
+  workflow_dispatch:
+    inputs:
+      import_world:
+        description: "Stage a new .mcworld import?"
+        type: boolean
+        default: false
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+    labels: [monolith]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Stage world import (optional)
+        if: ${{ inputs.import_world }}
+        run: |
+          ansible-playbook \
+            -i services/minecraft/ansible/inventory.ini \
+            services/minecraft/ansible/playbooks/import-world.yml
+
+      - name: Apply Kubernetes manifests
+        run: |
+          kubectl apply -f services/minecraft/kubernetes/namespace.yaml
+          kubectl apply -f services/minecraft/kubernetes/pvc.yaml
+          kubectl apply -f services/minecraft/kubernetes/configmap.yaml
+          kubectl apply -f services/minecraft/kubernetes/deployment.yaml
+          kubectl apply -f services/minecraft/kubernetes/service.yaml
+```
+
+---
+
+## Realm World Import Process
+
+### One-time setup steps
+
+1. **Export from Realm** — In-game → Settings → Download World → saves a `.mcworld` file
+2. **Place the file** at `services/minecraft/files/realm.mcworld`
+3. **Run the workflow** with `import_world: true`
+   - Ansible copies the file to `/opt/minecraft/import/` on Monolith
+4. **Pod starts** — init container checks for a `.imported` marker file
+   - Not found → unzips `.mcworld` into `/data/worlds/my-realm/`
+   - Found → skips (protects against accidental overwrites on restart)
+5. **Main container starts** — `LEVEL_NAME` in ConfigMap points to the imported world
+
+### To load a new world later
+
+Delete the marker file and re-run with `import_world: true`:
+```bash
+kubectl exec -n minecraft deploy/minecraft-bedrock -c world-import -- rm /data/worlds/.imported
+```
+Then re-run the workflow with `import_world: true`.
+
+---
+
+## Key Gotchas
+
+| Gotcha | Detail |
+|---|---|
+| **`LEVEL_NAME` must match folder name** | BDS is strict — the ConfigMap value must match the extracted world directory name exactly |
+| **Marker file prevents overwrites** | `/data/worlds/.imported` is created after first import — delete it intentionally to re-import |
+| **Marketplace content won't transfer** | License-locked to accounts, not the world file |
+| **Behavior/resource packs** | Must be copied separately into `behavior_packs` / `resource_packs` and re-linked in `world_behavior_packs.json` |
+| **Single node = no HA** | Fine for LAN — pod restarts automatically on crash |
+| **No automatic backups** | Consider adding a K3s `CronJob` to tarball the PVC data |
+| **`.mcworld` is gitignored** | `services/minecraft/files/*.mcworld` — keep world data out of version control |
+
+---
+
+## Resource Allocation (AMD A10 / 16GB RAM)
+
+| Resource | Request | Limit |
+|---|---|---|
+| Memory | 1Gi | 3Gi |
+| CPU | 500m | 2000m |
+
+Leaves plenty of headroom on the node for other services (Navidrome, monitoring stack, etc.).
+
+---
+
+## Quick Reference Commands
+
+```bash
+# Check pod status
+kubectl get pods -n minecraft
+
+# Watch logs
+kubectl logs -n minecraft deploy/minecraft-bedrock -f
+
+# Check init container logs (import troubleshooting)
+kubectl logs -n minecraft deploy/minecraft-bedrock -c world-import
+
+# Get the LAN IP players connect to
+kubectl get svc -n minecraft
+
+# Restart the server
+kubectl rollout restart deploy/minecraft-bedrock -n minecraft
+
+# Delete marker to force re-import on next deploy
+kubectl exec -n minecraft deploy/minecraft-bedrock -- rm /data/worlds/.imported
+```
+
+=== ./docs/Pipeline considerations.md ===
+
+**GitHub Actions** and **Terraform**,
+building a "GitOps Lite" pipeline -  high-level approach for that transition from CloudFormation to Terraform in a local lab:
+
+1. The State File "Gotcha"
+
+Unlike CloudFormation, which stores state in the AWS backend, Terraform needs a place to keep its `.tfstate`. Since this is a local lab:
+
+- **Local State:** Easiest for day one, but bad for GitHub Actions.
+- **S3/GCS Backend:** You can actually use a free-tier S3 bucket to hold your homelab state so your GitHub Actions can reach it.
+- **Alternative:** Use **Terraform Cloud** (free for small teams) to manage the state and locking without needing an external bucket.
+
+2. Provider Mapping
+
+In CloudFormation, you’re mostly dealing with `AWS::*` resources. For your lab, you’ll likely be using:
+
+- **`telmate/proxmox`** or **`bpg/proxmox`** (if you go the hypervisor route).
+- **`hashicorp/kubernetes`** and **`hashicorp/helm`** for the Navidrome layer.
+- **`cloudflare/cloudflare`** if you eventually want to manage local DNS or Tunnels via code.
+
+3. Hardening + GitHub Actions
+
+Since you're hardening the box first (presumably via SSH/Ansible or manual scripts), you can use GitHub Actions to:
+
+- **Lint your YAMLs:** Run `kube-linter` or `yamllint` before any push.
+- **Terraform Plan/Apply:** Use a **self-hosted runner** (on your Ryzen box) to execute the Terraform applies. This avoids the need to expose your lab's K8s API to the public internet for the GitHub-hosted runners to reach.
+=== ./kubernetes/apps/navidrome/deployment.yaml ===
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: navidrome
+spec:
+  selector:
+    matchLabels:
+      app: navidrome
+  template:
+    metadata:
+      labels:
+        app: navidrome
+    spec:
+      containers:
+      - name: navidrome
+        image: deluan/navidrome:latest
+        ports:
+        - containerPort: 4533
+        env:
+        - name: ND_SCANSCHEDULE
+          value: "1h"
+        - name: ND_LOGLEVEL
+          value: "info"
+        volumeMounts:
+        - name: db-storage
+          mountPath: /data
+        - name: music-storage
+          mountPath: /music
+      volumes:
+        - name: db-storage
+          persistentVolumeClaim:
+            claimName: navidrome-db
+        - name: music-storage
+          hostPath:
+            path: /mnt/lab-backups/music-library
+            type: DirectoryOrCreate
+=== ./kubernetes/apps/navidrome/ingress.yaml ===
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: navidrome
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: web
+spec:
+  rules:
+  - http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: navidrome
+            port:
+              number: 4533
+=== ./kubernetes/apps/navidrome/pvc.yaml ===
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: navidrome-db
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: fast
+  resources:
+    requests:
+      storage: 2Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: navidrome-music
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: tunes
+  resources:
+    requests:
+      storage: 800Gi
+=== ./kubernetes/apps/navidrome/service.yaml ===
+apiVersion: v1
+kind: Service
+metadata:
+  name: navidrome
+spec:
+  type: NodePort
+  selector:
+    app: navidrome
+  ports:
+  - port: 4533
+    targetPort: 4533
+    nodePort: 30533 # Access via http://monolith-ip:30533
+=== ./kubernetes/cluster/storage/fast-ssd.yaml ===
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: fast
+provisioner: rancher.io/local-path
+volumeBindingMode: WaitForFirstConsumer
+parameters:
+  nodePath: /mnt/k8s-worker
+=== ./kubernetes/cluster/storage/local-path-config.yaml ===
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: local-path-config
+  namespace: kube-system
+data:
+  config.json: |-
+    {
+      "nodePathMap": [
+        {
+          "node": "monolith",
+          "paths": [
+            # 1. Prioritize the HDD mount point to ensure it is selected first
+            "/mnt/lab-backups/music-library",
+            # 2. Secondary/Fallback paths (optional, consider removing to force failure if HDD is unmounted)
+            "/mnt/k8s-worker",
+            "/opt/local-path-provisioner"
+          ]
+        }
+      ]
+    }
+=== ./kubernetes/cluster/storage/slow-hdd.yaml ===
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: slow
+provisioner: rancher.io/local-path
+volumeBindingMode: WaitForFirstConsumer
+parameters:
+  nodePath: /mnt/lab-backups
+=== ./kubernetes/cluster/storage/tunes.yaml ===
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: tunes
+provisioner: rancher.io/local-path
+parameters:
+  # This MUST match the path in your local-path-config exactly
+  nodePath: /mnt/lab-backups/music-library
+reclaimPolicy: Retain
+volumeBindingMode: WaitForFirstConsumer
+=== ./network/omada/hardware.md ===
+
+- OC200 controller
+- ER605 router
+- TL-SG1210P PoE switch
+- 2x EAP245 APs
+=== ./nodes/amd-tower/hardware.md ===
+
+- AMD A10-9700 Radeon R7 10 Compute Cores 4C+6G 3.50 GHz 
+- Asrock AB350 Pro4
+- 16GB RAM
+- Fractal Design Define R4 (Monolith)
+- Noctua cooler 
+
+- ****Storage**** 
+- ~~512gb NVMe - boot~~
+- ~~512gb SSD~~ 
+- ~~256gb SSD~~  
+- ~~2tb HDD~~
+- 1tb SSD - media library
+
+```bash
+df -h
+
+Filesystem                         Size  Used Avail Use% Mounted on
+
+tmpfs                              1.6G  1.2M  1.6G   1% /run
+
+efivarfs                           128K   14K  110K  12% /sys/firmware/efi/efivars
+
+/dev/mapper/ubuntu--vg-ubuntu--lv  148G  6.8G  134G   5% /
+
+tmpfs                              7.6G     0  7.6G   0% /dev/shm
+
+tmpfs                              5.0M     0  5.0M   0% /run/lock
+
+/dev/nvme0n1p2                     2.0G  200M  1.6G  11% /boot
+
+/dev/nvme0n1p1                     1.1G  6.2M  1.1G   1% /boot/efi
+
+tmpfs                              1.6G   12K  1.6G   1% /run/user/1000
+
+/dev/sda                           458G   28K  435G   1% /mnt/k8s-worker
+
+/dev/sdb                           234G   28K  222G   1% /mnt/k8s-etcd
+
+/dev/sdc                           1.8T   28K  1.7T   1% /mnt/lab-backups
+```
+
+
+
+=== ./nodes/macbook/hardware.md ===
+
+13" MacBook Air M4 (2025) 16gb - 256gb
+
+=== ./nodes/vm40b/hardware.md ===
+
+Asus VB40B
+8gb of ram (2x 4gb)
+1tb SSD
+=== ./README.md ===
+# Home Lab
+
+Personal Kubernetes home lab documentation, configurations, and manifests.
+
+## Hardware
+- **Control Plane / Workstation** - 
+	- MacBook Air M4 running macOS (apex)
+- **Worker Node** - 
+	- AMD A10, ASRock AB350 Pro4, 16GB RAM, Fractal Design Define R4 (monolith)
+- Monitoring Node - 
+	- Asus VM40B, 8GB RAM, 1TB SSD (watchtower)
+
+## Network
+- TP-Link Omada ecosystem: 
+- OC200 controller
+- ER605 router
+- TL-SG1210P PoE switch 
+- 2x EAP245 APs
+
+## Stack
+- Kubernetes via k3s
+- Terraform
+- GitHub Actions
+- Ansible
+- Ubuntu Server 24.04 LTS on worker node
+
+## Finished Projects
+- Navidrome audio server with ~1TB FLAC/MP3 library
+
+## Next Project
+- Minecraft Server for the Wife and Daughter
+
+## Pending Projects
+- File server, local backup solution for daughter's iPad art and wife's crochet patterns & notes
+- Always-on DNS resolver + full-stack monitoring node.
+- Upgrade Worker Node hardware with Ryzen and 8TB HDD in place of the 2TB HDD
+
+## Status
+Online
+
+=== ./services/minecraft/ansible/playbooks/import-world.yml ===
+---
+- name: Stage Minecraft world import
+  hosts: monolith
+  become: true
+
+  vars:
+    import_dir: /opt/minecraft/import
+    mcworld_local_path: "{{ playbook_dir }}/../../files/realm.mcworld"
+
+  tasks:
+    - name: Create import staging directory
+      ansible.builtin.file:
+        path: "{{ import_dir }}"
+        state: directory
+        mode: "0755"
+
+    - name: Copy .mcworld file to node
+      ansible.builtin.copy:
+        src: "{{ mcworld_local_path }}"
+        dest: "{{ import_dir }}/realm.mcworld"
+        mode: "0644"
+
+    - name: Confirm file staged
+      ansible.builtin.debug:
+        msg: "realm.mcworld staged at {{ import_dir }} — deploy the manifest to trigger import"
+=== ./services/minecraft/kubernetes/configmap.yaml ===
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: minecraft-config
+  namespace: minecraft
+data:
+  EULA: "TRUE"
+  LEVEL_NAME: "my-realm"        # must match extracted world folder name
+  GAMEMODE: "survival"
+  DIFFICULTY: "normal"
+  MAX_PLAYERS: "3"
+  SERVER_NAME: "Homelab SMP"
+  ALLOW_CHEATS: "false"
+=== ./services/minecraft/kubernetes/deployment.yaml ===
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: minecraft-bedrock
+  namespace: minecraft
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: minecraft-bedrock
+  template:
+    metadata:
+      labels:
+        app: minecraft-bedrock
+    spec:
+      initContainers:
+        - name: world-import
+          image: busybox
+          command:
+            - sh
+            - -c
+            - |
+              WORLD_DIR="/data/worlds/my-realm"
+              MARKER="/data/worlds/.imported"
+
+              if [ -f "$MARKER" ]; then
+                echo "World already imported, skipping."
+                exit 0
+              fi
+
+              if [ -f "/world-import/realm.mcworld" ]; then
+                echo "Importing realm backup..."
+                mkdir -p "$WORLD_DIR"
+                unzip /world-import/realm.mcworld -d "$WORLD_DIR"
+                touch "$MARKER"
+                echo "Import complete."
+              else
+                echo "No .mcworld file found, starting fresh."
+              fi
+          volumeMounts:
+            - name: minecraft-data
+              mountPath: /data
+            - name: world-import
+              mountPath: /world-import
+
+      containers:
+        - name: minecraft-bedrock
+          image: itzg/minecraft-bedrock-server:latest
+          envFrom:
+            - configMapRef:
+                name: minecraft-config
+          ports:
+            - containerPort: 19132
+              protocol: UDP
+          volumeMounts:
+            - name: minecraft-data
+              mountPath: /data
+          resources:
+            requests:
+              memory: "1Gi"
+              cpu: "500m"
+            limits:
+              memory: "3Gi"
+              cpu: "2000m"
+
+      volumes:
+        - name: minecraft-data
+          persistentVolumeClaim:
+            claimName: minecraft-data
+        - name: world-import
+          hostPath:
+            path: /opt/minecraft/import   # ← Ansible drops the .mcworld here
+            type: DirectoryOrCreate
+=== ./services/minecraft/kubernetes/namespace.yaml ===
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: minecraft
+=== ./services/minecraft/kubernetes/pvc.yaml ===
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: minecraft-data
+  namespace: minecraft
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 10Gi
+=== ./services/minecraft/kubernetes/service.yaml ===
+apiVersion: v1
+kind: Service
+metadata:
+  name: minecraft-bedrock
+  namespace: minecraft
+spec:
+  type: LoadBalancer
+  selector:
+    app: minecraft-bedrock
+  ports:
+    - port: 19132
+      targetPort: 19132
+      protocol: UDP
+=== ./services/watchtower/ansible/playbooks/dns.yml ===
+
+=== ./services/watchtower/ansible/playbooks/exporters.yml ===
+
+=== ./services/watchtower/ansible/playbooks/monitoring.yml ===
+
+=== ./services/watchtower/Watchtower-Roadmap.md ===
+# Watchtower — Monitoring & DNS Stack Roadmap
+
+> **Hardware:** Asus VM40B · 8GB RAM · 1TB SSD (repurposed from Monolith)
+> **Hostname:** `watchtower` · **Dev machine:** `apex` (MacBook Air M4)
+> **Role:** Always-on DNS resolver + full-stack monitoring node
+> **IaC:** Terraform (Terraform Cloud state) + Ansible + GitHub Actions
+> **Alerts:** Slack → Little Wolf Acres workspace
+
+---
+
+## Stack Overview
+
+| Service | Role | Port |
+|---|---|---|
+| Unbound | Recursive DNS resolver (upstream) | 5335 |
+| AdGuard Home | DNS frontend, ad/tracker filtering | 53, 3000 |
+| Prometheus | Metrics scraping + TSDB | 9090 |
+| node_exporter | Watchtower host metrics | 9100 |
+| blackbox_exporter | Endpoint / ICMP probing | 9115 |
+| snmp_exporter | Omada network gear metrics | 9116 |
+| AdGuard exporter | AGH metrics → Prometheus | 9617 |
+| Netdata | Real-time host observability | 19999 |
+| Grafana | Dashboards + alerting → Slack | 3001 |
+
+---
+
+## Background & Key Decisions
+
+### Context
+
+This project grew out of a conversation mapping the full homelab. The Asus VM40B was an idle mini-PC being used as a doorstop. Rather than buy new hardware, the plan repurposes it with a 1TB SSD migrated from Monolith (where Navidrome's audio library was moved to an 8TB HDD upgrade). The 8TB was chosen over 4TB deliberately — the lab is planned to grow into LLM/AI dev work where model weights, datasets, and training checkpoints will consume storage fast.
+
+### Naming
+
+- **monolith** — the AMD tower running k3s. Named for its role as the single heavy node.
+- **watchtower** — the VM40B monitoring/DNS node. Named for its role: sees everything, never sleeps.
+- **apex** — the MacBook Air M4. All authoring, config, and remote ops originate here.
+- **Little Wolf Acres** — the family Slack workspace receiving Grafana alerts.
+
+### Why `services/` not `projects/`
+
+Projects implies temporary work with a completion state. These are permanent running infrastructure services. Navidrome and Watchtower are services. The rename also maps cleanly to how the industry talks about what runs in production.
+
+### Why Ansible alongside Terraform
+
+Terraform alone is awkward for ongoing config management of a bare Linux box — it's designed for infrastructure declaration, not package installs and service configuration. Ansible owns what's installed and running on Watchtower (packages, systemd units, config files). Terraform owns infrastructure facts (state, firewall declarations, future cloud resources). GitHub Actions orchestrates both. This is the standard real-world pattern and directly relevant to DevOps interview conversations.
+
+### Why Terraform Cloud for state
+
+The existing Monolith Terraform setup stores state locally on the runner, meaning a dead Monolith loses the state file. Terraform Cloud free tier hosts state remotely, survives any node failure, supports multiple workspaces (one per node), and lets GitHub Actions reach state without being tied to a specific runner machine. Two workspaces: `monolith` and `watchtower`.
+
+### Why isolated runners per node
+
+A self-hosted runner has network-level access to everything its host can reach. If one runner managed multiple nodes via SSH, a compromised pipeline job could pivot laterally across the lab. Watchtower's runner uses the `watchtower` label and only manages Watchtower. Monolith's runner uses the `monolith` label and only manages Monolith. Blast radius is contained by design. Watchtower is bootstrapped manually once via SSH from apex, then handed off to GitHub Actions permanently.
+
+### Why no Docker on Watchtower
+
+8GB RAM, always-on services, no orchestration layer. Everything runs as native binaries with systemd units — lighter, simpler to debug, no container runtime overhead. Consistent with Monolith using k3s with containerd rather than Docker.
+
+### Why Grafana alerting not Alertmanager
+
+At this scale Alertmanager adds operational surface area without meaningful benefit. Grafana's built-in alerting handles all required rules and routes directly to Slack.
+
+### Where this conversation left off
+
+PSU on the VM40B needs replacing before any hands-on work begins. Phase 0 (repo housekeeping + Terraform Cloud setup) can be done on apex immediately while waiting for hardware. The file server for family backups (daughter's iPad art, wife's crochet notes) is the next Monolith project after Watchtower is stable — noted in the repo README already.
+
+--------------
+
+## Repo Structure (Target State)
+
+`projects/` is being renamed to `services/` — permanent infrastructure belongs there, not projects. Watchtower moves from `projects/watchtower/` to `services/watchtower/`.
+
+```
+homelab/
+├── nodes/
+│   ├── macbook/          ← apex (dev machine)
+│   ├── amd-tower/        ← Monolith (k3s worker)
+│   └── vm40b/            ← Watchtower (new)
+├── kubernetes/           ← k3s cluster config, manifests, storage
+├── terraform/
+│   ├── monolith/         ← existing
+│   ├── cluster/          ← existing
+│   └── watchtower/       ← new
+│       ├── main.tf
+│       └── variables.tf
+├── services/             ← renamed from projects/
+│   ├── navidrome/        ← moved from projects/audio-server/
+│   └── watchtower/       ← moved from projects/watchtower/
+│       ├── ansible/
+│       │   ├── inventory.ini
+│       │   ├── playbooks/
+│       │   │   ├── dns.yml
+│       │   │   ├── monitoring.yml
+│       │   │   └── exporters.yml
+│       │   └── roles/
+│       │       ├── unbound/
+│       │       ├── adguard/
+│       │       ├── prometheus/
+│       │       ├── exporters/
+│       │       ├── netdata/
+│       │       └── grafana/
+│       └── Watchtower-Roadmap.md
+├── network/omada/
+├── docs/
+├── ansible/
+│   └── monolith/
+│       ├── inventory.ini
+│       ├── playbooks/
+│       │   ├── bootstrap.yml
+│       │   └── node.yml
+│       └── roles/
+│           ├── common/       ← baseline packages, UFW, unattended-upgrades
+│           ├── k3s/          ← replaces curl one-liner in Terraform
+│           ├── node_exporter/← so Watchtower can scrape it
+│           └── runner/       ← GitHub Actions runner as systemd service
+└── .github/
+    └── workflows/
+        ├── provision-k3s.yml       ← existing (monolith label)
+        ├── deploy-k8s-config.yml   ← existing (monolith label)
+        └── deploy-watchtower.yml   ← new (watchtower label)
+```
+
+---
+
+## Runner Security Model
+
+> Each node manages itself. No runner crosses node boundaries via pipeline.
+
+| Runner Label | Installed On | Manages |
+|---|---|---|
+| `monolith` | Monolith (AMD tower) | k3s cluster, Navidrome |
+| `watchtower` | Watchtower (VM40B) | DNS, monitoring stack |
+
+Watchtower is bootstrapped **manually via SSH from apex** — install OS, harden, install GitHub Actions runner. After that, all config changes go through GitHub Actions using `runs-on: [self-hosted, watchtower]`. Monolith's runner never touches Watchtower and vice versa.
+
+---
+
+## Workflow Architecture
+
+```
+apex (MacBook Air M4)
+  └── VS Code / Obsidian / Terminal
+        ├── Terraform → Terraform Cloud (remote state)
+        └── Git push → GitHub
+              └── GitHub Actions
+                    ├── deploy-watchtower.yml
+                    │     runs-on: [self-hosted, watchtower]
+                    │     └── Ansible playbooks → configure Watchtower services
+                    └── deploy-k8s-config.yml
+                          runs-on: [self-hosted, monolith]
+                          ├── kubectl apply → k3s cluster
+                          └── Ansible playbooks → configure Monolith node
+```
+
+---
+
+## Phase 0 — Repo Housekeeping & Dev Environment
+
+> Do this before any Watchtower work begins. Gets the house in order.
+
+### Repo reorganization (on apex)
+
+- [ ] Rename `projects/` → `services/`
+- [ ] Move `projects/audio-server/` → `services/navidrome/`
+- [ ] Move `projects/watchtower/` → `services/watchtower/`
+- [ ] Create `nodes/vm40b/` with `hardware.md`
+- [ ] Create `terraform/watchtower/` stub
+- [ ] Update `README.md` to reflect new structure and both nodes
+- [ ] Update `docs/homelab-overview.md` — replace old drive list with current `df -h` reality
+- [ ] Commit and push — verify nothing breaks in existing workflows
+
+### Terraform Cloud setup
+
+- [ ] Create account at [app.terraform.io](https://app.terraform.io) (free tier)
+- [ ] Create organization (e.g. `speddling-homelab`)
+- [ ] Create two workspaces: `monolith` and `watchtower`
+  - Execution mode: **Local** (runner executes, Terraform Cloud stores state)
+- [ ] Generate Terraform Cloud API token
+- [ ] Add token as GitHub Actions secret: `TF_API_TOKEN`
+- [ ] Add backend block to `terraform/monolith/main.tf`:
+
+```hcl
+terraform {
+  cloud {
+    organization = "speddling-homelab"
+    workspaces {
+      name = "monolith"
+    }
+  }
+}
+```
+
+- [ ] Add backend block to new `terraform/watchtower/main.tf`:
+
+```hcl
+terraform {
+  cloud {
+    organization = "speddling-homelab"
+    workspaces {
+      name = "watchtower"
+    }
+  }
+}
+```
+
+- [ ] Run `terraform init` in both directories — verify state migrates cleanly
+- [ ] Confirm Terraform Cloud UI shows both workspaces with state
+
+### GitHub Actions secrets audit
+
+- [ ] Confirm existing secrets still valid: `SSH_PRIVATE_KEY`, `VM40B_HOST`, `VM40B_USER`
+- [ ] Add `TF_API_TOKEN` (Terraform Cloud)
+- [ ] Add `SLACK_WEBHOOK_URL` (Grafana alert channel — see Phase 8)
+- [ ] **Do not commit Slack URLs, webhook URLs, or IPs to the repo**
+
+### apex dev environment
+
+- [ ] Verify: `terraform`, `ansible`, `git`, `gh`, `k9s` installed via MacPorts
+- [ ] Verify SSH config has both `monolith` and `watchtower` host aliases
+- [ ] Install VS Code extensions: `HashiCorp Terraform`, `Ansible`, `Remote-SSH`
+
+---
+
+## Phase 1 — Hardware & OS Prep
+
+> Physical access to VM40B required. Done manually from apex via SSH after install.
+
+- [ ] Install 1TB SSD into VM40B (2.5" SATA bay) — confirm BIOS detects it
+- [ ] Download Ubuntu Server 24.04 LTS — flash to USB (Balena Etcher or `dd`)
+- [ ] Boot and install — minimal install, OpenSSH server checked, no snaps
+- [ ] Set hostname during install: `watchtower`
+- [ ] Set static DHCP reservation in Omada controller by MAC address (do this before first boot if possible)
+- [ ] Harden SSH immediately after first login:
+  - [ ] `PasswordAuthentication no`
+  - [ ] `PermitRootLogin no`
+  - [ ] `AllowUsers <your-user>`
+  - [ ] Copy public key from apex: `ssh-copy-id watchtower`
+- [ ] `sudo apt update && sudo apt upgrade -y`
+- [ ] Install baseline packages: `curl wget git htop ufw`
+- [ ] Configure UFW — LAN only, no public exposure
+
+```bash
+sudo ufw default deny incoming
+sudo ufw default allow outgoing
+sudo ufw allow from 192.168.x.0/24 to any port 22 proto tcp
+sudo ufw allow from 192.168.x.0/24 to any port 53
+sudo ufw allow from 192.168.x.0/24 to any port 3000 proto tcp
+sudo ufw allow from 192.168.x.0/24 to any port 3001 proto tcp
+sudo ufw allow from 192.168.x.0/24 to any port 9090 proto tcp
+sudo ufw allow from 192.168.x.0/24 to any port 19999 proto tcp
+sudo ufw enable
+```
+
+- [ ] Enable `unattended-upgrades`: `sudo apt install unattended-upgrades -y`
+- [ ] Verify SSH from apex: `ssh watchtower`
+- [ ] Add `nodes/vm40b/hardware.md` to repo with confirmed specs and `df -h` output
+
+---
+
+## Phase 2 — GitHub Actions Runner (Watchtower)
+
+> Bootstrap manually. After this, GitHub Actions takes over.
+
+- [ ] SSH into Watchtower from apex
+- [ ] In GitHub repo → Settings → Actions → Runners → New self-hosted runner
+- [ ] Select Linux x64 — follow the generated install commands
+- [ ] When prompted for labels, add: `self-hosted,watchtower`
+- [ ] Install runner as a systemd service:
+
+```bash
+sudo ./svc.sh install
+sudo ./svc.sh start
+systemctl status actions.runner.*
+```
+
+- [ ] Verify runner shows as **Idle** in GitHub → Settings → Actions → Runners
+- [ ] Write `.github/workflows/deploy-watchtower.yml` on apex:
+
+```yaml
+name: Deploy Watchtower Config
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'services/watchtower/**'
+      - 'terraform/watchtower/**'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, watchtower]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
+
+      - name: Terraform Init & Apply
+        working-directory: terraform/watchtower
+        run: |
+          terraform init
+          terraform apply -auto-approve
+
+      - name: Run Ansible — DNS
+        run: |
+          ansible-playbook \
+            -i services/watchtower/ansible/inventory.ini \
+            services/watchtower/ansible/playbooks/dns.yml
+
+      - name: Run Ansible — Monitoring
+        run: |
+          ansible-playbook \
+            -i services/watchtower/ansible/inventory.ini \
+            services/watchtower/ansible/playbooks/monitoring.yml
+
+      - name: Run Ansible — Exporters
+        run: |
+          ansible-playbook \
+            -i services/watchtower/ansible/inventory.ini \
+            services/watchtower/ansible/playbooks/exporters.yml
+```
+
+- [ ] Push workflow — verify it appears in GitHub Actions tab
+- [ ] Run manually via `workflow_dispatch` with a no-op playbook to confirm runner picks it up
+
+---
+
+## Phase 3 — Ansible Scaffold
+
+> Authored on apex · roles deployed to Watchtower via GitHub Actions
+
+- [ ] Install Ansible on apex: `sudo port install ansible`
+- [ ] Create `services/watchtower/ansible/inventory.ini`:
+
+```ini
+[watchtower]
+watchtower ansible_host=192.168.x.x ansible_user=<your-user> ansible_ssh_private_key_file=~/.ssh/id_ed25519
+
+[watchtower:vars]
+ansible_python_interpreter=/usr/bin/python3
+```
+
+- [ ] Create role scaffolds using `ansible-galaxy role init`:
+
+```bash
+cd services/watchtower/ansible/roles
+ansible-galaxy role init unbound
+ansible-galaxy role init adguard
+ansible-galaxy role init prometheus
+ansible-galaxy role init exporters
+ansible-galaxy role init netdata
+ansible-galaxy role init grafana
+```
+
+- [ ] Write `playbooks/dns.yml` — applies `unbound` and `adguard` roles
+- [ ] Write `playbooks/monitoring.yml` — applies `prometheus`, `netdata`, `grafana` roles
+- [ ] Write `playbooks/exporters.yml` — applies `exporters` role
+- [ ] Test locally from apex before committing: `ansible-playbook -i inventory.ini playbooks/dns.yml --check`
+
+---
+
+## Phase 4 — DNS Layer (Unbound + AdGuard Home)
+
+> Ansible roles: `unbound`, `adguard`
+
+### Unbound role
+
+- [ ] Task: install via apt (`unbound`)
+- [ ] Template: `/etc/unbound/unbound.conf.d/watchtower.conf`
+  - Listen on `127.0.0.1:5335`
+  - Root hints enabled
+  - DNSSEC validation on
+  - Cache tuning: `rrset-cache-size: 256m`, `msg-cache-size: 128m`
+- [ ] Task: disable and mask `systemd-resolved` stub listener
+- [ ] Handler: restart unbound on config change
+- [ ] Verify: `dig @127.0.0.1 -p 5335 google.com`
+
+### AdGuard Home role
+
+- [ ] Task: download and run AGH installer script
+- [ ] Task: complete initial setup via AGH API (automate wizard)
+- [ ] Template: AGH config — upstream DNS `127.0.0.1:5335`
+- [ ] Blocklists to configure: Hagezi Multi Normal, OISD Big, Steven Black
+- [ ] Enable DNSSEC
+- [ ] Local DNS rewrites for homelab:
+  - `watchtower.local` → Watchtower IP
+  - `grafana.local` → Watchtower IP
+  - `navidrome.local` → Monolith IP
+  - `monolith.local` → Monolith IP
+- [ ] Lock AGH web UI to LAN CIDR only
+
+### Omada integration
+
+- [ ] In OC200: set primary DNS to Watchtower static IP
+- [ ] Set secondary DNS to `1.1.1.1` (fallback if Watchtower is down)
+- [ ] Verify DNS resolution from a LAN client
+- [ ] Verify ad blocking is active
+
+---
+
+## Phase 5 — Prometheus
+
+> Ansible role: `prometheus` · Native binary, no Docker
+
+- [ ] Task: create `prometheus` system user (no login shell, no home)
+- [ ] Task: download Prometheus binary (x86_64) from GitHub releases
+- [ ] Task: install to `/usr/local/bin/prometheus`
+- [ ] Template: `/etc/prometheus/prometheus.yml`
+
+```yaml
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: 'watchtower'
+    static_configs:
+      - targets: ['localhost:9100']
+
+  - job_name: 'blackbox'
+    static_configs:
+      - targets: ['localhost:9115']
+
+  - job_name: 'adguard'
+    static_configs:
+      - targets: ['localhost:9617']
+
+  - job_name: 'monolith'
+    static_configs:
+      - targets: ['monolith.local:9100']
+
+  - job_name: 'snmp-omada'
+    static_configs:
+      - targets: ['<omada-ip>']
+    metrics_path: /snmp
+    params:
+      module: [if_mib]
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - target_label: __address__
+        replacement: localhost:9116
+```
+
+- [ ] Template: `/etc/systemd/system/prometheus.service`
+  - `--storage.tsdb.retention.time=30d`
+  - `--storage.tsdb.retention.size=50GB`
+  - `--storage.tsdb.path=/var/lib/prometheus`
+- [ ] Handler: daemon-reload and restart on config change
+- [ ] Verify UI at `http://watchtower.local:9090`
+
+---
+
+## Phase 6 — Exporters
+
+> Ansible role: `exporters`
+
+### node_exporter — Watchtower
+
+- [ ] Task: install binary, create system user
+- [ ] Template: systemd unit
+- [ ] Verify: `curl localhost:9100/metrics`
+
+### node_exporter — Monolith
+
+- [ ] Add to Monolith via existing Terraform/pipeline or manual install
+- [ ] Confirm `monolith.local:9100` is reachable from Watchtower
+- [ ] Add scrape target already in `prometheus.yml` above
+
+### blackbox_exporter
+
+- [ ] Task: install binary + systemd unit
+- [ ] Configure probe modules: `http_2xx`, `icmp`, `tcp_connect`
+- [ ] Probe targets: ER605, EAP245s, Navidrome, Grafana, GitHub, apex
+- [ ] Verify endpoint probing in Prometheus
+
+### snmp_exporter
+
+- [ ] Task: install binary + systemd unit
+- [ ] Enable SNMP v2c on ER605 and EAP245s via Omada controller
+- [ ] Build MIB config with `generator.yml` for TP-Link OIDs
+- [ ] Verify interface counter scraping
+
+### AdGuard Home exporter
+
+- [ ] Install `adguard_exporter` (ebrianne/adguard-exporter)
+- [ ] Configure AGH API credentials — store as Ansible vault variable, not plaintext
+- [ ] Systemd unit
+- [ ] Verify metrics endpoint: `curl localhost:9617/metrics`
+
+---
+
+## Phase 7 — Netdata
+
+> Ansible role: `netdata` · Real-time host metrics complement to Prometheus
+
+- [ ] Task: install via official kickstart script (`--dont-start-it` flag)
+- [ ] Template: `/etc/netdata/netdata.conf`
+  - Bind to LAN IP only
+  - Disable Netdata Cloud (on-prem only)
+- [ ] Task: `systemctl enable --now netdata`
+- [ ] Verify dashboard: `http://watchtower.local:19999`
+- [ ] Optional: enable Prometheus exporting endpoint in `exporting.conf`
+
+---
+
+## Phase 8 — Grafana
+
+> Ansible role: `grafana`
+
+- [ ] Task: add Grafana OSS apt repo, install `grafana`
+- [ ] Template: `/etc/grafana/grafana.ini`
+  - Bind to LAN IP
+  - `disable_gravatar = true`
+  - `allow_sign_up = false`
+  - Change default admin password (store in Ansible vault)
+- [ ] Task: `systemctl enable --now grafana-server`
+- [ ] Add Prometheus data source (can be automated via Grafana API in Ansible)
+- [ ] Import community dashboards
+
+| Dashboard | Grafana ID |
+|---|---|
+| Node Exporter Full | 1860 |
+| Blackbox Exporter | 7587 |
+| AdGuard Home | 13330 |
+| Kubernetes / k3s cluster | 15661 |
+| SNMP Interface Stats | 11169 |
+
+- [ ] Build custom homelab overview dashboard:
+  - DNS query rate + block rate (AGH)
+  - Watchtower CPU / RAM / disk / network
+  - Monolith node health
+  - Uptime probes — ER605, APs, Navidrome, GitHub
+  - Omada AP client counts + throughput
+
+---
+
+## Phase 9 — Alerting (Grafana → Slack)
+
+> Slack workspace: Little Wolf Acres
+> Webhook URL stored as GitHub secret `SLACK_WEBHOOK_URL` — never committed to repo
+
+- [ ] In Slack: create `#homelab-alerts` channel
+- [ ] Create Incoming Webhook for that channel (Slack App Directory → Incoming Webhooks)
+- [ ] In Grafana → Alerting → Contact Points: add Slack contact point
+  - Webhook URL: paste from secret (entered manually in Grafana UI, not in repo)
+  - Channel: `#homelab-alerts`
+- [ ] Create notification policy — route all alerts to Slack contact point
+- [ ] Define alert rules:
+
+| Alert | Condition |
+|---|---|
+| Watchtower CPU high | > 80% sustained 5m |
+| Watchtower disk high | > 85% used |
+| DNS resolver down | blackbox probe fails > 2m |
+| Monolith unreachable | node_exporter scrape fails > 2m |
+| Any endpoint down | blackbox probe fails > 2m |
+| Prometheus scrape gap | any target missing > 5m |
+
+- [ ] Test alert: temporarily set a threshold to trigger, confirm Slack message arrives in `#homelab-alerts`
+- [ ] Test recovery: confirm Slack sends resolved notification
+
+---
+
+## Phase 10 — Ongoing Maintenance
+
+- [ ] Verify `unattended-upgrades` active: `systemctl status unattended-upgrades`
+- [ ] Set up logrotate for Prometheus, Grafana, AGH: `/etc/logrotate.d/`
+- [ ] Monthly: check Prometheus storage size — `du -sh /var/lib/prometheus`
+- [ ] Keep Ansible role package versions pinned — bump intentionally via PR, not automatically
+- [ ] All config changes go through GitHub Actions — no manual edits on Watchtower directly
+- [ ] Any manual deviation gets documented immediately in this file
+
+---
+
+## Reference
+
+### Useful commands from apex
+
+```bash
+# SSH to nodes
+ssh watchtower
+ssh monolith
+
+# Check all Watchtower services
+ssh watchtower "systemctl status prometheus grafana-server netdata adguardhome unbound"
+
+# Tail a service log
+ssh watchtower "journalctl -fu prometheus"
+ssh watchtower "journalctl -fu adguardhome"
+
+# Run a single Ansible playbook manually
+ansible-playbook -i services/watchtower/ansible/inventory.ini \
+  services/watchtower/ansible/playbooks/dns.yml
+
+# Ansible dry run (check mode)
+ansible-playbook -i services/watchtower/ansible/inventory.ini \
+  services/watchtower/ansible/playbooks/monitoring.yml --check
+
+# Terraform plan for Watchtower
+cd terraform/watchtower && terraform plan
+```
+
+### Port reference — UFW rules on Watchtower
+
+| Port | Protocol | Service | Allowed from |
+|---|---|---|---|
+| 22 | TCP | SSH | apex IP only |
+| 53 | TCP+UDP | AdGuard Home DNS | LAN |
+| 3000 | TCP | AdGuard Home UI | LAN |
+| 3001 | TCP | Grafana | LAN |
+| 9090 | TCP | Prometheus | LAN |
+| 19999 | TCP | Netdata | LAN |
+| 9100 | TCP | node_exporter | Watchtower only |
+| 9115 | TCP | blackbox_exporter | Watchtower only |
+| 9116 | TCP | snmp_exporter | Watchtower only |
+| 9617 | TCP | AGH exporter | Watchtower only |
+
+### Ansible vault note
+
+Sensitive values (AGH API credentials, Grafana admin password) go in an encrypted Ansible vault file, not plaintext in vars. To edit:
+
+```bash
+ansible-vault edit services/watchtower/ansible/group_vars/all/vault.yml
+```
+
+Store the vault password in macOS Keychain or a local `.vault_pass` file excluded via `.gitignore`.
+
+---
+
+## Related Notes
+
+- [[Monolith — K3s Cluster]]
+- [[Omada Network Config]]
+- [[Navidrome — Audio Server]]
+- [[GitHub Actions — Homelab Pipelines]]
+- [[apex — MacBook Air M4 Dev Environment]]
+- [[Terraform Cloud — State Management]]
+
+---
+
+*Last updated: 2026-04-21*
+*Status: 🟡 In Progress — awaiting hardware (PSU replacement)*
+
+=== ./terraform/README.md ===
+# Terraform Skeleton
+
