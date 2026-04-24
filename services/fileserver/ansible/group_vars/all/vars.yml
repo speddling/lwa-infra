@@ -3,7 +3,7 @@
 # Then move passwords into vault.yml and reference here
 
 samba_user: vault
-samba_password: "changeme"      # ← replace before deploying
+samba_password: "bubbie"      # ← replace before deploying
 
 james_user: james
 james_password: "junia"         # ← replace before deploying
