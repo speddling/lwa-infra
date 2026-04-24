@@ -184,8 +184,9 @@
       "obsidian-git:Open Git source control": false
     }
   },
-  "active": "165dadc935b0cab3",
+  "active": "bffb361906a7587a",
   "lastOpenFiles": [
+    "docs/network.md",
     "docs/Pipeline considerations.md",
     "docs/storage.md",
     "docs/homelab-setup-notes.md",
