@@ -1,5 +1,5 @@
 ---
-- name: Configure Samba file server (vault)
+- name: Configure Samba file server (vault + studio-archive)
   hosts: monolith
   become: true
 
@@ -7,11 +7,6 @@
     - ../group_vars/all/vars.yml
 
   tasks:
-    - name: Install Samba
-      ansible.builtin.apt:
-        name: samba
-        state: present
-        update_cache: true
     - name: Install Samba and dependencies
       ansible.builtin.apt:
         name:
@@ -22,31 +17,60 @@
         state: present
         update_cache: true
 
-    - name: Create Samba system user
+    - name: Create vault Samba user
       ansible.builtin.user:
         name: "{{ samba_user }}"
         shell: /sbin/nologin
         create_home: false
         state: present
 
-    - name: Create share directory
+    - name: Create james Samba user
+      ansible.builtin.user:
+        name: "{{ james_user }}"
+        shell: /sbin/nologin
+        create_home: false
+        state: present
+
+    - name: Create vault share directory
       ansible.builtin.file:
-        path: "{{ samba_share_path }}"
+        path: "{{ vault_share_path }}"
         state: directory
         mode: "0775"
         owner: "{{ samba_user }}"
         group: "{{ samba_user }}"
 
-    - name: Set Samba password for user
+    - name: Create studio-archive share directory
+      ansible.builtin.file:
+        path: "{{ studio_share_path }}"
+        state: directory
+        mode: "0770"
+        owner: "{{ james_user }}"
+        group: "{{ james_user }}"
+
+    - name: Set Samba password for vault
       ansible.builtin.expect:
         command: smbpasswd -a {{ samba_user }}
         responses:
           "New SMB password:": "{{ samba_password }}"
           "Retype new SMB password:": "{{ samba_password }}"
- #     no_log: true
+      no_log: true
+      changed_when: false
 
-    - name: Enable Samba user
+    - name: Enable vault Samba user
       ansible.builtin.shell: smbpasswd -e {{ samba_user }}
+      changed_when: false
+
+    - name: Set Samba password for james
+      ansible.builtin.expect:
+        command: smbpasswd -a {{ james_user }}
+        responses:
+          "New SMB password:": "{{ james_password }}"
+          "Retype new SMB password:": "{{ james_password }}"
+      no_log: true
+      changed_when: false
+
+    - name: Enable james Samba user
+      ansible.builtin.shell: smbpasswd -e {{ james_user }}
       changed_when: false
 
     - name: Write smb.conf
@@ -66,12 +90,6 @@
       loop:
         - smbd
         - nmbd
-
-    - name: Allow Samba through UFW
-      community.general.ufw:
-        rule: allow
-        name: Samba
-        comment: Samba - vault share
 
   handlers:
     - name: Restart Samba

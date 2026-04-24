@@ -11,12 +11,22 @@
    map to guest = never
    smb encrypt = desired
 
-[{{ samba_share_name }}]
+[{{ vault_share_name }}]
    comment = Vault — Family backup share
-   path = {{ samba_share_path }}
+   path = {{ vault_share_path }}
    browseable = yes
    read only = no
    valid users = {{ samba_user }}
    create mask = 0664
    directory mask = 0775
    force user = {{ samba_user }}
+
+[{{ studio_share_name }}]
+   comment = Studio Archive — DAW project storage
+   path = {{ studio_share_path }}
+   browseable = yes
+   read only = no
+   valid users = {{ james_user }}
+   create mask = 0660
+   directory mask = 0770
+   force user = {{ james_user }}
