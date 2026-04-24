@@ -69,6 +69,10 @@ When the 8TB HDD arrives to replace the 2TB:
 
 ---
 
+## Post-Watchtower Cleanup
+- Remove UFW from fileserver Ansible playbook — firewall policy will be managed at the network layer via ER605 / Watchtower
+
+
 ## Working With Claude
 
 To share this repo with Claude for review or updates, run from the repo root:

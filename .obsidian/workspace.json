@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "docs/homelab-setup-notes.md",
+                "file": "docs/Pipeline considerations.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "homelab-setup-notes"
+              "title": "Pipeline considerations"
             }
           }
         ]
@@ -186,6 +186,8 @@
   },
   "active": "165dadc935b0cab3",
   "lastOpenFiles": [
+    "docs/storage.md",
+    "docs/homelab-setup-notes.md",
     "services/fileserver/ansible/inventory.ini",
     "services/fileserver/ansible/group_vars/all/vars.yml",
     "services/fileserver/ansible/group_vars/all",
@@ -196,9 +198,7 @@
     "services/fileserver/ansible/templates",
     "services/fileserver/ansible/playbooks/fileserver.yml",
     "services/fileserver/ansible/playbooks",
-    "services/fileserver/ansible",
     "kubernetes/cluster/storage/Storage Setup.md",
-    "docs/storage.md",
     "services/watchtower/Watchtower-Roadmap.md",
     "docs/minecraft-bedrock-k3s.md",
     "README.md",
@@ -207,7 +207,6 @@
     "terraform/README.md",
     "docs/ab350_pro4_upgrade_summary.md",
     "docs/Pipeline considerations.md",
-    "docs/homelab-setup-notes.md",
     "docs/homelab-overview.md",
     "nodes/macbook/hardware.md",
     "nodes/amd-tower/hardware.md",
