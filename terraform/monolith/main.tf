@@ -1,3 +1,12 @@
+terraform {
+  cloud {
+    organization = "littlewolfacres"
+    workspaces {
+      name = "monolith"
+    }
+  }
+}
+
 resource "null_resource" "k3s_bootstrap" {
   # This runs on Monolith via your GitHub Runner
   provisioner "local-exec" {
