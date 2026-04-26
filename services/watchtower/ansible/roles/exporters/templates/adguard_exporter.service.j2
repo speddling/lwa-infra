@@ -1,0 +1,17 @@
+[Unit]
+Description=AdGuard Home Exporter
+After=network.target AdGuardHome.service
+
+[Service]
+Type=simple
+Environment="ADGUARD_PROTOCOL=http"
+Environment="ADGUARD_HOSTNAME=127.0.0.1"
+Environment="ADGUARD_PORT=3000"
+Environment="ADGUARD_USERNAME=admin"
+Environment="ADGUARD_PASSWORD={{ vault_adguard_password }}"
+Environment="SERVER_PORT=9617"
+ExecStart=/usr/local/bin/adguard_exporter
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

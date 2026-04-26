@@ -1,0 +1,7 @@
+---
+- name: Configure exporters
+  hosts: watchtower
+  become: yes
+
+  roles:
+    - exporters

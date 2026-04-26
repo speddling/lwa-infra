@@ -1,3 +1,186 @@
-#SPDX-License-Identifier: MIT-0
 ---
-# tasks file for exporters
+# node_exporter
+- name: Create node_exporter system user
+  user:
+    name: node_exporter
+    system: yes
+    shell: /usr/sbin/nologin
+    create_home: no
+
+- name: Check if node_exporter is already installed
+  stat:
+    path: /usr/local/bin/node_exporter
+  register: node_exporter_binary
+
+- name: Download node_exporter tarball
+  get_url:
+    url: https://github.com/prometheus/node_exporter/releases/download/v1.7.0/node_exporter-1.7.0.linux-amd64.tar.gz
+    dest: /tmp/node_exporter.tar.gz
+  when: not node_exporter_binary.stat.exists
+
+- name: Extract node_exporter
+  unarchive:
+    src: /tmp/node_exporter.tar.gz
+    dest: /tmp/
+    remote_src: yes
+  when: not node_exporter_binary.stat.exists
+
+- name: Install node_exporter binary
+  copy:
+    src: /tmp/node_exporter-1.7.0.linux-amd64/node_exporter
+    dest: /usr/local/bin/node_exporter
+    owner: root
+    group: root
+    mode: '0755'
+    remote_src: yes
+  when: not node_exporter_binary.stat.exists
+
+- name: Deploy node_exporter systemd unit
+  template:
+    src: node_exporter.service.j2
+    dest: /etc/systemd/system/node_exporter.service
+    owner: root
+    group: root
+    mode: '0644'
+  notify:
+    - reload systemd
+    - restart node_exporter
+
+- name: Enable and start node_exporter
+  systemd:
+    name: node_exporter
+    enabled: yes
+    state: started
+
+# blackbox_exporter
+- name: Check if blackbox_exporter is already installed
+  stat:
+    path: /usr/local/bin/blackbox_exporter
+  register: blackbox_binary
+
+- name: Download blackbox_exporter tarball
+  get_url:
+    url: https://github.com/prometheus/blackbox_exporter/releases/download/v0.25.0/blackbox_exporter-0.25.0.linux-amd64.tar.gz
+    dest: /tmp/blackbox_exporter.tar.gz
+  when: not blackbox_binary.stat.exists
+
+- name: Extract blackbox_exporter
+  unarchive:
+    src: /tmp/blackbox_exporter.tar.gz
+    dest: /tmp/
+    remote_src: yes
+  when: not blackbox_binary.stat.exists
+
+- name: Install blackbox_exporter binary
+  copy:
+    src: /tmp/blackbox_exporter-0.25.0.linux-amd64/blackbox_exporter
+    dest: /usr/local/bin/blackbox_exporter
+    owner: root
+    group: root
+    mode: '0755'
+    remote_src: yes
+  when: not blackbox_binary.stat.exists
+
+- name: Deploy blackbox_exporter config
+  template:
+    src: blackbox.yml.j2
+    dest: /etc/prometheus/blackbox.yml
+    owner: root
+    group: root
+    mode: '0644'
+  notify: restart blackbox_exporter
+
+- name: Deploy blackbox_exporter systemd unit
+  template:
+    src: blackbox_exporter.service.j2
+    dest: /etc/systemd/system/blackbox_exporter.service
+    owner: root
+    group: root
+    mode: '0644'
+  notify:
+    - reload systemd
+    - restart blackbox_exporter
+
+- name: Enable and start blackbox_exporter
+  systemd:
+    name: blackbox_exporter
+    enabled: yes
+    state: started
+
+# snmp_exporter
+- name: Check if snmp_exporter is already installed
+  stat:
+    path: /usr/local/bin/snmp_exporter
+  register: snmp_binary
+
+- name: Download snmp_exporter tarball
+  get_url:
+    url: https://github.com/prometheus/snmp_exporter/releases/download/v0.26.0/snmp_exporter-0.26.0.linux-amd64.tar.gz
+    dest: /tmp/snmp_exporter.tar.gz
+  when: not snmp_binary.stat.exists
+
+- name: Extract snmp_exporter
+  unarchive:
+    src: /tmp/snmp_exporter.tar.gz
+    dest: /tmp/
+    remote_src: yes
+  when: not snmp_binary.stat.exists
+
+- name: Install snmp_exporter binary
+  copy:
+    src: /tmp/snmp_exporter-0.26.0.linux-amd64/snmp_exporter
+    dest: /usr/local/bin/snmp_exporter
+    owner: root
+    group: root
+    mode: '0755'
+    remote_src: yes
+  when: not snmp_binary.stat.exists
+
+- name: Deploy snmp_exporter systemd unit
+  template:
+    src: snmp_exporter.service.j2
+    dest: /etc/systemd/system/snmp_exporter.service
+    owner: root
+    group: root
+    mode: '0644'
+  notify:
+    - reload systemd
+    - restart snmp_exporter
+
+- name: Enable and start snmp_exporter
+  systemd:
+    name: snmp_exporter
+    enabled: yes
+    state: started
+
+# adguard_exporter
+- name: Check if adguard_exporter is already installed
+  stat:
+    path: /usr/local/bin/adguard_exporter
+  register: adguard_exporter_binary
+
+- name: Download adguard_exporter binary
+  get_url:
+    url: https://github.com/ebrianne/adguard-exporter/releases/latest/download/adguard_exporter-linux-amd64
+    dest: /usr/local/bin/adguard_exporter
+    owner: root
+    group: root
+    mode: '0755'
+  when: not adguard_exporter_binary.stat.exists
+
+- name: Deploy adguard_exporter systemd unit
+  template:
+    src: adguard_exporter.service.j2
+    dest: /etc/systemd/system/adguard_exporter.service
+    owner: root
+    group: root
+    mode: '0644'
+  notify:
+    - reload systemd
+    - restart adguard_exporter
+
+- name: Enable and start adguard_exporter
+  systemd:
+    name: adguard_exporter
+    enabled: yes
+    state: started

@@ -1,3 +1,24 @@
-#SPDX-License-Identifier: MIT-0
 ---
-# handlers file for exporters
+- name: reload systemd
+  systemd:
+    daemon_reload: yes
+
+- name: restart node_exporter
+  systemd:
+    name: node_exporter
+    state: restarted
+
+- name: restart blackbox_exporter
+  systemd:
+    name: blackbox_exporter
+    state: restarted
+
+- name: restart snmp_exporter
+  systemd:
+    name: snmp_exporter
+    state: restarted
+
+- name: restart adguard_exporter
+  systemd:
+    name: adguard_exporter
+    state: restarted
