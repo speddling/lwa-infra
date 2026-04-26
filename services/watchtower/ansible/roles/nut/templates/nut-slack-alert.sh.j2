@@ -1,0 +1,18 @@
+#!/bin/bash
+WEBHOOK="{{ vault_slack_webhook_url }}"
+
+case $1 in
+  onbatt)
+    MESSAGE="⚡ *POWER OUTAGE* — Watchtower is on battery. Check the homelab."
+    ;;
+  online)
+    MESSAGE="✅ *Power Restored* — Watchtower is back on line power."
+    ;;
+  lowbatt)
+    MESSAGE="🔴 *LOW BATTERY* — Watchtower battery critical. Shutdown imminent."
+    ;;
+esac
+
+curl -s -X POST -H 'Content-type: application/json' \
+  --data "{\"text\": \"$MESSAGE\"}" \
+  "$WEBHOOK"

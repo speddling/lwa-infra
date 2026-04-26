@@ -1,0 +1,14 @@
+---
+- name: restart nut-server
+  systemd:
+    name: nut-server
+    state: restarted
+
+- name: restart nut-monitor
+  systemd:
+    name: nut-monitor
+    state: restarted
+
+- name: reload systemd
+  systemd:
+    daemon_reload: yes

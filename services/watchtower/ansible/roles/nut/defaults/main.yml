@@ -1,0 +1,7 @@
+---
+nut_enabled: false
+nut_ups_name: cyberpower
+nut_ups_driver: usbhid-ups
+nut_ups_port: auto
+nut_monitor_user: monuser
+nut_monitor_password: "{{ vault_nut_monitor_password }}"

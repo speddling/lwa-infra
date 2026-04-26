@@ -1,0 +1,15 @@
+[Unit]
+Description=NUT Exporter for Prometheus
+After=network.target nut-server.service
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/nut_exporter \
+  --nut.server=127.0.0.1 \
+  --nut.port=3493 \
+  --nut.username={{ nut_monitor_user }} \
+  --nut.password={{ nut_monitor_password }}
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
