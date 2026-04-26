@@ -20,7 +20,11 @@
     path: /etc/systemd/resolved.conf
     regexp: '^#?DNSStubListener='
     line: 'DNSStubListener=no'
-  notify: restart systemd-resolved
+
+- name: Restart systemd-resolved to release port 53
+  systemd:
+    name: systemd-resolved
+    state: restarted
 
 - name: Deploy unbound config
   template:
