@@ -37,3 +37,4 @@ alias studio='ssh speddling@192.168.0.109'
 ---
 
 *Last updated: 2026-04-24*
+

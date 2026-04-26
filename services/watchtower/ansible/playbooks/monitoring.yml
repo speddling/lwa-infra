@@ -1,0 +1,10 @@
+---
+- name: Configure monitoring layer
+  hosts: watchtower
+  become: yes
+
+  roles:
+    - prometheus
+    - netdata
+    - grafana
+    - nut
