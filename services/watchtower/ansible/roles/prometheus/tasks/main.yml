@@ -1,3 +1,75 @@
-#SPDX-License-Identifier: MIT-0
 ---
-# tasks file for prometheus
+- name: Create prometheus system user
+  user:
+    name: prometheus
+    system: yes
+    shell: /usr/sbin/nologin
+    create_home: no
+
+- name: Create prometheus directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: prometheus
+    group: prometheus
+    mode: '0755'
+  loop:
+    - /etc/prometheus
+    - /var/lib/prometheus
+
+- name: Check if Prometheus is already installed
+  stat:
+    path: /usr/local/bin/prometheus
+  register: prometheus_binary
+
+- name: Download Prometheus tarball
+  get_url:
+    url: https://github.com/prometheus/prometheus/releases/download/v2.51.2/prometheus-2.51.2.linux-amd64.tar.gz
+    dest: /tmp/prometheus.tar.gz
+  when: not prometheus_binary.stat.exists
+
+- name: Extract Prometheus
+  unarchive:
+    src: /tmp/prometheus.tar.gz
+    dest: /tmp/
+    remote_src: yes
+  when: not prometheus_binary.stat.exists
+
+- name: Install Prometheus binaries
+  copy:
+    src: "/tmp/prometheus-2.51.2.linux-amd64/{{ item }}"
+    dest: "/usr/local/bin/{{ item }}"
+    owner: root
+    group: root
+    mode: '0755'
+    remote_src: yes
+  loop:
+    - prometheus
+    - promtool
+  when: not prometheus_binary.stat.exists
+
+- name: Deploy Prometheus config
+  template:
+    src: prometheus.yml.j2
+    dest: /etc/prometheus/prometheus.yml
+    owner: prometheus
+    group: prometheus
+    mode: '0644'
+  notify: restart prometheus
+
+- name: Deploy Prometheus systemd unit
+  template:
+    src: prometheus.service.j2
+    dest: /etc/systemd/system/prometheus.service
+    owner: root
+    group: root
+    mode: '0644'
+  notify:
+    - reload systemd
+    - restart prometheus
+
+- name: Enable and start Prometheus
+  systemd:
+    name: prometheus
+    enabled: yes
+    state: started

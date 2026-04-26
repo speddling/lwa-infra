@@ -186,6 +186,8 @@
   },
   "active": "bffb361906a7587a",
   "lastOpenFiles": [
+    "services/watchtower/ansible/roles/prometheus/templates/prometheus.service.j2",
+    "services/watchtower/ansible/roles/prometheus/templates/prometheus.yml.j2",
     "services/watchtower/ansible/roles/nut/templates/nut_exporter.service.j2",
     "services/watchtower/ansible/roles/nut/templates/nut-slack-alert.sh.j2",
     "services/watchtower/ansible/roles/nut/templates/upssched.conf.j2",
@@ -195,8 +197,6 @@
     "services/watchtower/ansible/roles/nut/templates/upsd.conf.j2",
     "services/watchtower/ansible/roles/nut/templates/ups.conf.j2",
     "services/watchtower/ansible/roles/nut/templates",
-    "services/watchtower/ansible/roles/nut/untitled folder",
-    "services/watchtower/ansible/roles/nut/handlers/main.yml",
     "services/watchtower/ansible/roles/grafana/README.md",
     "services/watchtower/ansible/roles/netdata/README.md",
     "services/watchtower/ansible/roles/exporters/README.md",
