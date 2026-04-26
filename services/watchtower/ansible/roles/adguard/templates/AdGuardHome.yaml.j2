@@ -7,7 +7,7 @@ http:
 
 users:
   - name: admin
-    password: "$2y$10$placeholder_change_this_in_vault"
+    password: "{{ vault_adguard_password_hash }}"
 
 auth_attempts: 5
 block_auth_min: 15
