@@ -1,0 +1,147 @@
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: Watchtower
+    folder: Homelab
+    interval: 1m
+    rules:
+      - uid: watchtower-high-cpu
+        title: High CPU Usage
+        condition: C
+        data:
+          - refId: A
+            datasourceUid: "- Prometheus -"
+            model:
+              expr: 100 - (avg(rate(node_cpu_seconds_total{mode="idle",instance="localhost:9100"}[5m])) * 100)
+              intervalMs: 1000
+              maxDataPoints: 43200
+          - refId: C
+            datasourceUid: "__expr__"
+            model:
+              type: threshold
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [85]
+                  query:
+                    params: [A]
+        noDataState: NoData
+        execErrState: Error
+        for: 5m
+        annotations:
+          description: "Watchtower CPU usage is above 85% for 5 minutes"
+        labels:
+          severity: warning
+
+      - uid: watchtower-high-memory
+        title: High Memory Usage
+        condition: C
+        data:
+          - refId: A
+            datasourceUid: "- Prometheus -"
+            model:
+              expr: (1 - (node_memory_MemAvailable_bytes{instance="localhost:9100"} / node_memory_MemTotal_bytes{instance="localhost:9100"})) * 100
+              intervalMs: 1000
+              maxDataPoints: 43200
+          - refId: C
+            datasourceUid: "__expr__"
+            model:
+              type: threshold
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [85]
+                  query:
+                    params: [A]
+        noDataState: NoData
+        execErrState: Error
+        for: 5m
+        annotations:
+          description: "Watchtower memory usage is above 85% for 5 minutes"
+        labels:
+          severity: warning
+
+      - uid: watchtower-disk-space
+        title: Low Disk Space
+        condition: C
+        data:
+          - refId: A
+            datasourceUid: "- Prometheus -"
+            model:
+              expr: (1 - (node_filesystem_avail_bytes{instance="localhost:9100",mountpoint="/"} / node_filesystem_size_bytes{instance="localhost:9100",mountpoint="/"})) * 100
+              intervalMs: 1000
+              maxDataPoints: 43200
+          - refId: C
+            datasourceUid: "__expr__"
+            model:
+              type: threshold
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [80]
+                  query:
+                    params: [A]
+        noDataState: NoData
+        execErrState: Error
+        for: 5m
+        annotations:
+          description: "Watchtower disk usage is above 80%"
+        labels:
+          severity: critical
+
+      - uid: node-exporter-down
+        title: Node Exporter Down
+        condition: C
+        data:
+          - refId: A
+            datasourceUid: "- Prometheus -"
+            model:
+              expr: up{job="watchtower"}
+              intervalMs: 1000
+              maxDataPoints: 43200
+          - refId: C
+            datasourceUid: "__expr__"
+            model:
+              type: threshold
+              conditions:
+                - evaluator:
+                    type: lt
+                    params: [1]
+                  query:
+                    params: [A]
+        noDataState: Alerting
+        execErrState: Alerting
+        for: 1m
+        annotations:
+          description: "Watchtower node_exporter is down - host metrics unavailable"
+        labels:
+          severity: critical
+
+      - uid: adguard-down
+        title: AdGuard Home Down
+        condition: C
+        data:
+          - refId: A
+            datasourceUid: "- Prometheus -"
+            model:
+              expr: up{job="adguard"}
+              intervalMs: 1000
+              maxDataPoints: 43200
+          - refId: C
+            datasourceUid: "__expr__"
+            model:
+              type: threshold
+              conditions:
+                - evaluator:
+                    type: lt
+                    params: [1]
+                  query:
+                    params: [A]
+        noDataState: Alerting
+        execErrState: Alerting
+        for: 1m
+        annotations:
+          description: "AdGuard Home is down - DNS filtering may be affected"
+        labels:
+          severity: critical

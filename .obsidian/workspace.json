@@ -186,6 +186,7 @@
   },
   "active": "bffb361906a7587a",
   "lastOpenFiles": [
+    "services/watchtower/ansible/roles/grafana/templates/alert_rules.yml.j2",
     "services/watchtower/ansible/roles/grafana/templates/alerting.yml.j2",
     "services/watchtower/ansible/roles/grafana/templates/dashboards.yml.j2",
     "services/watchtower/ansible/roles/grafana/templates/datasources.yml.j2",
@@ -196,7 +197,6 @@
     "services/watchtower/ansible/roles/exporters/templates/adguard_exporter.service.j2",
     "services/watchtower/ansible/roles/exporters/templates/snmp_exporter.service.j2",
     "services/watchtower/ansible/roles/exporters/templates/blackbox.yml.j2",
-    "services/watchtower/ansible/roles/exporters/templates/node_exporter.service.j2",
     "services/watchtower/ansible/roles/grafana/README.md",
     "services/watchtower/ansible/roles/netdata/README.md",
     "services/watchtower/ansible/roles/exporters/README.md",
