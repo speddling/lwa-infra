@@ -1,182 +1,280 @@
 apiVersion: 1
-
 groups:
-  - orgId: 1
-    name: Watchtower
-    folder: Homelab
-    interval: 1m
-    rules:
-      - uid: watchtower-high-cpu
-        title: High CPU Usage
-        condition: C
-        data:
-          - refId: A
-            relativeTimeRange:
-              from: 300
-              to: 0
-            datasourceUid: "PBFA97CFB590B2093"
-            model:
-              expr: 100 - (avg(rate(node_cpu_seconds_total{mode="idle",instance="localhost:9100"}[5m])) * 100)
-              intervalMs: 1000
-              maxDataPoints: 43200
-          - refId: C
-            relativeTimeRange:
-              from: 300
-              to: 0
-            datasourceUid: "__expr__"
-            model:
-              type: threshold
-	      expression: A
-              conditions:
-                - evaluator:
-                    type: gt
-                    params: [85]
-                  query:
-                    params: [A]
-        noDataState: NoData
-        execErrState: Error
-        for: 5m
-        annotations:
-          description: "Watchtower CPU usage is above 85% for 5 minutes"
-        labels:
-          severity: warning
+    - orgId: 1
+      name: watchtower
+      folder: Homelab
+      interval: 1m
+      rules:
+        - uid: dfkb3o1bs0npcd
+          title: High CPU Usage
+          condition: C
+          data:
+            - refId: A
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: PBFA97CFB590B2093
+              model:
+                editorMode: code
+                expr: 100 - (avg(rate(node_cpu_seconds_total{mode="idle",instance="localhost:9100"}[5m])) * 100)
+                instant: true
+                intervalMs: 1000
+                legendFormat: __auto
+                maxDataPoints: 43200
+                range: false
+                refId: A
+            - refId: C
+              queryType: expression
+              datasourceUid: __expr__
+              model:
+                conditions:
+                    - evaluator:
+                        params:
+                            - 85
+                        type: gt
+                      operator:
+                        type: and
+                      query:
+                        params:
+                            - C
+                      reducer:
+                        params: []
+                        type: last
+                      type: query
+                datasource:
+                    type: __expr__
+                    uid: __expr__
+                expression: A
+                intervalMs: 1000
+                maxDataPoints: 43200
+                refId: C
+                type: threshold
+          noDataState: NoData
+          execErrState: Error
+          for: 5m
+          annotations: {}
+          labels:
+            severity: warning
+          isPaused: false
+          notification_settings:
+            receiver: Sentinel
 
-      - uid: watchtower-high-memory
-        title: High Memory Usage
-        condition: C
-        data:
-          - refId: A
-            relativeTimeRange:
-              from: 300
-              to: 0
-            datasourceUid: "PBFA97CFB590B2093"
-            model:
-              expr: (1 - (node_memory_MemAvailable_bytes{instance="localhost:9100"} / node_memory_MemTotal_bytes{instance="localhost:9100"})) * 100
-              intervalMs: 1000
-              maxDataPoints: 43200
-          - refId: C
-            relativeTimeRange:
-              from: 300
-              to: 0
-            datasourceUid: "__expr__"
-            model:
-              type: threshold
-              expression: A
-              conditions:
-                - evaluator:
-                    type: gt
-                    params: [85]
-                  query:
-                    params: [A]
-        noDataState: NoData
-        execErrState: Error
-        for: 5m
-        annotations:
-          description: "Watchtower memory usage is above 85% for 5 minutes"
-        labels:
-          severity: warning
+        - uid: watchtower-high-memory
+          title: High Memory Usage
+          condition: C
+          data:
+            - refId: A
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: PBFA97CFB590B2093
+              model:
+                editorMode: code
+                expr: (1 - (node_memory_MemAvailable_bytes{instance="localhost:9100"} / node_memory_MemTotal_bytes{instance="localhost:9100"})) * 100
+                instant: true
+                intervalMs: 1000
+                legendFormat: __auto
+                maxDataPoints: 43200
+                range: false
+                refId: A
+            - refId: C
+              queryType: expression
+              datasourceUid: __expr__
+              model:
+                conditions:
+                    - evaluator:
+                        params:
+                            - 85
+                        type: gt
+                      operator:
+                        type: and
+                      query:
+                        params:
+                            - C
+                      reducer:
+                        params: []
+                        type: last
+                      type: query
+                datasource:
+                    type: __expr__
+                    uid: __expr__
+                expression: A
+                intervalMs: 1000
+                maxDataPoints: 43200
+                refId: C
+                type: threshold
+          noDataState: NoData
+          execErrState: Error
+          for: 5m
+          annotations:
+            description: "Watchtower memory usage is above 85% for 5 minutes"
+          labels:
+            severity: warning
+          isPaused: false
+          notification_settings:
+            receiver: Sentinel
 
-      - uid: watchtower-disk-space
-        title: Low Disk Space
-        condition: C
-        data:
-          - refId: A
-            relativeTimeRange:
-              from: 300
-              to: 0
-            datasourceUid: "PBFA97CFB590B2093"
-            model:
-              expr: (1 - (node_filesystem_avail_bytes{instance="localhost:9100",mountpoint="/"} / node_filesystem_size_bytes{instance="localhost:9100",mountpoint="/"})) * 100
-              intervalMs: 1000
-              maxDataPoints: 43200
-          - refId: C
-            relativeTimeRange:
-              from: 300
-              to: 0
-            datasourceUid: "__expr__"
-            model:
-              type: threshold
-              expression: A
-              conditions:
-                - evaluator:
-                    type: gt
-                    params: [80]
-                  query:
-                    params: [A]
-        noDataState: NoData
-        execErrState: Error
-        for: 5m
-        annotations:
-          description: "Watchtower disk usage is above 80%"
-        labels:
-          severity: critical
+        - uid: watchtower-disk-space
+          title: Low Disk Space
+          condition: C
+          data:
+            - refId: A
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: PBFA97CFB590B2093
+              model:
+                editorMode: code
+                expr: (1 - (node_filesystem_avail_bytes{instance="localhost:9100",mountpoint="/"} / node_filesystem_size_bytes{instance="localhost:9100",mountpoint="/"})) * 100
+                instant: true
+                intervalMs: 1000
+                legendFormat: __auto
+                maxDataPoints: 43200
+                range: false
+                refId: A
+            - refId: C
+              queryType: expression
+              datasourceUid: __expr__
+              model:
+                conditions:
+                    - evaluator:
+                        params:
+                            - 80
+                        type: gt
+                      operator:
+                        type: and
+                      query:
+                        params:
+                            - C
+                      reducer:
+                        params: []
+                        type: last
+                      type: query
+                datasource:
+                    type: __expr__
+                    uid: __expr__
+                expression: A
+                intervalMs: 1000
+                maxDataPoints: 43200
+                refId: C
+                type: threshold
+          noDataState: NoData
+          execErrState: Error
+          for: 5m
+          annotations:
+            description: "Watchtower disk usage is above 80%"
+          labels:
+            severity: critical
+          isPaused: false
+          notification_settings:
+            receiver: Sentinel
 
-      - uid: node-exporter-down
-        title: Node Exporter Down
-        condition: C
-        data:
-          - refId: A
-            relativeTimeRange:
-              from: 300
-              to: 0
-            datasourceUid: "PBFA97CFB590B2093"
-            model:
-              expr: up{job="watchtower"}
-              intervalMs: 1000
-              maxDataPoints: 43200
-          - refId: C
-            relativeTimeRange:
-              from: 300
-              to: 0
-            datasourceUid: "__expr__"
-            model:
-              type: threshold
-              expression: A
-              conditions:
-                - evaluator:
-                    type: lt
-                    params: [1]
-                  query:
-                    params: [A]
-        noDataState: Alerting
-        execErrState: Alerting
-        for: 1m
-        annotations:
-          description: "Watchtower node_exporter is down - host metrics unavailable"
-        labels:
-          severity: critical
+        - uid: watchtower-node-exporter-down
+          title: Node Exporter Down
+          condition: C
+          data:
+            - refId: A
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: PBFA97CFB590B2093
+              model:
+                editorMode: code
+                expr: up{job="watchtower"}
+                instant: true
+                intervalMs: 1000
+                legendFormat: __auto
+                maxDataPoints: 43200
+                range: false
+                refId: A
+            - refId: C
+              queryType: expression
+              datasourceUid: __expr__
+              model:
+                conditions:
+                    - evaluator:
+                        params:
+                            - 1
+                        type: lt
+                      operator:
+                        type: and
+                      query:
+                        params:
+                            - C
+                      reducer:
+                        params: []
+                        type: last
+                      type: query
+                datasource:
+                    type: __expr__
+                    uid: __expr__
+                expression: A
+                intervalMs: 1000
+                maxDataPoints: 43200
+                refId: C
+                type: threshold
+          noDataState: Alerting
+          execErrState: Alerting
+          for: 1m
+          annotations:
+            description: "Watchtower node_exporter is down - host metrics unavailable"
+          labels:
+            severity: critical
+          isPaused: false
+          notification_settings:
+            receiver: Sentinel
 
-      - uid: adguard-down
-        title: AdGuard Home Down
-        condition: C
-        data:
-          - refId: A
-            relativeTimeRange:
-              from: 300
-              to: 0
-            datasourceUid: "PBFA97CFB590B2093"
-            model:
-              expr: up{job="adguard"}
-              intervalMs: 1000
-              maxDataPoints: 43200
-          - refId: C
-            relativeTimeRange:
-              from: 300
-              to: 0
-            datasourceUid: "__expr__"
-            model:
-              type: threshold
-              expression: A
-              conditions:
-                - evaluator:
-                    type: lt
-                    params: [1]
-                  query:
-                    params: [A]
-        noDataState: Alerting
-        execErrState: Alerting
-        for: 1m
-        annotations:
-          description: "AdGuard Home is down - DNS filtering may be affected"
-        labels:
-          severity: critical
+        - uid: watchtower-adguard-down
+          title: AdGuard Home Down
+          condition: C
+          data:
+            - refId: A
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: PBFA97CFB590B2093
+              model:
+                editorMode: code
+                expr: up{job="adguard"}
+                instant: true
+                intervalMs: 1000
+                legendFormat: __auto
+                maxDataPoints: 43200
+                range: false
+                refId: A
+            - refId: C
+              queryType: expression
+              datasourceUid: __expr__
+              model:
+                conditions:
+                    - evaluator:
+                        params:
+                            - 1
+                        type: lt
+                      operator:
+                        type: and
+                      query:
+                        params:
+                            - C
+                      reducer:
+                        params: []
+                        type: last
+                      type: query
+                datasource:
+                    type: __expr__
+                    uid: __expr__
+                expression: A
+                intervalMs: 1000
+                maxDataPoints: 43200
+                refId: C
+                type: threshold
+          noDataState: Alerting
+          execErrState: Alerting
+          for: 1m
+          annotations:
+            description: "AdGuard Home is down - DNS filtering may be affected"
+          labels:
+            severity: critical
+          isPaused: false
+          notification_settings:
+            receiver: Sentinel

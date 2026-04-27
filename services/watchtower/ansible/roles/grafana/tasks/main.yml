@@ -74,3 +74,8 @@
     name: grafana-server
     enabled: yes
     state: started
+- name: Ensure Grafana is restarted to pick up provisioning changes
+  systemd:
+    name: grafana-server
+    state: restarted
+
