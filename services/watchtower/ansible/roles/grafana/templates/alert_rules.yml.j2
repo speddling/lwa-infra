@@ -14,7 +14,7 @@ groups:
             relativeTimeRange:
               from: 300
               to: 0
-            datasourceUid: "- Prometheus -"
+            datasourceUid: "PBFA97CFB590B2093"
             model:
               expr: 100 - (avg(rate(node_cpu_seconds_total{mode="idle",instance="localhost:9100"}[5m])) * 100)
               intervalMs: 1000
@@ -48,7 +48,7 @@ groups:
             relativeTimeRange:
               from: 300
               to: 0
-            datasourceUid: "- Prometheus -"
+            datasourceUid: "PBFA97CFB590B2093"
             model:
               expr: (1 - (node_memory_MemAvailable_bytes{instance="localhost:9100"} / node_memory_MemTotal_bytes{instance="localhost:9100"})) * 100
               intervalMs: 1000
@@ -82,7 +82,7 @@ groups:
             relativeTimeRange:
               from: 300
               to: 0
-            datasourceUid: "- Prometheus -"
+            datasourceUid: "PBFA97CFB590B2093"
             model:
               expr: (1 - (node_filesystem_avail_bytes{instance="localhost:9100",mountpoint="/"} / node_filesystem_size_bytes{instance="localhost:9100",mountpoint="/"})) * 100
               intervalMs: 1000
@@ -116,7 +116,7 @@ groups:
             relativeTimeRange:
               from: 300
               to: 0
-            datasourceUid: "- Prometheus -"
+            datasourceUid: "PBFA97CFB590B2093"
             model:
               expr: up{job="watchtower"}
               intervalMs: 1000
@@ -150,7 +150,7 @@ groups:
             relativeTimeRange:
               from: 300
               to: 0
-            datasourceUid: "- Prometheus -"
+            datasourceUid: "PBFA97CFB590B2093"
             model:
               expr: up{job="adguard"}
               intervalMs: 1000
