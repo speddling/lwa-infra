@@ -1,5 +1,5 @@
 name: Deploy Watchtower Config
-# triggering it by a commit
+
 on:
   push:
     branches: [master]
