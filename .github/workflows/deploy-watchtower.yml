@@ -10,7 +10,7 @@ on:
 
 jobs:
   deploy:
-    runs-on: [self-hosted]
+    runs-on: [self-hosted, watchtower]
     steps:
       - uses: actions/checkout@v4
 
@@ -26,19 +26,16 @@ jobs:
           terraform apply -auto-approve
 
       - name: Run Ansible — DNS
+        working-directory: services/watchtower/ansible
         run: |
-          ansible-playbook \
-            -i services/watchtower/ansible/inventory.ini \
-            services/watchtower/ansible/playbooks/dns.yml
-
-      - name: Run Ansible — Monitoring
-        run: |
-          ansible-playbook \
-            -i services/watchtower/ansible/inventory.ini \
-            services/watchtower/ansible/playbooks/monitoring.yml
+          ansible-playbook -i inventory.ini playbooks/dns.yml
 
       - name: Run Ansible — Exporters
+        working-directory: services/watchtower/ansible
         run: |
-          ansible-playbook \
-            -i services/watchtower/ansible/inventory.ini \
-            services/watchtower/ansible/playbooks/exporters.yml
+          ansible-playbook -i inventory.ini playbooks/exporters.yml
+
+      - name: Run Ansible — Monitoring
+        working-directory: services/watchtower/ansible
+        run: |
+          ansible-playbook -i inventory.ini playbooks/monitoring.yml
