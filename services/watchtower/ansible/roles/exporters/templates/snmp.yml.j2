@@ -1,0 +1,35 @@
+auths:
+  littlewolfacres_v3:
+    community: {{ vault_snmp_community }}
+    security_level: authNoPriv
+    username: {{ vault_snmp_v3_username }}
+    password: {{ vault_snmp_v3_password }}
+    auth_protocol: SHA
+    priv_protocol: DES
+
+modules:
+  if_mib:
+    walk:
+      - interfaces
+      - ifXTable
+    auth:
+      community: {{ vault_snmp_community }}
+    lookups:
+      - source_indexes: [ifIndex]
+        lookup: ifAlias
+      - source_indexes: [ifIndex]
+        lookup: ifDescr
+      - source_indexes: [ifIndex]
+        lookup: ifName
+    overrides:
+      ifAlias:
+        ignore: true
+      ifDescr:
+        regex_extracts:
+          '':
+            - regex: '(.*)'
+              value: '$1'
+      ifAdminStatus:
+        rename: ifAdminStatus
+      ifOperStatus:
+        rename: ifOperStatus

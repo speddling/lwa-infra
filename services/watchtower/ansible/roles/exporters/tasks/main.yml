@@ -136,6 +136,15 @@
     remote_src: yes
   when: not snmp_binary.stat.exists
 
+- name: Deploy snmp.yml config
+  template:
+    src: snmp.yml.j2
+    dest: /etc/prometheus/snmp.yml
+    owner: root
+    group: root
+    mode: '0644'
+  notify: restart snmp_exporter
+
 - name: Deploy snmp_exporter systemd unit
   template:
     src: snmp_exporter.service.j2
