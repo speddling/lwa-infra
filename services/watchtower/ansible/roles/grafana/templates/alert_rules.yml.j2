@@ -5,7 +5,7 @@ groups:
       folder: Homelab
       interval: 1m
       rules:
-        - uid: wtcpu001
+        - uid: watchtower-high-cpu
           title: High CPU Usage
           condition: C
           data:
@@ -25,6 +25,9 @@ groups:
                 refId: A
             - refId: C
               queryType: expression
+              relativeTimeRange:
+                from: 600
+                to: 0
               datasourceUid: __expr__
               model:
                 conditions:
@@ -52,7 +55,8 @@ groups:
           noDataState: NoData
           execErrState: Error
           for: 5m
-          annotations: {}
+          annotations:
+            description: "Watchtower CPU usage is above 85% for 5 minutes"
           labels:
             severity: warning
           isPaused: false
@@ -79,6 +83,9 @@ groups:
                 refId: A
             - refId: C
               queryType: expression
+              relativeTimeRange:
+                from: 600
+                to: 0
               datasourceUid: __expr__
               model:
                 conditions:
@@ -134,6 +141,9 @@ groups:
                 refId: A
             - refId: C
               queryType: expression
+              relativeTimeRange:
+                from: 600
+                to: 0
               datasourceUid: __expr__
               model:
                 conditions:
@@ -189,6 +199,9 @@ groups:
                 refId: A
             - refId: C
               queryType: expression
+              relativeTimeRange:
+                from: 600
+                to: 0
               datasourceUid: __expr__
               model:
                 conditions:
@@ -244,6 +257,9 @@ groups:
                 refId: A
             - refId: C
               queryType: expression
+              relativeTimeRange:
+                from: 600
+                to: 0
               datasourceUid: __expr__
               model:
                 conditions:
