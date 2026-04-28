@@ -1,0 +1,7 @@
+---
+- name: Configure Monolith monitoring
+  hosts: monolith
+  become: yes
+
+  roles:
+    - node_exporter

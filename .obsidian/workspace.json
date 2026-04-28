@@ -186,6 +186,8 @@
   },
   "active": "165dadc935b0cab3",
   "lastOpenFiles": [
+    "services/monolith/ansible/playbooks/monitoring.yml",
+    "services/monolith/ansible/roles/node_exporter/templates/node_exporter.service.j2",
     "services/monolith/ansible/roles/node_exporter/vars/main.yml",
     "services/monolith/ansible/roles/node_exporter/tests/test.yml",
     "services/monolith/ansible/roles/node_exporter/tests/inventory",
@@ -195,8 +197,6 @@
     "services/monolith/ansible/roles/node_exporter/defaults/main.yml",
     "services/monolith/ansible/roles/node_exporter/vars",
     "services/monolith/ansible/roles/node_exporter/tests",
-    "services/monolith/ansible/roles/node_exporter/templates",
-    "services/monolith/ansible/roles/node_exporter/tasks",
     "services/monolith/ansible/roles/node_exporter/README.md",
     "services/watchtower/Watchtower-Roadmap.md",
     "services/watchtower/ansible/roles/grafana/README.md",
