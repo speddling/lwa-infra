@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "docs/network.md",
+                "file": "docs/homelab-state.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "network"
+              "title": "homelab-state"
             }
           }
         ]
@@ -186,6 +186,8 @@
   },
   "active": "165dadc935b0cab3",
   "lastOpenFiles": [
+    "docs/network.md",
+    "docs/homelab-state.md",
     "services/watchtower/ansible/roles/exporters/templates/snmp.yml.j2",
     "services/monolith/ansible/playbooks/monitoring.yml",
     "services/monolith/ansible/roles/node_exporter/templates/node_exporter.service.j2",
@@ -196,7 +198,6 @@
     "services/monolith/ansible/roles/node_exporter/meta/main.yml",
     "services/monolith/ansible/roles/node_exporter/handlers/main.yml",
     "services/monolith/ansible/roles/node_exporter/defaults/main.yml",
-    "services/monolith/ansible/roles/node_exporter/vars",
     "services/monolith/ansible/roles/node_exporter/README.md",
     "services/watchtower/Watchtower-Roadmap.md",
     "services/watchtower/ansible/roles/grafana/README.md",
@@ -207,7 +208,6 @@
     "services/watchtower/ansible/roles/unbound/README.md",
     "terraform/README.md",
     "nodes/vm40b/hardware.md",
-    "docs/network.md",
     "docs/homelab-setup-notes.md",
     "README.md",
     "docs/Pipeline considerations.md",
