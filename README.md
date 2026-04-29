@@ -26,13 +26,14 @@ Personal Kubernetes home lab documentation, configurations, and manifests.
 
 ## Finished Projects
 - Navidrome audio server with ~1TB FLAC/MP3 library
+- Always-on DNS resolver + full-stack monitoring node (full IaC pipeline)
 - Linux Samba share - for Wife & Daughter's file backups
 
 ## Next Project
 - Minecraft Server for the Wife and Daughter
+- 
 
 ## Pending Projects
-- Always-on DNS resolver + full-stack monitoring node.
 - Upgrade Worker Node hardware with Ryzen, max ram, and 8TB HDD
 
 ## Status

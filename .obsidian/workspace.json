@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "docs/homelab-setup-notes.md",
+                "file": "README.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "homelab-setup-notes"
+              "title": "README"
             }
           }
         ]
@@ -186,12 +186,12 @@
   },
   "active": "165dadc935b0cab3",
   "lastOpenFiles": [
+    "docs/homelab-setup-notes.md",
     "docs/storage.md",
     "docs/network.md",
     "docs/Monolith Upgrades?.md",
     "docs/homelab-state.md",
     "docs/K9s Reference.md",
-    "docs/homelab-setup-notes.md",
     "services/watchtower/ansible/roles/exporters/templates/snmp.yml.j2",
     "services/monolith/ansible/playbooks/monitoring.yml",
     "services/monolith/ansible/roles/node_exporter/templates/node_exporter.service.j2",
