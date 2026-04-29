@@ -63,35 +63,16 @@ Before installing any Ryzen 5000 (Vermeer) CPU, you **must** update the BIOS inc
 
 ## Workload Fit Assessment
 
-| Workload | CPU demand | RAM demand | Notes |
-|---|---|---|---|
-| k3s base overhead | Low | ~1–2GB | k3s is much lighter than full k8s |
-| Navidrome | Very low | ~256MB | Basically idle |
-| LAN fileshare/backup (3 users) | Very low (I/O bound) | Low | Network and disk are the bottleneck, not CPU |
-| Python coursework | Low–Medium | Low | Bursts during script runs |
-| Front-end dev (upcoming) | Low | Low | Node/npm dev servers are light |
-| Back-end + DB (upcoming) | Medium | Medium | Multiple containers — where 64GB earns its keep |
-| Small ML school projects | Medium (bursts) | Medium | CPU inference only; no GPU compute needed |
-| AI image / music generation | N/A | N/A | Hard pass — not in scope |
-
----
-
-## Migration Strategy
-
-Given AWS DevOps experience:
-- Run everything locally through front-end and early back-end coursework
-- When projects need more compute (GPU ML, large DB datasets, load testing), migrate to AWS — EKS, RDS, EC2 as appropriate
-- k3s manifests translate reasonably well to EKS with minor adjustments
-- Local lab remains the fast-iteration, zero-cost environment; cloud is for scale
-
----
-
-## Total Upgrade Cost Estimate
-
-| Option | CPU | RAM | GPU | Total |
-|---|---|---|---|---|
-| **Option 1 (recommended)** | 5600G ~$130 | 4×16GB ~$90 | None | **~$220** |
-| Option 2 | 5700X ~$160 | 4×16GB ~$90 | GT 710 ~$35 | **~$285** |
+| Workload                       | CPU demand           | RAM demand | Notes                                           |
+| ------------------------------ | -------------------- | ---------- | ----------------------------------------------- |
+| k3s base overhead              | Low                  | ~1–2GB     | k3s is much lighter than full k8s               |
+| Navidrome                      | Very low             | ~256MB     | Basically idle                                  |
+| LAN fileshare/backup (3 users) | Very low (I/O bound) | Low        | Network and disk are the bottleneck, not CPU    |
+| Python coursework              | Low–Medium           | Low        | Bursts during script runs                       |
+| Front-end dev (upcoming)       | Low                  | Low        | Node/npm dev servers are light                  |
+| Back-end + DB (upcoming)       | Medium               | Medium     | Multiple containers — where 64GB earns its keep |
+| Small ML school projects       | Medium (bursts)      | Medium     | CPU inference only; no GPU compute needed       |
+|                                |                      |            |                                                 |
 
 ---
 

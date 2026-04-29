@@ -4,14 +4,17 @@
 
 All static assignments are DHCP MAC-bound in the ER605. Do not set static IPs at the OS level.
 
-| IP | Hostname | Role |
-|---|---|---|
-| 192.168.0.4 | Big Brother | Reolink NVR / Camera Controller |
-| 192.168.0.7 | OC200 | Omada Network Controller |
-| 192.168.0.19 | Apex | MacBook Pro — Primary Workstation |
-| 192.168.0.20 | Monolith | k3s Node — Primary Server |
-| 192.168.0.21 | Watchtower | Ansible / DNS / Network Services (pending) |
-| 192.168.0.109 | Studio | Ubuntu Studio — DAW / KDE Workstation |
+| IP            | Hostname           | Role                                       |
+| ------------- | ------------------ | ------------------------------------------ |
+| 192.168.0.4   | Big Brother        | Reolink NVR / Camera Controller            |
+| 192.168.0.7   | OC200              | Omada Network Controller                   |
+| 192.168.0.19  | Apex               | MacBook Pro — Primary Workstation          |
+| 192.168.0.20  | Monolith           | k3s Node — Primary Server                  |
+| 192.168.0.21  | Watchtower         | Ansible / DNS / Network Services (pending) |
+| 192.168.0.109 | Studio             | Ubuntu Studio — DAW / KDE Workstation      |
+| 192.168.0.1   | ER605 v2.0         | Gigabit Multi-WAN VPN Router               |
+| 192.168.0.2   | EAP245-Foyer       | Access Point / Mesh                        |
+| 192.168.0.5   | EAP245-Yarn-Studio |                                            |
 
 All other devices use dynamic DHCP leases.
 
