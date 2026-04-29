@@ -1,0 +1,4229 @@
+=== ./.github/workflows/deploy-fileserver.yml ===
+name: Deploy Fileserver
+
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, monolith]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Ansible
+        run: |
+          sudo apt-get install -y ansible
+
+      - name: Install Ansible community.general collection
+        run: |
+          ansible-galaxy collection install community.general
+
+      - name: Run fileserver playbook
+        run: |
+          ansible-playbook \
+            -i services/fileserver/ansible/inventory.ini \
+            services/fileserver/ansible/playbooks/fileserver.yml
+
+=== ./.github/workflows/deploy-minecraft.yml ===
+name: Deploy Minecraft
+
+on:
+  workflow_dispatch:
+    inputs:
+      import_world:
+        description: "Stage a new .mcworld import?"
+        type: boolean
+        default: false
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, monolith]
+    labels: [monolith]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Stage world import (optional)
+        if: ${{ inputs.import_world }}
+        run: |
+          ansible-playbook \
+            -i services/minecraft/ansible/inventory.ini \
+            services/minecraft/ansible/playbooks/import-world.yml
+
+      - name: Apply Kubernetes manifests
+        run: |
+          kubectl apply -f services/minecraft/kubernetes/namespace.yaml
+          kubectl apply -f services/minecraft/kubernetes/pvc.yaml
+          kubectl apply -f services/minecraft/kubernetes/configmap.yaml
+          kubectl apply -f services/minecraft/kubernetes/deployment.yaml
+          kubectl apply -f services/minecraft/kubernetes/service.yaml
+=== ./.github/workflows/deploy-navidrome.yml ===
+name: Deploy Navidrome
+
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, monolith]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Apply storage config
+        run: |
+          kubectl apply -f kubernetes/cluster/storage/local-path-config.yaml
+
+      - name: Apply Kubernetes manifests
+        run: |
+          kubectl apply -f services/navidrome/kubernetes/namespace.yaml
+          kubectl apply -f services/navidrome/kubernetes/pvc.yaml
+          kubectl apply -f services/navidrome/kubernetes/configmap.yaml
+          kubectl apply -f services/navidrome/kubernetes/deployment.yaml
+          kubectl apply -f services/navidrome/kubernetes/service.yaml
+          kubectl apply -f services/navidrome/kubernetes/ingress.yaml
+
+      - name: Verify deployment
+        run: |
+          echo "Checking volume binding..."
+          kubectl get pvc -n navidrome
+          echo "Checking pod status..."
+          kubectl get pods -n navidrome
+
+=== ./.github/workflows/deploy-watchtower.yml ===
+name: Deploy Watchtower Config
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'services/watchtower/**'
+      - 'terraform/watchtower/**'
+      - '.github/workflows/deploy-watchtower.yml'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, watchtower]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y unzip ansible nodejs
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
+
+      - name: Terraform Init & Apply
+        working-directory: terraform/watchtower
+        run: |
+          terraform init
+          terraform apply -auto-approve
+
+      - name: Run Ansible — DNS
+        working-directory: services/watchtower/ansible
+        run: |
+          ansible-playbook -i inventory.ini playbooks/dns.yml
+
+      - name: Run Ansible — Exporters
+        working-directory: services/watchtower/ansible
+        run: |
+          ansible-playbook -i inventory.ini playbooks/exporters.yml
+
+      - name: Run Ansible — Monitoring
+        working-directory: services/watchtower/ansible
+        run: |
+          ansible-playbook -i inventory.ini playbooks/monitoring.yml
+
+=== ./.github/workflows/provision-k3s.yml ===
+name: Provision K3s Cluster
+
+on:
+  workflow_dispatch: # This gives you a manual "Play" button in GitHub
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, monolith]
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Install Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform Init
+        working-directory: ./terraform/monolith
+        run: terraform init
+
+      - name: Terraform Apply
+        working-directory: ./terraform/monolith
+        run: terraform apply -auto-approve
+=== ./ansible/monolith/playbooks/bootstrap.yml ===
+
+=== ./ansible/monolith/playbooks/node.yml ===
+
+=== ./docs/homelab-setup-notes.md ===
+---
+title: Kubernetes Homelab Setup Notes
+date: 2026-04-15
+tags: [homelab, kubernetes, k3s, terraform, navidrome, devops, bios]
+---
+
+# Kubernetes Homelab Setup Notes
+
+Personal notes from planning a k3s-based homelab with Navidrome and Terraform, based on hardware at [github.com/speddling/homelab](https://github.com/speddling/homelab).
+
+---
+
+## Hardware
+
+| Component | Spec |
+|---|---|
+| Control Plane / Dev Machine | MacBook Air M4, 16GB RAM, macOS |
+| Worker Node | AMD A10, 16GB RAM, Fractal Design Define R4 |
+| Network | TP-Link Omada — OC200, ER605, TL-SG1210P PoE switch, 2× EAP245 APs |
+| OS (Worker) | Ubuntu Server 24.04 LTS |
+| Kubernetes | k3s |
+| Primary Project | Navidrome audio server, ~1TB FLAC/MP3 library |
+
+---
+
+## Hardware Assessment
+
+### Control Plane — MacBook Air M4
+
+Solid and unconventional choice. The M4 is extremely efficient, and running k3s control-plane duties on macOS is well-supported. The 16GB unified memory is comfortable for control-plane-only work.
+
+**Watch out for:** macOS sleep/wake can occasionally disrupt etcd or the k3s API server. Configure *"prevent sleep when display is off"* or keep the Mac tethered while the cluster is active.
+
+### Worker Node — AMD A10 / 16GB RAM
+
+The A10 is an older APU (Piledriver/Steamroller, ~2013–2015 era). For this use case it is **perfectly adequate**:
+
+- Navidrome is extremely lightweight — 3 concurrent streams is trivial for any modern multi-core chip
+- 16GB RAM gives plenty of headroom for k3s, Navidrome, and supporting pods
+- The Define R4 has excellent thermals and drive mounting — ideal for a ~1TB music library
+
+**Weak spots:** The A10's single-threaded performance is dated. For CPU-heavier future workloads (video transcoding, ML inference), you'll feel it. For Navidrome, you're fine.
+
+### Navidrome Fitness
+
+For 3 concurrent FLAC/MP3 streams, the worker node is more than sufficient. Navidrome typically runs under 200MB RAM and barely registers on CPU unless actively transcoding. Expect the initial library scan to take 10–30 minutes on a spinning HDD, but subsequent startups are fast.
+
+---
+
+## BIOS Settings — AMD A10 Worker Node
+
+### Virtualization & CPU
+
+| Setting | Value | Priority | Notes |
+|---|---|---|---|
+| AMD-V / SVM Mode | Enable | **Required** | Needed for container runtimes. Under Advanced → CPU Configuration. |
+| IOMMU (AMD-Vi) | Enable | Recommended | Good practice; needed for hardware passthrough later. |
+| C-States (C6/C7) | Disable deep states, set C1E max | Recommended | Deep sleep causes latency spikes and "Not Ready" events under low load. |
+| Hyper-Threading / SMT | Enable | Recommended | More logical cores = more scheduling headroom for pods. |
+
+### Memory
+
+| Setting | Value | Priority | Notes |
+|---|---|---|---|
+| XMP / EXPO Profile | Enable if available | Optional | Runs RAM at rated speed. Verify stability on older A10 platforms. |
+| ECC | N/A | — | A10 consumer APUs don't support ECC. |
+
+### Storage & Boot
+
+| Setting | Value | Priority | Notes |
+|---|---|---|---|
+| SATA Mode | AHCI | **Required** | Do not use IDE or RAID — breaks Ubuntu disk detection. |
+| Boot Mode | UEFI (disable CSM/Legacy) | Recommended | Ubuntu 24.04 strongly prefers pure UEFI. |
+| Secure Boot | Disable | Recommended | Can conflict with unsigned k3s kernel modules (Flannel/WireGuard). Re-enable later with enrolled keys if desired. |
+
+### Power & Availability
+
+| Setting | Value | Priority | Notes |
+|---|---|---|---|
+| Restore on AC Power Loss | Power On | **Required** | Ensures the worker comes back up after any outage. |
+| Wake on LAN | Enable | Recommended | Lets you wake the node remotely from the Mac. |
+| Spread Spectrum | Disable | Optional | No benefit for a server; can cause subtle timing instability. |
+
+### Display & Onboard Peripherals
+
+| Setting | Value | Priority | Notes |
+|---|---|---|---|
+| Primary Display | iGPU | Optional | A10 uses integrated graphics. Disable POST display output after setup if running headless. |
+| Serial / Parallel Ports | Disable if unused | Optional | Reduces IRQ noise. |
+
+---
+
+## GitOps Workflow — Mac as Dev Platform
+
+### The Key Nuance: GitHub Actions Runners
+
+GitHub's hosted runners (`ubuntu-latest`) **cannot reach inside your home network**. Deployment to the worker node requires one of two approaches:
+
+**Option A — Self-hosted runner (recommended)**
+Install the GitHub Actions runner agent directly on the AMD A10 node. When a workflow triggers, GitHub sends the job to your node rather than a cloud VM. The runner makes outbound connections to GitHub — no inbound firewall rules needed.
+
+**Option B — Outbound tunnel**
+Use Cloudflare Tunnel or Tailscale to allow GitHub Actions to SSH into the node through a persistent outbound connection. More complex; useful if you can't install a runner.
+
+For a homelab learning DevOps patterns, **Option A is the right call** — simpler, free, and directly translates to enterprise GitOps patterns (ArgoCD, Flux).
+
+### Workflow Architecture
+
+```
+MacBook Air M4 (dev)
+  └── author Terraform configs, k8s manifests, workflow YAML
+  └── git push → GitHub repo (source of truth)
+        └── GitHub Actions workflow triggers
+              └── job dispatched to self-hosted runner (AMD A10)
+                    ├── terraform apply  (infra layer)
+                    └── kubectl apply    (app layer)
+                          └── k3s cluster → Navidrome pod
+```
+
+### What Runs Where
+
+**MacBook (dev tooling):**
+- `kubectl` — pointed at k3s cluster via kubeconfig
+- `terraform`
+- `helm`
+- `k9s` — cluster visibility TUI
+
+You never need Docker Desktop. k3s uses `containerd` and workloads run on the worker.
+
+**Worker node (persistent services):**
+- `k3s` agent
+- GitHub Actions self-hosted runner (installed as a `systemd` service)
+
+### Terraform — Two-Layer Pattern
+
+Split Terraform into two layers for clean separation:
+
+**Layer 1 — Infrastructure**
+- Static IP reservation in ER605
+- DNS records in Omada
+- kubeconfig provisioning
+
+**Layer 2 — Application**
+- Navidrome Helm release
+- PersistentVolumeClaim for music library mount
+- k3s namespace
+
+This lets you `plan`/`apply` the app layer independently without touching network config.
+
+**State file:** Store in a remote backend — Cloudflare R2 (free tier) works well as an S3-compatible backend. Do not store state locally on the Mac.
+
+### Example GitHub Actions Workflow
+
+```yaml
+name: Deploy to homelab
+
+on:
+  push:
+    branches: [master]
+
+jobs:
+  deploy:
+    runs-on: self-hosted   # targets your AMD A10 runner
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Terraform init & apply
+        working-directory: terraform/
+        run: |
+          terraform init
+          terraform apply -auto-approve
+
+      - name: Apply Kubernetes manifests
+        run: kubectl apply -f kubernetes/
+```
+
+### ARM vs x86 — Image Build Note
+
+The MacBook M4 builds `arm64` images locally. The AMD A10 worker is `amd64`. For Navidrome this is irrelevant (pull the official image). For any custom images you build locally, specify `--platform linux/amd64` or use GitHub Actions hosted runners (which are `amd64`) to build and push to a registry before deploying.
+
+---
+
+## Practical First Steps
+
+Get these working in order before building anything else:
+
+1. **Install k3s** on the AMD A10 worker node
+2. **Copy kubeconfig** to the Mac — verify `kubectl get nodes` works from macOS
+3. **Assign a static IP** to the worker via the ER605 (do this early — kubeconfig embeds the IP)
+4. **Install self-hosted runner** on the worker as a systemd service
+5. **Write a minimal workflow** that runs `kubectl get nodes` — prove the pipeline end-to-end
+6. **Add Terraform** once the loop is proven
+7. **Deploy Navidrome** via Helm as your first real workload
+
+One working loop beats a perfect architecture you haven't validated yet.
+
+---
+## Upgrade Thoughts
+
+| **Component** | **Choice**                | **Reason for K8s**                                                                                                             |
+| ------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| **CPU**       | **Ryzen 9 5900X**         | Highest core count that the VRMs can safely handle.                                                                            |
+| **RAM**       | **64GB DDR4-3200**        | Critical for running multiple nodes and namespaces.                                                                            |
+| **Cooling**   | **Down-draft Air Cooler** | A cooler like the _Noctua NH-L12S_ or _Be Quiet! Shadow Rock LP_ blows air onto the VRMs, which is vital for this motherboard. |
+| **Storage**   | **NVMe Gen3 (Slot 1)**    | Use the Ultra M.2 slot for your `etcd` store and boot drive to keep latency low.                                               |
+
+
+---
+
+### 1. The Storage Architecture (K3s + Navidrome)
+
+Since you have a mix of NVMe, SATA SSDs, and a mechanical HDD, here is the most efficient way to map them in your Kubernetes lab:
+
+- **Boot Drive / Control Plane (Samsung 512GB NVMe):** * Install your OS (likely Ubuntu Server or Debian) here.
+    
+    - K3s stores its `etcd` database in `/var/lib/rancher/k3s`. The low latency of your NVMe is crucial for preventing "database leader election" timeouts as your cluster grows.
+        
+- **Media Library SSD (Crucial 1TB SSD):** * Mount this specifically for your **Navidrome** music library.
+    
+    - **Pro Tip:** Format this with **XFS** or **Ext4**. If you use K3s with **Local Path Provisioner**, you can point a Persistent Volume (PV) directly to this SSD to keep Navidrome’s scanning fast.
+        
+- **Application Data SSD (Crucial 512GB & 256GB SSD):** * Use this for other lightweight containers (AdGuard Home, Home Assistant, etc.). It keeps your OS drive clean and your media drive dedicated to throughput.
+    
+- **Backup & Cold Storage (2TB HDD):** * Mount this for long-term backups or large file storage that doesn't require speed. You can also use this as a "Bulk Storage" class in K3s for non-essential pods.
+    
+
+---
+
+
+
+## Network Stack Reference
+
+| Device | Role |
+|---|---|
+| OC200 | Omada cloud controller |
+| ER605 | Router / gateway |
+| TL-SG1210P | PoE switch |
+| EAP245 (×2) | Access points |
+
+---
+
+## References
+
+- [speddling/homelab on GitHub](https://github.com/speddling/homelab)
+- [k3s documentation](https://docs.k3s.io)
+- [Navidrome documentation](https://www.navidrome.org/docs/)
+- [GitHub Actions self-hosted runners](https://docs.github.com/en/actions/hosting-your-own-runners/managing-self-hosted-runners/about-self-hosted-runners)
+- [Terraform Kubernetes provider](https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs)
+- [Terraform Helm provider](https://registry.terraform.io/providers/hashicorp/helm/latest/docs)
+
+
+
+
+
+-------------------
+New info / conversations:
+
+## Talos Linux or Flux/ArgoCD
+
+Since you are already using GitHub Actions, you are 90% of the way to a "Pull-based" deployment model.
+
+- **FluxCD or ArgoCD:** Instead of GitHub Actions "pushing" the YAML to the Monolith, these tools live _inside_ your cluster. They watch your GitHub repo; the moment you commit a change to a YAML, the cluster "pulls" it and updates itself.
+    
+    - _Why?_ It fixes "Configuration Drift." If someone manually changes a setting on the Monolith, Flux will automatically revert it to match your GitHub repo.
+        
+
+## Local Development: Tilt or Skaffold
+
+hate waiting for a GitHub Action to run just to see a small change:
+
+- **[Tilt](https://tilt.dev/):** It watches your local directory on your Mac. The second you save a file, it syncs the change directly into the Kubernetes cluster on the Monolith. It makes remote K8s feel like local development.
+    
+
+## 5. Better Mac Terminal Experience
+
+- **[Kubectx & Kubens](https://github.com/ahmetb/kubectx):** Essential if you eventually add more clusters or namespaces. Switch contexts (`kubectx monolith`) and namespaces (`kubens navidrome`) instantly.
+    
+- **[Starship Prompt](https://starship.rs/):** A customizable shell prompt that will show you exactly which K8s context and namespace you are currently targeting, so you never accidentally delete something in the wrong place.
+
+
+---
+
+### The "A10 to Ryzen" Upgrade Path
+
+Since you’re on an A10 (likely an A10-9700), you’re on the **AM4 socket**. This is great news because you have a massive upgrade path, but there are two major "gotchas" for a Homelab build:
+
+#### 1. The "Cheap but Powerful" Sweet Spot
+
+The **Ryzen 5 5600G** is currently the king of budget server upgrades for your board.
+
+- **Why the "G"?** Since your Monolith is a headless server, having integrated graphics (APU) is a lifesaver for troubleshooting. More importantly, Navidrome/Plex/Jellyfin can use that integrated GPU for **hardware transcoding**, which keeps your CPU usage at 1% even when streaming high-bitrate video.
+    
+- **Performance:** You go from 4 weak cores to 6 very fast cores (12 threads). It will handle K3s and Navidrome without breaking a sweat.
+    
+
+#### 2. The RAM Trap
+
+- **Speed:** Ryzen _loves_ fast RAM. Your A10 probably has 2133MHz or 2400MHz DDR4. If you stick with that, you’ll bottleneck the Ryzen. Aim for **3200MHz CL16**—it’s the "sweet spot" for price and performance.
+    
+- **Spec:** Ensure it's non-ECC unbuffered DDR4 (standard desktop RAM). Maxing out at **32GB** (2x16GB) is usually plenty for a Monolith running K3s and a large media library.
+    
+
+#### 3. The BIOS Warning (Critical!)
+
+**Do not swap the CPUs until you update the BIOS.** Your current motherboard BIOS was written before Ryzen 5000 existed. You must:
+
+1. Keep the A10 installed.
+    
+2. Download the latest BIOS from your motherboard manufacturer.
+    
+3. Flash it.
+    
+4. _Then_ swap in the Ryzen. _(Note: Some older boards actually drop support for the A10 once you flash the "Ryzen-ready" BIOS, so once you flash it, you might be committed to the swap immediately.)_
+    
+
+---
+
+### The Storage Move
+
+Replacing the "vintage" 2TB with an **8TB HDD** is a solid move. When that time comes, since you’re already comfortable with `rsync`, you’ll just:
+
+1. Mount the new 8TB as `/mnt/lab-backups-new`.
+    
+2. Rsync everything from the 2TB to the 8TB.
+    
+3. Update your Terraform/Kubernetes `hostPath` to point to the new disk.
+
+----------------
+
+Asus VM40B 8gb + 1tb SSD  
+  
+
+- **AdGuard Home:**
+- **Unbound:**
+- **Netdata:**
+- **Prometheus:**
+- **Grafana:**
+- **Exporters:**
+
+--------------------------
+
+- **Hot storage** (NVMe) — active model weights, datasets being trained on
+- **Warm storage** (SSD) — projects, code, containers
+- **Cold storage** (HDD) — audio library, backups, archived models
+
+---
+
+
+## Working With Claude
+
+To share this repo with Claude for review or updates, run from the repo root:
+
+```bash
+find . -type f \( -name "*.yaml" -o -name "*.md" -o -name "*.yml" \) \
+  ! -path "./.obsidian/*" \
+  | sort | while read f; do
+    echo "=== $f ==="
+    cat "$f"
+    echo ""
+  done > homelab-dump.txt
+```
+
+Upload `homelab-dump.txt` directly in the Claude chat window.
+=== ./docs/homelab-state.md ===
+# Little Wolf Acres — Homelab Current State
+> Last updated: April 2026 · Authored on apex · All IaC in `speddling/homelab` repo
+
+---
+
+## Network
+
+### Hardware
+
+| Device | IP | Role | Status |
+|---|---|---|---|
+| ER605 v2.0 | 192.168.0.1 | Gigabit Multi-WAN VPN Router | ✅ Online |
+| OC200 | 192.168.0.7 | Omada Network Controller | ✅ Online |
+| TL-SG1210P | — | Unmanaged PoE Switch | ✅ Online (no SNMP) |
+| EAP245 — Foyer | 192.168.0.2 | Access Point | ✅ Online |
+| EAP245 — Yarn Studio | 192.168.0.5 | Access Point | ✅ Online |
+
+### Static DHCP Reservations (MAC-bound in ER605)
+
+| IP | Hostname | Role |
+|---|---|---|
+| 192.168.0.4 | Big Brother | Reolink NVR / Camera Controller |
+| 192.168.0.7 | OC200 | Omada Network Controller |
+| 192.168.0.19 | Apex | MacBook Pro — Primary Workstation |
+| 192.168.0.20 | Monolith | k3s Node — Primary Server |
+| 192.168.0.21 | Watchtower | DNS / Monitoring Stack |
+| 192.168.0.109 | Studio | Ubuntu Studio — DAW / KDE Workstation |
+
+> All other devices use dynamic DHCP leases. Do not set static IPs at the OS level.
+
+### DNS
+
+- **Primary DNS:** Watchtower (`192.168.0.21`) — AdGuard Home → Unbound → Root
+- **Fallback DNS:** `1.1.1.1`
+- **Local rewrites managed in AdGuard Home:**
+
+| Domain | Resolves To |
+|---|---|
+| `watchtower.local` | 192.168.0.21 |
+| `grafana.local` | 192.168.0.21 |
+| `monolith.local` | 192.168.0.20 |
+| `navidrome.local` | 192.168.0.20 |
+
+### SNMP
+
+- Enabled at site level in Omada Controller
+- Community string: `littlewolfacres` (stored in Ansible vault)
+- SNMPv3 user: `prometheus` (stored in Ansible vault)
+- Monitored devices: ER605, EAP245 Foyer, EAP245 Yarn Studio
+- **Note:** TL-SG1210P is unmanaged — no SNMP support. Upgrade to JetStream switch planned.
+
+---
+
+## Watchtower
+
+### Hardware
+
+| Spec     | Detail                        |
+| -------- | ----------------------------- |
+| Machine  | Asus VM40B Mini-PC            |
+| RAM      | 8GB                           |
+| Storage  | 1TB SSD                       |
+| OS       | Ubuntu Server 24.04 LTS       |
+| Hostname | `watchtower`                  |
+| IP       | 192.168.0.21 (DHCP MAC-bound) |
+
+### Role
+
+Always-on DNS resolver and full-stack monitoring node. Never runs workloads. Sees everything, never sleeps.
+
+### Services
+
+| Service | Role | Port | Status |
+|---|---|---|---|
+| Unbound | Recursive DNS resolver (upstream) | 5335 | ✅ Running |
+| AdGuard Home | DNS frontend, ad/tracker filtering | 53, 3000 | ✅ Running |
+| Prometheus | Metrics scraping + TSDB | 9090 | ✅ Running |
+| node_exporter | Watchtower host metrics | 9100 | ✅ Running |
+| blackbox_exporter | Endpoint / ICMP probing | 9115 | ✅ Running |
+| snmp_exporter | Omada network gear metrics | 9116 | ✅ Running |
+| adguard_exporter | AGH metrics → Prometheus | 9618 | ✅ Running |
+| Netdata | Real-time host observability | 19999 | ✅ Running |
+| Grafana | Dashboards + alerting → Slack | 3001 | ✅ Running |
+
+### Web UIs
+
+| Service | URL |
+|---|---|
+| AdGuard Home | http://192.168.0.21:3000 |
+| Grafana | http://192.168.0.21:3001 |
+| Prometheus | http://192.168.0.21:9090 |
+| Netdata | http://192.168.0.21:19999 |
+
+### Prometheus Targets
+
+| Job | Target | Status |
+|---|---|---|
+| watchtower | localhost:9100 | ✅ Up |
+| blackbox | localhost:9115 | ✅ Up |
+| adguard | localhost:9618 | ✅ Up |
+| monolith | monolith.local:9100 | ✅ Up |
+| snmp-er605 | 192.168.0.1 | ✅ Up |
+| snmp-eap-yarn-studio | 192.168.0.5 | ✅ Up |
+| snmp-eap-foyer | 192.168.0.2 | ✅ Up |
+
+### Grafana Dashboards
+
+| Dashboard | Grafana ID |
+|---|---|
+| Node Exporter Full | 1860 |
+| AdGuard Home | 20799 |
+| Blackbox Exporter | 7587 |
+| SNMP Interface Stats | 11169 |
+
+### Alerting
+
+- **Contact point:** Sentinel → `#sentinel` in Little Wolf Acres Slack
+- **Alert rules (all in `watchtower` group, Homelab folder):**
+
+| Alert | Condition |
+|---|---|
+| High CPU Usage | > 85% sustained 5m |
+| High Memory Usage | > 85% sustained 5m |
+| Low Disk Space | > 80% used |
+| Node Exporter Down | Scrape fails > 1m |
+| AdGuard Home Down | Scrape fails > 1m |
+
+### UFW Rules
+
+| Port | Protocol | Service | Allowed From |
+|---|---|---|---|
+| 22 | TCP | SSH | Apex (192.168.0.19) only |
+| 53 | TCP+UDP | AdGuard Home DNS | LAN |
+| 3000 | TCP | AdGuard Home UI | LAN |
+| 3001 | TCP | Grafana | LAN |
+| 9090 | TCP | Prometheus | LAN |
+| 9116 | TCP | snmp_exporter | LAN |
+| 9618 | TCP | adguard_exporter | LAN |
+| 19999 | TCP | Netdata | LAN |
+
+### IaC
+
+| Layer | Tool | Location |
+|---|---|---|
+| State | Terraform Cloud (`littlewolfacres` org, `watchtower` workspace) | app.terraform.io |
+| Config | Ansible | `services/watchtower/ansible/` |
+| Pipeline | GitHub Actions | `.github/workflows/deploy-watchtower.yml` |
+| Runner | Self-hosted, label: `watchtower` | Installed on Watchtower as systemd service |
+
+### Pending
+
+- **NUT (UPS monitoring)** — role is written and ready, waiting for CyberPower CP1500PFCLCD hardware
+
+---
+
+## Monolith
+
+### Hardware
+
+| Spec     | Detail                        |
+| -------- | ----------------------------- |
+| Machine  | AMD Tower                     |
+| OS       | Ubuntu Server 24.04 LTS       |
+| Hostname | `monolith`                    |
+| IP       | 192.168.0.20 (DHCP MAC-bound) |
+| Storage  | Boot 512GB NVMe               |
+|          | 256GB SSD                     |
+|          | 512GB SSD                     |
+|          | 2TB HDD                       |
+
+### Role
+
+Primary k3s node. Runs all workloads. Named for its role as the single heavy node.
+
+### Services
+
+| Service | Role | Status |
+|---|---|---|
+| k3s | Kubernetes (single-node cluster) | ✅ Running |
+| Navidrome | Music streaming server | ✅ Running |
+| Samba | File share (family backups, media) | ✅ Running |
+| node_exporter | Host metrics → Prometheus on Watchtower | ✅ Running |
+
+### IaC
+
+| Layer | Tool | Location |
+|---|---|---|
+| State | Terraform Cloud (`littlewolfacres` org, `monolith` workspace) | app.terraform.io |
+| Config | Ansible | `services/monolith/ansible/` |
+| Pipeline | GitHub Actions | `.github/workflows/` (existing k3s workflows) |
+| Runner | Self-hosted, label: `monolith` | Installed on Monolith as systemd service |
+
+### DNS
+
+- Points to Watchtower (`192.168.0.21`) as primary DNS
+- Fallback: `1.1.1.1`
+- Configured via `/etc/systemd/resolved.conf`
+
+### Pending
+
+- **File server** — structured family backup solution (daughter's iPad art, wife's crochet notes)
+- **UFW** — currently inactive, needs hardening pass
+
+---
+
+## Apex
+
+| Spec | Detail |
+|---|---|
+| Machine | MacBook Pro |
+| Hostname | `apex` |
+| IP | 192.168.0.19 (DHCP MAC-bound) |
+| Role | Primary workstation — all authoring, config, remote ops originate here |
+
+### Shell Aliases (`~/.zprofile`)
+
+```bash
+# Navigation
+alias school="cd ~/school-codes"
+alias labs="cd ~/homelab"
+alias runs="cd ~/runbooks"
+
+# Lab hosts
+alias watchtower='ssh speddling@192.168.0.21'
+alias monolith='ssh speddling@192.168.0.20'
+alias studio='ssh speddling@192.168.0.109'
+```
+
+---
+
+## CLI Reference — Little Wolf Acres Homelab
+
+### SSH
+
+```bash
+watchtower              # SSH into Watchtower
+monolith                # SSH into Monolith
+studio                  # SSH into Studio
+```
+
+### Service Health Checks (run on Watchtower)
+
+```bash
+# Check all core Watchtower services at once
+systemctl status prometheus grafana-server netdata AdGuardHome unbound
+
+# Check individual services
+systemctl status prometheus
+systemctl status grafana-server
+systemctl status AdGuardHome
+systemctl status unbound
+systemctl status node_exporter
+systemctl status blackbox_exporter
+systemctl status snmp_exporter
+systemctl status adguard_exporter
+systemctl status netdata
+```
+
+### Live Log Tailing (run on Watchtower)
+
+```bash
+journalctl -fu prometheus
+journalctl -fu grafana-server
+journalctl -fu AdGuardHome
+journalctl -fu unbound
+journalctl -fu adguard_exporter
+journalctl -fu snmp_exporter
+```
+
+### DNS Testing
+
+```bash
+# Test Unbound directly (recursive resolver)
+dig @127.0.0.1 -p 5335 google.com
+
+# Test AdGuard Home (DNS frontend)
+dig @127.0.0.1 google.com
+
+# Test a local rewrite
+dig monolith.local
+dig grafana.local
+
+# Test from a specific DNS server
+dig @192.168.0.21 monolith.local
+```
+
+### SNMP Testing (run on Watchtower)
+
+```bash
+# Test ER605
+snmpwalk -v2c -c littlewolfacres 192.168.0.1 1.3.6.1.2.1.1.1.0
+
+# Test EAP245 Yarn Studio
+snmpwalk -v2c -c littlewolfacres 192.168.0.5 1.3.6.1.2.1.1.1.0
+
+# Test EAP245 Foyer
+snmpwalk -v2c -c littlewolfacres 192.168.0.2 1.3.6.1.2.1.1.1.0
+
+# Test SNMP exporter directly
+curl "http://localhost:9116/snmp?module=if_mib&auth=littlewolfacres_v2&target=192.168.0.1"
+```
+
+### Prometheus
+
+```bash
+# Validate config before restarting
+promtool check config /etc/prometheus/prometheus.yml
+
+# Check storage size
+du -sh /var/lib/prometheus
+
+# Restart after config change
+sudo systemctl restart prometheus
+```
+
+### Ansible (run from apex)
+
+```bash
+# Run DNS playbook
+cd ~/homelab/services/watchtower/ansible
+ansible-playbook -i inventory.ini playbooks/dns.yml --ask-become-pass --vault-password-file=~/homelab/.vault_pass
+
+# Run monitoring playbook
+ansible-playbook -i inventory.ini playbooks/monitoring.yml --ask-become-pass --vault-password-file=~/homelab/.vault_pass
+
+# Run exporters playbook
+ansible-playbook -i inventory.ini playbooks/exporters.yml --ask-become-pass --vault-password-file=~/homelab/.vault_pass
+
+# Dry run (check mode)
+ansible-playbook -i inventory.ini playbooks/monitoring.yml --check --ask-become-pass --vault-password-file=~/homelab/.vault_pass
+
+# Edit vault
+ansible-vault edit group_vars/all/vault.yml --vault-password-file=~/homelab/.vault_pass
+
+# View vault
+ansible-vault view group_vars/all/vault.yml --vault-password-file=~/homelab/.vault_pass
+```
+
+### Monolith Ansible (run from apex)
+
+```bash
+cd ~/homelab/services/monolith/ansible
+ansible-playbook -i inventory.ini playbooks/monitoring.yml --ask-become-pass
+```
+
+### Terraform (run from apex)
+
+```bash
+# Watchtower
+cd ~/homelab/terraform/watchtower
+terraform init
+terraform plan
+terraform apply
+
+# Monolith
+cd ~/homelab/terraform/monolith
+terraform init
+terraform plan
+terraform apply
+```
+
+### UFW (run on Watchtower)
+
+```bash
+# Check rules
+sudo ufw status
+
+# Temporarily allow Studio for SSH troubleshooting
+sudo ufw allow from 192.168.0.109 to any port 22 proto tcp
+
+# Remove it when done
+sudo ufw delete allow from 192.168.0.109 to any port 22 proto tcp
+```
+
+### NUT — When UPS Arrives (run on apex)
+
+```bash
+# Enable NUT role
+# Edit inventory.ini and add:
+# nut_enabled=true
+# under [watchtower:vars]
+
+# Then redeploy
+cd ~/homelab/services/watchtower/ansible
+ansible-playbook -i inventory.ini playbooks/monitoring.yml --ask-become-pass --vault-password-file=~/homelab/.vault_pass
+```
+
+### Grafana API (run from anywhere on LAN)
+
+```bash
+# List all alert rules
+curl -s -u 'admin:PASSWORD' 'http://192.168.0.21:3001/api/v1/provisioning/alert-rules' | python3 -m json.tool
+
+# Delete a specific alert rule by UID
+curl -X DELETE -u 'admin:PASSWORD' 'http://192.168.0.21:3001/api/v1/provisioning/alert-rules/RULE-UID'
+```
+
+### Git Workflow
+
+```bash
+# Standard commit and push (triggers GitHub Actions if paths match)
+cd ~/homelab
+git add .
+git commit -m "feat: description of change"
+git push
+
+# Trigger workflow manually via GitHub CLI
+gh workflow run deploy-watchtower.yml
+```
+
+---
+
+## Pending Work
+
+| Item | Priority | Notes |
+|---|---|---|
+| Password rotation | High | All passwords exposed during setup session |
+| Monolith UFW hardening | High | Currently inactive |
+| Foyer AP cable run | Medium | Cat5e from spool, wiring closet cleanup |
+| Family file server | Medium | Structured backup for iPad art, crochet notes |
+| JetStream PoE switch | Low | Replaces unmanaged TL-SG1210P, enables SNMP per-port stats |
+| UPS — CyberPower CP1500PFCLCD | Low | NUT role ready, waiting on hardware budget |
+| Grafana custom dashboard | Low | Homelab overview — DNS rate, AP clients, uptime probes |
+| SNMP MIB generator | Low | Proper TP-Link MIB walk for richer metrics |
+| Omada DNS integration | Low | Point LAN clients at Watchtower via DHCP option |
+
+=== ./docs/K9s Reference.md ===
+# Commands
+
+## CLI Arguments
+
+K9s CLI comes with a view arguments that you can use to launch the tool with different configuration.
+
+```
+# List all available CLI options
+k9s help
+# Get info about K9s runtime (logs, configs, etc..)
+k9s info
+# Run K9s in a given namespace.
+k9s -n mycoolns
+# Run K9s and launch in pod view via the pod command.
+k9s -c pod
+# Start K9s in a non default KubeConfig context
+k9s --context coolCtx
+# Start K9s in readonly mode - with all modification commands disabled
+k9s --readonly
+```
+
+## Key Bindings
+
+| Action | Command | Comment |
+| --- | --- | --- |
+| Show active keyboard mnemonics and help | `?` |  |
+| Show all available resource alias | `ctrl-a` |  |
+| To bail out of K9s | `:q`, `ctrl-c` |  |
+| View a Kubernetes resource using singular/plural or short-name | `:`pod⏎ | accepts singular, plural, short-name or alias ie pod or pods |
+| View a Kubernetes resource in a given namespace | `:`pod ns-x⏎ |  |
+| View filtered pods | `:`pod /fred⏎ | View all pods filtered by fred |
+| View labeled pods | `:`pod app=fred,env=dev⏎ | View all pods with labels matching app=fred and env=dev |
+| View pods in a given context | `:`pod @ctx1⏎ | View all pods in context ctx1. Switches out your current k9s context! |
+| Filter out a resource view given a filter | `/`filter⏎ | Regex2 supported ie `fred|blee` to filter resources named fred or blee |
+| Inverse regex filter | `/`! filter⏎ | Keep everything that _doesn’t_ match. |
+| Filter resource view by labels | `/`-l label-selector⏎ |  |
+| Fuzzy find a resource given a filter | `/`-f filter⏎ |  |
+| Bails out of view/command/filter mode | `<esc>` |  |
+| Key mapping to describe, view, edit, view logs,… | `d`,`v`, `e`, `l`,… |  |
+| To view and switch to another Kubernetes context (Pod view) | `:`ctx⏎ |  |
+| To view and switch directly to another Kubernetes context (Last used view) | `:`ctx context-name⏎ |  |
+| To view and switch to another Kubernetes namespace | `:`ns⏎ |  |
+| To view all saved resources | `:`screendump or sd⏎ |  |
+| To delete a resource (TAB and ENTER to confirm) | `ctrl-d` |  |
+| To kill a resource (no confirmation dialog, equivalent to kubectl delete –now) | `ctrl-k` |  |
+| Launch pulses view | `:`pulses or pu⏎ |  |
+| Launch XRay view | `:`xray RESOURCE \[NAMESPACE\]⏎ | RESOURCE can be one of po, svc, dp, rs, sts, ds, NAMESPACE is optional |
+
+=== ./docs/minecraft-bedrock-k3s.md ===
+# Minecraft Bedrock Server — K3s Homelab Reference
+
+## Overview
+
+A Bedrock-only Minecraft server for 2–3 LAN players, running on the `amd-tower` (Monolith) worker node via K3s. World data is imported from a Realm backup and persisted via a PersistentVolumeClaim.
+
+---
+
+## Stack
+
+| Layer | Tool |
+|---|---|
+| Container runtime | K3s (k3s.io) |
+| Server image | `itzg/minecraft-bedrock-server:latest` |
+| IaC | Terraform |
+| Config management | Ansible |
+| CI/CD | GitHub Actions (self-hosted runner on Monolith) |
+| OS | Ubuntu Server 24.04 LTS |
+
+---
+
+## Networking
+
+| Detail | Value |
+|---|---|
+| Protocol | **UDP** (not TCP) |
+| Port | `19132` |
+| Service type | `LoadBalancer` (k3s servicelb) |
+| Client connection | Node LAN IP on port `19132` |
+
+> ⚠️ The UDP protocol must be explicitly declared in the Service manifest — k3s servicelb supports it but defaults to TCP.
+
+---
+
+## Directory Structure
+
+```
+homelab/
+├── services/
+│   └── minecraft/
+│       ├── ansible/
+│       │   ├── inventory.ini
+│       │   └── playbooks/
+│       │       └── import-world.yml
+│       ├── kubernetes/
+│       │   ├── namespace.yaml
+│       │   ├── pvc.yaml
+│       │   ├── configmap.yaml
+│       │   ├── deployment.yaml
+│       │   └── service.yaml
+│       └── files/
+│           └── .gitkeep          ← .mcworld files go here, gitignored
+└── .github/
+    └── workflows/
+        └── deploy-minecraft.yml
+```
+
+---
+
+## Kubernetes Manifests
+
+### `namespace.yaml`
+```yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: minecraft
+```
+
+### `pvc.yaml`
+```yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: minecraft-data
+  namespace: minecraft
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 10Gi
+```
+
+### `configmap.yaml`
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: minecraft-config
+  namespace: minecraft
+data:
+  EULA: "TRUE"
+  LEVEL_NAME: "my-realm"        # must match extracted world folder name
+  GAMEMODE: "survival"
+  DIFFICULTY: "normal"
+  MAX_PLAYERS: "3"
+  SERVER_NAME: "Homelab SMP"
+  ALLOW_CHEATS: "false"
+```
+
+### `deployment.yaml`
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: minecraft-bedrock
+  namespace: minecraft
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: minecraft-bedrock
+  template:
+    metadata:
+      labels:
+        app: minecraft-bedrock
+    spec:
+      initContainers:
+        - name: world-import
+          image: busybox
+          command:
+            - sh
+            - -c
+            - |
+              WORLD_DIR="/data/worlds/my-realm"
+              MARKER="/data/worlds/.imported"
+
+              if [ -f "$MARKER" ]; then
+                echo "World already imported, skipping."
+                exit 0
+              fi
+
+              if [ -f "/world-import/realm.mcworld" ]; then
+                echo "Importing realm backup..."
+                mkdir -p "$WORLD_DIR"
+                unzip /world-import/realm.mcworld -d "$WORLD_DIR"
+                touch "$MARKER"
+                echo "Import complete."
+              else
+                echo "No .mcworld file found, starting fresh."
+              fi
+          volumeMounts:
+            - name: minecraft-data
+              mountPath: /data
+            - name: world-import
+              mountPath: /world-import
+
+      containers:
+        - name: minecraft-bedrock
+          image: itzg/minecraft-bedrock-server:latest
+          envFrom:
+            - configMapRef:
+                name: minecraft-config
+          ports:
+            - containerPort: 19132
+              protocol: UDP
+          volumeMounts:
+            - name: minecraft-data
+              mountPath: /data
+          resources:
+            requests:
+              memory: "1Gi"
+              cpu: "500m"
+            limits:
+              memory: "3Gi"
+              cpu: "2000m"
+
+      volumes:
+        - name: minecraft-data
+          persistentVolumeClaim:
+            claimName: minecraft-data
+        - name: world-import
+          hostPath:
+            path: /opt/minecraft/import   # Ansible stages the .mcworld here
+            type: DirectoryOrCreate
+```
+
+### `service.yaml`
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: minecraft-bedrock
+  namespace: minecraft
+spec:
+  type: LoadBalancer
+  selector:
+    app: minecraft-bedrock
+  ports:
+    - port: 19132
+      targetPort: 19132
+      protocol: UDP
+```
+
+---
+
+## Ansible
+
+### `import-world.yml`
+```yaml
+---
+- name: Stage Minecraft world import
+  hosts: monolith
+  become: true
+
+  vars:
+    import_dir: /opt/minecraft/import
+    mcworld_local_path: "{{ playbook_dir }}/../../files/realm.mcworld"
+
+  tasks:
+    - name: Create import staging directory
+      ansible.builtin.file:
+        path: "{{ import_dir }}"
+        state: directory
+        mode: "0755"
+
+    - name: Copy .mcworld file to node
+      ansible.builtin.copy:
+        src: "{{ mcworld_local_path }}"
+        dest: "{{ import_dir }}/realm.mcworld"
+        mode: "0644"
+
+    - name: Confirm file staged
+      ansible.builtin.debug:
+        msg: "realm.mcworld staged at {{ import_dir }} — deploy the manifest to trigger import"
+```
+
+---
+
+## GitHub Actions
+
+### `deploy-minecraft.yml`
+```yaml
+name: Deploy Minecraft
+
+on:
+  workflow_dispatch:
+    inputs:
+      import_world:
+        description: "Stage a new .mcworld import?"
+        type: boolean
+        default: false
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+    labels: [monolith]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Stage world import (optional)
+        if: ${{ inputs.import_world }}
+        run: |
+          ansible-playbook \
+            -i services/minecraft/ansible/inventory.ini \
+            services/minecraft/ansible/playbooks/import-world.yml
+
+      - name: Apply Kubernetes manifests
+        run: |
+          kubectl apply -f services/minecraft/kubernetes/namespace.yaml
+          kubectl apply -f services/minecraft/kubernetes/pvc.yaml
+          kubectl apply -f services/minecraft/kubernetes/configmap.yaml
+          kubectl apply -f services/minecraft/kubernetes/deployment.yaml
+          kubectl apply -f services/minecraft/kubernetes/service.yaml
+```
+
+---
+
+## Realm World Import Process
+
+### One-time setup steps
+
+1. **Export from Realm** — In-game → Settings → Download World → saves a `.mcworld` file
+2. **Place the file** at `services/minecraft/files/realm.mcworld`
+3. **Run the workflow** with `import_world: true`
+   - Ansible copies the file to `/opt/minecraft/import/` on Monolith
+4. **Pod starts** — init container checks for a `.imported` marker file
+   - Not found → unzips `.mcworld` into `/data/worlds/my-realm/`
+   - Found → skips (protects against accidental overwrites on restart)
+5. **Main container starts** — `LEVEL_NAME` in ConfigMap points to the imported world
+
+### To load a new world later
+
+Delete the marker file and re-run with `import_world: true`:
+```bash
+kubectl exec -n minecraft deploy/minecraft-bedrock -c world-import -- rm /data/worlds/.imported
+```
+Then re-run the workflow with `import_world: true`.
+
+---
+
+## Key Gotchas
+
+| Gotcha | Detail |
+|---|---|
+| **`LEVEL_NAME` must match folder name** | BDS is strict — the ConfigMap value must match the extracted world directory name exactly |
+| **Marker file prevents overwrites** | `/data/worlds/.imported` is created after first import — delete it intentionally to re-import |
+| **Marketplace content won't transfer** | License-locked to accounts, not the world file |
+| **Behavior/resource packs** | Must be copied separately into `behavior_packs` / `resource_packs` and re-linked in `world_behavior_packs.json` |
+| **Single node = no HA** | Fine for LAN — pod restarts automatically on crash |
+| **No automatic backups** | Consider adding a K3s `CronJob` to tarball the PVC data |
+| **`.mcworld` is gitignored** | `services/minecraft/files/*.mcworld` — keep world data out of version control |
+
+---
+
+## Resource Allocation (AMD A10 / 16GB RAM)
+
+| Resource | Request | Limit |
+|---|---|---|
+| Memory | 1Gi | 3Gi |
+| CPU | 500m | 2000m |
+
+Leaves plenty of headroom on the node for other services (Navidrome, monitoring stack, etc.).
+
+---
+
+## Quick Reference Commands
+
+```bash
+# Check pod status
+kubectl get pods -n minecraft
+
+# Watch logs
+kubectl logs -n minecraft deploy/minecraft-bedrock -f
+
+# Check init container logs (import troubleshooting)
+kubectl logs -n minecraft deploy/minecraft-bedrock -c world-import
+
+# Get the LAN IP players connect to
+kubectl get svc -n minecraft
+
+# Restart the server
+kubectl rollout restart deploy/minecraft-bedrock -n minecraft
+
+# Delete marker to force re-import on next deploy
+kubectl exec -n minecraft deploy/minecraft-bedrock -- rm /data/worlds/.imported
+```
+
+=== ./docs/Monolith Upgrades?.md ===
+# ASRock AB350 Pro4 — Upgrade Summary
+**Use case:** k3s Kubernetes lab · Navidrome audio server · LAN fileshare/backup
+
+---
+
+## System Context
+
+| Item | Detail |
+|---|---|
+| Motherboard | ASRock AB350 Pro4 (AM4, B350 chipset) |
+| Current CPU | Ryzen 3 1200 (Summit Ridge / "A10" — Raven Ridge APU) |
+| Max RAM | 64GB DDR4 (4 slots) |
+| Max RAM speed | DDR4-3200 (native, no OC needed with Zen 3) |
+| OS | Ubuntu (headless) |
+| Orchestration | k3s |
+
+---
+
+## ⚠️ Critical: BIOS Update Sequence
+
+Before installing any Ryzen 5000 (Vermeer) CPU, you **must** update the BIOS incrementally using your existing CPU. Skipping steps risks a non-booting system or bricked BIOS.
+
+**Required update path:**
+```
+3.40 → 5.40 → 7.00 → 8.02
+```
+
+- Download each version from the [ASRock AB350 Pro4 BIOS page](https://www.asrock.com/mb/AMD/AB350%20Pro4/)
+- Do **not** skip intermediate versions — the BIOS chip is small and updates are incremental by design
+- Complete all updates with your **current CPU in place**, then swap
+
+> The B350 chipset officially supports up to Matisse (Ryzen 3000). Ryzen 5000 (Vermeer) works on BIOS 8.02 but is community-confirmed, not officially listed by ASRock for this board.
+
+---
+
+## Planned Upgrade: Ryzen 5 5600G + 64GB DDR4
+
+### CPU: AMD Ryzen 5 5600G
+| Spec            | Value                                  |
+| --------------- | -------------------------------------- |
+| Architecture    | Zen 3 (Cezanne)                        |
+| Cores / Threads | 6c / 12t                               |
+| Base / Boost    | 3.9 GHz / 4.4 GHz                      |
+| TDP             | 65W                                    |
+| iGPU            | Radeon Vega 7 (no discrete GPU needed) |
+|                 |                                        |
+
+
+---
+
+## RAM: 64GB DDR4-3200 CL16
+
+**Configuration:** 4×16GB across all 4 slots (preferred over 2×32GB)
+
+**Kits:**
+- G.Skill RipjawsV 4×16GB DDR4-3200 CL16
+- Kingston Fury Beast 4×16GB DDR4-3200 CL16 
+- Corsair Vengeance LPX 4×16GB DDR4-3200 CL16 
+
+> **Note:** DDR4-3200 is the official rated speed for Zen 3 on this board. No XMP/overclocking needed — it just works at spec.
+
+---
+
+## Workload Fit Assessment
+
+| Workload                       | CPU demand           | RAM demand | Notes                                           |
+| ------------------------------ | -------------------- | ---------- | ----------------------------------------------- |
+| k3s base overhead              | Low                  | ~1–2GB     | k3s is much lighter than full k8s               |
+| Navidrome                      | Very low             | ~256MB     | Basically idle                                  |
+| LAN fileshare/backup (3 users) | Very low (I/O bound) | Low        | Network and disk are the bottleneck, not CPU    |
+| Python coursework              | Low–Medium           | Low        | Bursts during script runs                       |
+| Front-end dev (upcoming)       | Low                  | Low        | Node/npm dev servers are light                  |
+| Back-end + DB (upcoming)       | Medium               | Medium     | Multiple containers — where 64GB earns its keep |
+| Small ML school projects       | Medium (bursts)      | Medium     | CPU inference only; no GPU compute needed       |
+|                                |                      |            |                                                 |
+
+---
+
+## Quick Checklist
+
+- [ ] Download BIOS versions 3.40, 5.40, 7.00, and 8.02 from ASRock before ordering CPU
+- [ ] Update BIOS incrementally with current CPU installed
+- [ ] Order CPU + RAM kit
+- [ ] Set iGPU VRAM to 512MB in BIOS after install (Option 1 only)
+- [ ] Verify DDR4-3200 is detected correctly in BIOS (should be automatic with Zen 3)
+- [ ] Enjoy the upgrade
+
+=== ./docs/network.md ===
+# Network Documentation
+
+## Static IP Reservations
+
+All static assignments are DHCP MAC-bound in the ER605. Do not set static IPs at the OS level.
+
+| IP            | Hostname           | Role                                       |
+| ------------- | ------------------ | ------------------------------------------ |
+| 192.168.0.4   | Big Brother        | Reolink NVR / Camera Controller            |
+| 192.168.0.7   | OC200              | Omada Network Controller                   |
+| 192.168.0.19  | Apex               | MacBook Pro — Primary Workstation          |
+| 192.168.0.20  | Monolith           | k3s Node — Primary Server                  |
+| 192.168.0.21  | Watchtower         | Ansible / DNS / Network Services (pending) |
+| 192.168.0.109 | Studio             | Ubuntu Studio — DAW / KDE Workstation      |
+| 192.168.0.1   | ER605 v2.0         | Gigabit Multi-WAN VPN Router               |
+| 192.168.0.2   | EAP245-Foyer       | Access Point / Mesh                        |
+| 192.168.0.5   | EAP245-Yarn-Studio | Access Point / Mesh                        |
+
+All other devices use dynamic DHCP leases.
+
+---
+
+## Notes
+
+- When Watchtower DNS is live, all fstab and Ansible inventory files referencing IPs should be updated to hostnames
+- ER605 manages routing and firewall at the network boundary
+
+---
+
+*Last updated: 2026-04-29*
+
+
+=== ./docs/Pipeline considerations.md ===
+
+**GitHub Actions** and **Terraform**,
+building a "GitOps Lite" pipeline -  high-level approach for that transition from CloudFormation to Terraform in a local lab:
+
+1. The State File "Gotcha"
+
+Unlike CloudFormation, which stores state in the AWS backend, Terraform needs a place to keep its `.tfstate`. Since this is a local lab:
+
+- **Local State:** Easiest for day one, but bad for GitHub Actions.
+- **S3/GCS Backend:** You can actually use a free-tier S3 bucket to hold your homelab state so your GitHub Actions can reach it.
+- **Alternative:** Use **Terraform Cloud** (free for small teams) to manage the state and locking without needing an external bucket.
+
+2. Provider Mapping
+
+In CloudFormation, you’re mostly dealing with `AWS::*` resources. For your lab, you’ll likely be using:
+
+- **`telmate/proxmox`** or **`bpg/proxmox`** (if you go the hypervisor route).
+- **`hashicorp/kubernetes`** and **`hashicorp/helm`** for the Navidrome layer.
+- **`cloudflare/cloudflare`** if you eventually want to manage local DNS or Tunnels via code.
+
+3. Hardening + GitHub Actions
+
+Since you're hardening the box first (presumably via SSH/Ansible or manual scripts), you can use GitHub Actions to:
+
+- **Lint your YAMLs:** Run `kube-linter` or `yamllint` before any push.
+- **Terraform Plan/Apply:** Use a **self-hosted runner** (on your Ryzen box) to execute the Terraform applies. This avoids the need to expose your lab's K8s API to the public internet for the GitHub-hosted runners to reach.
+=== ./docs/storage.md ===
+# Monolith — Storage Layout
+
+## Physical Drives
+
+| Device | Size | Type | Mount | Purpose |
+|---|---|---|---|---|
+| nvme0n1 | 476.9G | NVMe SSD | `/` (150G LVM) | Boot / OS / k3s — remaining space is unallocated headroom |
+| sda | 465.8G | SATA SSD | `/mnt/ssd-a` | k8s local-path provisioner (PVC storage) |
+| sdb | 238.5G | SATA SSD | `/mnt/ssd-b` | File server / family backups |
+| sdc | 1.8T | SATA HDD | `/mnt/lab-backups` | Music library — replace with 8TB HDD when upgraded |
+
+> **Note:** The AB350 Pro4 throttles NVMe to PCIe 2.0 x2. The unallocated NVMe space is intentional headroom for future growth, not an oversight.
+
+---
+
+## Mount Points
+
+All mounts are UUID-based in `/etc/fstab` to survive drive reordering on reboot.
+
+```
+UUID=2903b345-9ec9-4524-9a59-c065f1a7c67c  /mnt/ssd-a       ext4  defaults  0  2
+UUID=6ec61651-6596-4f29-82e5-ca6c43b6f552  /mnt/ssd-b       ext4  defaults  0  2
+UUID=725e0389-8e5b-431f-bdb4-1c59ab79ddf6  /mnt/lab-backups ext4  defaults  0  2
+```
+
+---
+
+## k3s Storage Classes
+
+| Class | Provisioner | Path | Used By |
+|---|---|---|---|
+| `local-path` (default) | rancher.io/local-path | `/mnt/ssd-a` | Navidrome DB, future service PVCs |
+
+The music library is mounted directly via `hostPath` in the Navidrome deployment — it is too large and too static to benefit from PVC abstraction at this scale.
+
+---
+
+## Directory Structure
+
+```
+/mnt/ssd-a/
+└── pvc-*/                        ← k3s local-path provisioner directories
+
+/mnt/ssd-b/
+└── (fileserver)
+
+/mnt/lab-backups/
+└── music-library/                ← Navidrome audio library (~605G)
+```
+
+---
+
+## Planned Changes
+
+### 8TB HDD Upgrade
+When the 8TB HDD arrives to replace the 2TB:
+
+1. Install 8TB, identify device with `lsblk`
+2. Format: `sudo mkfs.ext4 /dev/sdX`
+3. Mount temporarily: `sudo mount /dev/sdX /mnt/hdd-new`
+4. Rsync music library: `sudo rsync -av /mnt/lab-backups/ /mnt/hdd-new/`
+5. Update `/etc/fstab` — replace `sdc` UUID with new drive UUID, change mount point to `/mnt/hdd`
+6. Unmount old, mount new: `sudo umount /mnt/lab-backups && sudo mount -a`
+7. Update `deployment.yaml` hostPath: `/mnt/lab-backups/music-library` → `/mnt/hdd/music-library`
+8. Redeploy via GitHub Actions: `deploy-navidrome.yml`
+9. Navidrome will rescan the library automatically within 1 hour (or trigger manually)
+
+> DB loss on redeploy is acceptable — library reindexes automatically, playlists must be recreated manually.
+
+---
+
+## Post-Watchtower Cleanup
+- Remove UFW from fileserver Ansible playbook — firewall policy will be managed at the network layer via ER605 / Watchtower
+
+---
+
+*Last updated: 2026-04-23*
+
+=== ./kubernetes/cluster/storage/local-path-config.yaml ===
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: local-path-config
+  namespace: kube-system
+data:
+  config.json: |-
+    {
+      "nodePathMap": [
+        {
+          "node": "monolith",
+          "paths": [
+            "/mnt/ssd-a"
+          ]
+        }
+      ]
+    }
+
+=== ./kubernetes/cluster/storage/Storage Setup.md ===
+
+```Text
+
+- **The Brain (`etcd`):** Isolated on your 238G drive to prevent cluster crashes during heavy disk I/O.
+    
+- **The Muscle (`fast`):** Ready for apps that need speed on your 465G SSD.
+    
+- **The Attic (`slow`):** Ready for the big, heavy data on your 1.8T HDD.
+  
+```
+
+
+
+=== ./network/omada/hardware.md ===
+
+- OC200 controller
+- ER605 router
+- TL-SG1210P PoE switch
+- 2x EAP245 APs
+=== ./nodes/amd-tower/hardware.md ===
+
+- AMD A10-9700 Radeon R7 10 Compute Cores 4C+6G 3.50 GHz 
+- Asrock AB350 Pro4
+- 16GB RAM
+- Fractal Design Define R4 (Monolith)
+- Noctua cooler 
+
+- ****Storage**** 
+- ~~512gb NVMe - boot~~
+- ~~512gb SSD~~ 
+- ~~256gb SSD~~  
+- ~~2tb HDD~~
+- 1tb SSD - media library
+
+```bash
+df -h
+
+Filesystem                         Size  Used Avail Use% Mounted on
+
+tmpfs                              1.6G  1.2M  1.6G   1% /run
+
+efivarfs                           128K   14K  110K  12% /sys/firmware/efi/efivars
+
+/dev/mapper/ubuntu--vg-ubuntu--lv  148G  6.8G  134G   5% /
+
+tmpfs                              7.6G     0  7.6G   0% /dev/shm
+
+tmpfs                              5.0M     0  5.0M   0% /run/lock
+
+/dev/nvme0n1p2                     2.0G  200M  1.6G  11% /boot
+
+/dev/nvme0n1p1                     1.1G  6.2M  1.1G   1% /boot/efi
+
+tmpfs                              1.6G   12K  1.6G   1% /run/user/1000
+
+/dev/sda                           458G   28K  435G   1% /mnt/k8s-worker
+
+/dev/sdb                           234G   28K  222G   1% /mnt/k8s-etcd
+
+/dev/sdc                           1.8T   28K  1.7T   1% /mnt/lab-backups
+```
+
+
+
+=== ./nodes/macbook/hardware.md ===
+
+13" MacBook Air M4 (2025) 16gb - 256gb
+
+=== ./nodes/vm40b/hardware.md ===
+
+Asus VB40B
+8gb of ram (2x 4gb)
+1tb SSD
+=== ./README.md ===
+# Home Lab
+
+Personal Kubernetes home lab documentation, configurations, and manifests.
+
+## Hardware
+- **Control Plane / Workstation** - 
+	- MacBook Air M4 running macOS (apex)
+- **Worker Node** - 
+	- AMD A10, ASRock AB350 Pro4, 16GB RAM, Fractal Design Define R4 (monolith)
+- Monitoring Node - 
+	- Asus VM40B, 8GB RAM, 1TB SSD (watchtower)
+
+## Network
+- TP-Link Omada ecosystem: 
+- OC200 controller
+- ER605 router
+- TL-SG1210P PoE switch 
+- 2x EAP245 APs
+
+## Stack
+- Kubernetes via k3s
+- Terraform
+- GitHub Actions
+- Ansible
+- Ubuntu Server 24.04 LTS on worker node
+
+## Finished Projects
+- Navidrome audio server with ~1TB FLAC/MP3 library
+- Always-on DNS resolver + full-stack monitoring node (full IaC pipeline)
+- Linux Samba share - for Wife & Daughter's file backups
+
+## Next Project
+- Minecraft Server for the Wife and Daughter
+- rewire closet then reconfigure Omada setup.
+
+## Pending Projects
+- Upgrade Worker Node hardware with Ryzen, max ram, and 8TB HDD
+
+## Status
+Online
+
+=== ./services/fileserver/ansible/group_vars/all/vars.yml ===
+# TODO: vault these credentials before sharing this repo publicly
+# Run: ansible-vault encrypt services/fileserver/ansible/group_vars/all/vars.yml
+# Then move passwords into vault.yml and reference here
+
+samba_user: vault
+samba_password: "bubbie"      # ← replace before deploying
+
+james_user: james
+james_password: "junia"         # ← replace before deploying
+
+vault_share_name: vault
+vault_share_path: /mnt/ssd-b/vault
+
+studio_share_name: studio-archive
+studio_share_path: /mnt/lab-backups/studio-archive
+
+=== ./services/fileserver/ansible/playbooks/fileserver.yml ===
+---
+- name: Configure Samba file server (vault + studio-archive)
+  hosts: monolith
+  become: true
+
+  vars_files:
+    - ../group_vars/all/vars.yml
+
+  tasks:
+    - name: Install Samba and dependencies
+      ansible.builtin.apt:
+        name:
+          - samba
+          - expect
+          - python3-pexpect
+          - ufw
+        state: present
+        update_cache: true
+
+    - name: Create vault Samba user
+      ansible.builtin.user:
+        name: "{{ samba_user }}"
+        shell: /sbin/nologin
+        create_home: false
+        state: present
+
+    - name: Create james Samba user
+      ansible.builtin.user:
+        name: "{{ james_user }}"
+        shell: /sbin/nologin
+        create_home: false
+        state: present
+
+    - name: Create vault share directory
+      ansible.builtin.file:
+        path: "{{ vault_share_path }}"
+        state: directory
+        mode: "0775"
+        owner: "{{ samba_user }}"
+        group: "{{ samba_user }}"
+
+    - name: Create studio-archive share directory
+      ansible.builtin.file:
+        path: "{{ studio_share_path }}"
+        state: directory
+        mode: "0770"
+        owner: "{{ james_user }}"
+        group: "{{ james_user }}"
+
+    - name: Set Samba password for vault
+      ansible.builtin.expect:
+        command: smbpasswd -a {{ samba_user }}
+        responses:
+          "New SMB password:": "{{ samba_password }}"
+          "Retype new SMB password:": "{{ samba_password }}"
+      no_log: true
+      changed_when: false
+
+    - name: Enable vault Samba user
+      ansible.builtin.shell: smbpasswd -e {{ samba_user }}
+      changed_when: false
+
+    - name: Set Samba password for james
+      ansible.builtin.expect:
+        command: smbpasswd -a {{ james_user }}
+        responses:
+          "New SMB password:": "{{ james_password }}"
+          "Retype new SMB password:": "{{ james_password }}"
+      no_log: true
+      changed_when: false
+
+    - name: Enable james Samba user
+      ansible.builtin.shell: smbpasswd -e {{ james_user }}
+      changed_when: false
+
+    - name: Write smb.conf
+      ansible.builtin.template:
+        src: ../templates/smb.conf.j2
+        dest: /etc/samba/smb.conf
+        owner: root
+        group: root
+        mode: "0644"
+      notify: Restart Samba
+
+    - name: Enable and start Samba services
+      ansible.builtin.systemd:
+        name: "{{ item }}"
+        enabled: true
+        state: started
+      loop:
+        - smbd
+        - nmbd
+
+  handlers:
+    - name: Restart Samba
+      ansible.builtin.systemd:
+        name: smbd
+        state: restarted
+
+=== ./services/minecraft/ansible/playbooks/import-world.yml ===
+---
+- name: Stage Minecraft world import
+  hosts: monolith
+  become: true
+
+  vars:
+    import_dir: /opt/minecraft/import
+    mcworld_local_path: "{{ playbook_dir }}/../../files/realm.mcworld"
+
+  tasks:
+    - name: Create import staging directory
+      ansible.builtin.file:
+        path: "{{ import_dir }}"
+        state: directory
+        mode: "0755"
+
+    - name: Copy .mcworld file to node
+      ansible.builtin.copy:
+        src: "{{ mcworld_local_path }}"
+        dest: "{{ import_dir }}/realm.mcworld"
+        mode: "0644"
+
+    - name: Confirm file staged
+      ansible.builtin.debug:
+        msg: "realm.mcworld staged at {{ import_dir }} — deploy the manifest to trigger import"
+=== ./services/minecraft/kubernetes/configmap.yaml ===
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: minecraft-config
+  namespace: minecraft
+data:
+  EULA: "TRUE"
+  LEVEL_NAME: "my-realm"        # must match extracted world folder name
+  GAMEMODE: "survival"
+  DIFFICULTY: "normal"
+  MAX_PLAYERS: "3"
+  SERVER_NAME: "Homelab SMP"
+  ALLOW_CHEATS: "false"
+=== ./services/minecraft/kubernetes/deployment.yaml ===
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: minecraft-bedrock
+  namespace: minecraft
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: minecraft-bedrock
+  template:
+    metadata:
+      labels:
+        app: minecraft-bedrock
+    spec:
+      initContainers:
+        - name: world-import
+          image: busybox
+          command:
+            - sh
+            - -c
+            - |
+              WORLD_DIR="/data/worlds/my-realm"
+              MARKER="/data/worlds/.imported"
+
+              if [ -f "$MARKER" ]; then
+                echo "World already imported, skipping."
+                exit 0
+              fi
+
+              if [ -f "/world-import/realm.mcworld" ]; then
+                echo "Importing realm backup..."
+                mkdir -p "$WORLD_DIR"
+                unzip /world-import/realm.mcworld -d "$WORLD_DIR"
+                touch "$MARKER"
+                echo "Import complete."
+              else
+                echo "No .mcworld file found, starting fresh."
+              fi
+          volumeMounts:
+            - name: minecraft-data
+              mountPath: /data
+            - name: world-import
+              mountPath: /world-import
+
+      containers:
+        - name: minecraft-bedrock
+          image: itzg/minecraft-bedrock-server:latest
+          envFrom:
+            - configMapRef:
+                name: minecraft-config
+          ports:
+            - containerPort: 19132
+              protocol: UDP
+          volumeMounts:
+            - name: minecraft-data
+              mountPath: /data
+          resources:
+            requests:
+              memory: "1Gi"
+              cpu: "500m"
+            limits:
+              memory: "3Gi"
+              cpu: "2000m"
+
+      volumes:
+        - name: minecraft-data
+          persistentVolumeClaim:
+            claimName: minecraft-data
+        - name: world-import
+          hostPath:
+            path: /opt/minecraft/import   # ← Ansible drops the .mcworld here
+            type: DirectoryOrCreate
+=== ./services/minecraft/kubernetes/namespace.yaml ===
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: minecraft
+=== ./services/minecraft/kubernetes/pvc.yaml ===
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: minecraft-data
+  namespace: minecraft
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 10Gi
+=== ./services/minecraft/kubernetes/service.yaml ===
+apiVersion: v1
+kind: Service
+metadata:
+  name: minecraft-bedrock
+  namespace: minecraft
+spec:
+  type: LoadBalancer
+  selector:
+    app: minecraft-bedrock
+  ports:
+    - port: 19132
+      targetPort: 19132
+      protocol: UDP
+=== ./services/monolith/ansible/playbooks/monitoring.yml ===
+---
+- name: Configure Monolith monitoring
+  hosts: monolith
+  become: yes
+
+  roles:
+    - node_exporter
+
+=== ./services/monolith/ansible/roles/node_exporter/defaults/main.yml ===
+#SPDX-License-Identifier: MIT-0
+---
+# defaults file for /Users/speddling/homelab/services/monolith/ansible/roles/node_exporter
+
+=== ./services/monolith/ansible/roles/node_exporter/handlers/main.yml ===
+---
+- name: reload systemd
+  systemd:
+    daemon_reload: yes
+
+- name: restart node_exporter
+  systemd:
+    name: node_exporter
+    state: restarted
+
+=== ./services/monolith/ansible/roles/node_exporter/meta/main.yml ===
+#SPDX-License-Identifier: MIT-0
+galaxy_info:
+  author: your name
+  description: your role description
+  company: your company (optional)
+
+  # If the issue tracker for your role is not on github, uncomment the
+  # next line and provide a value
+  # issue_tracker_url: http://example.com/issue/tracker
+
+  # Choose a valid license ID from https://spdx.org - some suggested licenses:
+  # - BSD-3-Clause (default)
+  # - MIT
+  # - GPL-2.0-or-later
+  # - GPL-3.0-only
+  # - Apache-2.0
+  # - CC-BY-4.0
+  license: license (GPL-2.0-or-later, MIT, etc)
+
+  min_ansible_version: 2.2
+
+  # If this a Container Enabled role, provide the minimum Ansible Container version.
+  # min_ansible_container_version:
+
+  galaxy_tags: []
+    # List tags for your role here, one per line. A tag is a keyword that describes
+    # and categorizes the role. Users find roles by searching for tags. Be sure to
+    # remove the '[]' above, if you add tags to this list.
+    #
+    # NOTE: A tag is limited to a single word comprised of alphanumeric characters.
+    #       Maximum 20 tags per role.
+
+dependencies: []
+  # List your role dependencies here, one per line. Be sure to remove the '[]' above,
+  # if you add dependencies to this list.
+
+=== ./services/monolith/ansible/roles/node_exporter/README.md ===
+Role Name
+=========
+
+A brief description of the role goes here.
+
+Requirements
+------------
+
+Any pre-requisites that may not be covered by Ansible itself or the role should be mentioned here. For instance, if the role uses the EC2 module, it may be a good idea to mention in this section that the boto package is required.
+
+Role Variables
+--------------
+
+A description of the settable variables for this role should go here, including any variables that are in defaults/main.yml, vars/main.yml, and any variables that can/should be set via parameters to the role. Any variables that are read from other roles and/or the global scope (ie. hostvars, group vars, etc.) should be mentioned here as well.
+
+Dependencies
+------------
+
+A list of other roles hosted on Galaxy should go here, plus any details in regards to parameters that may need to be set for other roles, or variables that are used from other roles.
+
+Example Playbook
+----------------
+
+Including an example of how to use your role (for instance, with variables passed in as parameters) is always nice for users too:
+
+    - hosts: servers
+      roles:
+         - { role: username.rolename, x: 42 }
+
+License
+-------
+
+BSD
+
+Author Information
+------------------
+
+An optional section for the role authors to include contact information, or a website (HTML is not allowed).
+
+=== ./services/monolith/ansible/roles/node_exporter/tasks/main.yml ===
+---
+- name: Create node_exporter system user
+  user:
+    name: node_exporter
+    system: yes
+    shell: /usr/sbin/nologin
+    create_home: no
+
+- name: Check if node_exporter is already installed
+  stat:
+    path: /usr/local/bin/node_exporter
+  register: node_exporter_binary
+
+- name: Download node_exporter tarball
+  get_url:
+    url: https://github.com/prometheus/node_exporter/releases/download/v1.7.0/node_exporter-1.7.0.linux-amd64.tar.gz
+    dest: /tmp/node_exporter.tar.gz
+  when: not node_exporter_binary.stat.exists
+
+- name: Extract node_exporter
+  unarchive:
+    src: /tmp/node_exporter.tar.gz
+    dest: /tmp/
+    remote_src: yes
+  when: not node_exporter_binary.stat.exists
+
+- name: Install node_exporter binary
+  copy:
+    src: /tmp/node_exporter-1.7.0.linux-amd64/node_exporter
+    dest: /usr/local/bin/node_exporter
+    owner: root
+    group: root
+    mode: '0755'
+    remote_src: yes
+  when: not node_exporter_binary.stat.exists
+
+- name: Deploy node_exporter systemd unit
+  template:
+    src: node_exporter.service.j2
+    dest: /etc/systemd/system/node_exporter.service
+    owner: root
+    group: root
+    mode: '0644'
+  notify:
+    - reload systemd
+    - restart node_exporter
+
+- name: Enable and start node_exporter
+  systemd:
+    name: node_exporter
+    enabled: yes
+    state: started
+
+=== ./services/monolith/ansible/roles/node_exporter/tests/test.yml ===
+#SPDX-License-Identifier: MIT-0
+---
+- hosts: localhost
+  remote_user: root
+  roles:
+    - /Users/speddling/homelab/services/monolith/ansible/roles/node_exporter
+
+=== ./services/monolith/ansible/roles/node_exporter/vars/main.yml ===
+#SPDX-License-Identifier: MIT-0
+---
+# vars file for /Users/speddling/homelab/services/monolith/ansible/roles/node_exporter
+
+=== ./services/navidrome/kubernetes/configmap.yaml ===
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: navidrome-config
+  namespace: navidrome
+data:
+  ND_SCANSCHEDULE: "1h"
+  ND_LOGLEVEL: "info"
+  ND_MUSICFOLDER: "/music"
+  ND_DATAFOLDER: "/data"
+
+=== ./services/navidrome/kubernetes/deployment.yaml ===
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: navidrome
+  namespace: navidrome
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: navidrome
+  template:
+    metadata:
+      labels:
+        app: navidrome
+    spec:
+      containers:
+        - name: navidrome
+          image: deluan/navidrome:latest
+          envFrom:
+            - configMapRef:
+                name: navidrome-config
+          ports:
+            - containerPort: 4533
+          volumeMounts:
+            - name: db-storage
+              mountPath: /data
+            - name: music-storage
+              mountPath: /music
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+            limits:
+              memory: "512Mi"
+              cpu: "1000m"
+      volumes:
+        - name: db-storage
+          persistentVolumeClaim:
+            claimName: navidrome-db
+        - name: music-storage
+          hostPath:
+            path: /mnt/lab-backups/music-library  # → /mnt/hdd/music-library after 8TB swap
+            type: Directory
+
+=== ./services/navidrome/kubernetes/ingress.yaml ===
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: navidrome
+  namespace: navidrome
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: web
+spec:
+  rules:
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: navidrome
+                port:
+                  number: 4533
+
+=== ./services/navidrome/kubernetes/namespace.yaml ===
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: navidrome
+
+=== ./services/navidrome/kubernetes/pvc.yaml ===
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: navidrome-db
+  namespace: navidrome
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 2Gi
+
+=== ./services/navidrome/kubernetes/service.yaml ===
+apiVersion: v1
+kind: Service
+metadata:
+  name: navidrome
+  namespace: navidrome
+spec:
+  type: NodePort
+  selector:
+    app: navidrome
+  ports:
+    - port: 4533
+      targetPort: 4533
+      nodePort: 30533  # Access via http://monolith.local:30533
+
+=== ./services/watchtower/ansible/group_vars/all/vault.yml ===
+$ANSIBLE_VAULT;1.1;AES256
+34643466353732333436346463373534393234373730376230396635346562646565303731613233
+3332663538633364333438396433646364653962356565390a376134363165613936393837663363
+30383333386666623232376332383533313266373536323132313236666437623732353037396333
+3631343230353133320a366334353662653838373133306539303364646634373139323834333433
+37623135353236343035316237646137643135323132303639376137386265326135646230306565
+35333430373265633263656132336163323965663036616664613062653565363263333734356534
+34636364613333383130376432363930373633373461383737376362353063633366303664653362
+61613837316335306630343764383162626132383766383737616230303031363166616437626430
+30323639636332343264343336383936353266626232646133616533623035663236396336383930
+36613639356565396236373632623034666531383530333436353264363761663863386338363833
+35343039623833363265626131663531626263306536386366656431636530386233333465376537
+37646532616535373732373433616634396637643562643835613261316333643136326535303661
+34626165336132386633366562643436626664356137613233313363663336303165646166643431
+39343865393638393934323261323566326235373666346531616363363931356233343239653165
+62303332323564386534376337323838333436623439613233666330653037313363656235373338
+37323831346462666335623830633335343963633661626239353231663639613235363634316430
+30326465343265336163316465356565616330336364633266316232333631616136303338333932
+65363835306463346564653961383033613231336662366433646636353230393839383839313231
+32303562653730666331336662633762313362333362386339356333646138373139363131326333
+38306533336337356464653966373033373631646234383339383663353936643036613466383066
+65333037376633616636636631613164386436396235373665386361356131363862623439376664
+63383738356231333863613434633636656362656537363462336561616437663639633166383362
+31653963633038356233616337316463666635613834343633626537376538643030666361363532
+63653766656261663664393061636236633230316635393264383565366639396232333839616231
+62623634663964633166353834643838623964653161393935396130326237636362353836623438
+38343562313233333263373761613936393830323563313436393232336561653138336331306336
+35303330356366333663326234626163346663333366623032656438343138383763616534616461
+34363631386532396137333435353862306466623035313239643930373436373962663365666263
+66636438376466363164633232616566393737323830306430393037366535386235653239626537
+6138346265343339333262313037363166303365346463343862
+
+=== ./services/watchtower/ansible/playbooks/dns.yml ===
+---
+- name: Configure DNS layer
+  hosts: watchtower
+  become: yes
+
+  roles:
+    - unbound
+    - adguard
+
+=== ./services/watchtower/ansible/playbooks/exporters.yml ===
+---
+- name: Configure exporters
+  hosts: watchtower
+  become: yes
+
+  roles:
+    - exporters
+
+=== ./services/watchtower/ansible/playbooks/monitoring.yml ===
+---
+- name: Configure monitoring layer
+  hosts: watchtower
+  become: yes
+
+  roles:
+    - prometheus
+    - netdata
+    - grafana
+    - nut
+
+=== ./services/watchtower/ansible/roles/adguard/defaults/main.yml ===
+#SPDX-License-Identifier: MIT-0
+---
+# defaults file for adguard
+
+=== ./services/watchtower/ansible/roles/adguard/handlers/main.yml ===
+---
+- name: restart adguardhome
+  systemd:
+    name: AdGuardHome
+    state: restarted
+
+=== ./services/watchtower/ansible/roles/adguard/meta/main.yml ===
+#SPDX-License-Identifier: MIT-0
+galaxy_info:
+  author: your name
+  description: your role description
+  company: your company (optional)
+
+  # If the issue tracker for your role is not on github, uncomment the
+  # next line and provide a value
+  # issue_tracker_url: http://example.com/issue/tracker
+
+  # Choose a valid license ID from https://spdx.org - some suggested licenses:
+  # - BSD-3-Clause (default)
+  # - MIT
+  # - GPL-2.0-or-later
+  # - GPL-3.0-only
+  # - Apache-2.0
+  # - CC-BY-4.0
+  license: license (GPL-2.0-or-later, MIT, etc)
+
+  min_ansible_version: 2.2
+
+  # If this a Container Enabled role, provide the minimum Ansible Container version.
+  # min_ansible_container_version:
+
+  galaxy_tags: []
+    # List tags for your role here, one per line. A tag is a keyword that describes
+    # and categorizes the role. Users find roles by searching for tags. Be sure to
+    # remove the '[]' above, if you add tags to this list.
+    #
+    # NOTE: A tag is limited to a single word comprised of alphanumeric characters.
+    #       Maximum 20 tags per role.
+
+dependencies: []
+  # List your role dependencies here, one per line. Be sure to remove the '[]' above,
+  # if you add dependencies to this list.
+
+=== ./services/watchtower/ansible/roles/adguard/README.md ===
+Role Name
+=========
+
+A brief description of the role goes here.
+
+Requirements
+------------
+
+Any pre-requisites that may not be covered by Ansible itself or the role should be mentioned here. For instance, if the role uses the EC2 module, it may be a good idea to mention in this section that the boto package is required.
+
+Role Variables
+--------------
+
+A description of the settable variables for this role should go here, including any variables that are in defaults/main.yml, vars/main.yml, and any variables that can/should be set via parameters to the role. Any variables that are read from other roles and/or the global scope (ie. hostvars, group vars, etc.) should be mentioned here as well.
+
+Dependencies
+------------
+
+A list of other roles hosted on Galaxy should go here, plus any details in regards to parameters that may need to be set for other roles, or variables that are used from other roles.
+
+Example Playbook
+----------------
+
+Including an example of how to use your role (for instance, with variables passed in as parameters) is always nice for users too:
+
+    - hosts: servers
+      roles:
+         - { role: username.rolename, x: 42 }
+
+License
+-------
+
+BSD
+
+Author Information
+------------------
+
+An optional section for the role authors to include contact information, or a website (HTML is not allowed).
+
+=== ./services/watchtower/ansible/roles/adguard/tasks/main.yml ===
+---
+- name: Check if AdGuard Home is already installed
+  stat:
+    path: /opt/AdGuardHome/AdGuardHome
+  register: agh_binary
+
+- name: Download AdGuard Home tarball
+  get_url:
+    url: https://github.com/AdguardTeam/AdGuardHome/releases/latest/download/AdGuardHome_linux_amd64.tar.gz
+    dest: /tmp/AdGuardHome.tar.gz
+  when: not agh_binary.stat.exists
+
+- name: Extract AdGuard Home
+  unarchive:
+    src: /tmp/AdGuardHome.tar.gz
+    dest: /opt/
+    remote_src: yes
+  when: not agh_binary.stat.exists
+
+- name: Install AdGuard Home service
+  command: /opt/AdGuardHome/AdGuardHome -s install
+  when: not agh_binary.stat.exists
+
+- name: Deploy AdGuard Home config
+  template:
+    src: AdGuardHome.yaml.j2
+    dest: /opt/AdGuardHome/AdGuardHome.yaml
+    owner: root
+    group: root
+    mode: '0644'
+  notify: restart adguardhome
+
+- name: Enable and start AdGuard Home
+  systemd:
+    name: AdGuardHome
+    enabled: yes
+    state: started
+
+=== ./services/watchtower/ansible/roles/adguard/tests/test.yml ===
+#SPDX-License-Identifier: MIT-0
+---
+- hosts: localhost
+  remote_user: root
+  roles:
+    - adguard
+
+=== ./services/watchtower/ansible/roles/adguard/vars/main.yml ===
+#SPDX-License-Identifier: MIT-0
+---
+# vars file for adguard
+
+=== ./services/watchtower/ansible/roles/exporters/defaults/main.yml ===
+#SPDX-License-Identifier: MIT-0
+---
+# defaults file for exporters
+
+=== ./services/watchtower/ansible/roles/exporters/handlers/main.yml ===
+---
+- name: reload systemd
+  systemd:
+    daemon_reload: yes
+
+- name: restart node_exporter
+  systemd:
+    name: node_exporter
+    state: restarted
+
+- name: restart blackbox_exporter
+  systemd:
+    name: blackbox_exporter
+    state: restarted
+
+- name: restart snmp_exporter
+  systemd:
+    name: snmp_exporter
+    state: restarted
+
+- name: restart adguard_exporter
+  systemd:
+    name: adguard_exporter
+    state: restarted
+
+=== ./services/watchtower/ansible/roles/exporters/meta/main.yml ===
+#SPDX-License-Identifier: MIT-0
+galaxy_info:
+  author: your name
+  description: your role description
+  company: your company (optional)
+
+  # If the issue tracker for your role is not on github, uncomment the
+  # next line and provide a value
+  # issue_tracker_url: http://example.com/issue/tracker
+
+  # Choose a valid license ID from https://spdx.org - some suggested licenses:
+  # - BSD-3-Clause (default)
+  # - MIT
+  # - GPL-2.0-or-later
+  # - GPL-3.0-only
+  # - Apache-2.0
+  # - CC-BY-4.0
+  license: license (GPL-2.0-or-later, MIT, etc)
+
+  min_ansible_version: 2.2
+
+  # If this a Container Enabled role, provide the minimum Ansible Container version.
+  # min_ansible_container_version:
+
+  galaxy_tags: []
+    # List tags for your role here, one per line. A tag is a keyword that describes
+    # and categorizes the role. Users find roles by searching for tags. Be sure to
+    # remove the '[]' above, if you add tags to this list.
+    #
+    # NOTE: A tag is limited to a single word comprised of alphanumeric characters.
+    #       Maximum 20 tags per role.
+
+dependencies: []
+  # List your role dependencies here, one per line. Be sure to remove the '[]' above,
+  # if you add dependencies to this list.
+
+=== ./services/watchtower/ansible/roles/exporters/README.md ===
+Role Name
+=========
+
+A brief description of the role goes here.
+
+Requirements
+------------
+
+Any pre-requisites that may not be covered by Ansible itself or the role should be mentioned here. For instance, if the role uses the EC2 module, it may be a good idea to mention in this section that the boto package is required.
+
+Role Variables
+--------------
+
+A description of the settable variables for this role should go here, including any variables that are in defaults/main.yml, vars/main.yml, and any variables that can/should be set via parameters to the role. Any variables that are read from other roles and/or the global scope (ie. hostvars, group vars, etc.) should be mentioned here as well.
+
+Dependencies
+------------
+
+A list of other roles hosted on Galaxy should go here, plus any details in regards to parameters that may need to be set for other roles, or variables that are used from other roles.
+
+Example Playbook
+----------------
+
+Including an example of how to use your role (for instance, with variables passed in as parameters) is always nice for users too:
+
+    - hosts: servers
+      roles:
+         - { role: username.rolename, x: 42 }
+
+License
+-------
+
+BSD
+
+Author Information
+------------------
+
+An optional section for the role authors to include contact information, or a website (HTML is not allowed).
+
+=== ./services/watchtower/ansible/roles/exporters/tasks/main.yml ===
+---
+# node_exporter
+- name: Create node_exporter system user
+  user:
+    name: node_exporter
+    system: yes
+    shell: /usr/sbin/nologin
+    create_home: no
+
+- name: Check if node_exporter is already installed
+  stat:
+    path: /usr/local/bin/node_exporter
+  register: node_exporter_binary
+
+- name: Download node_exporter tarball
+  get_url:
+    url: https://github.com/prometheus/node_exporter/releases/download/v1.7.0/node_exporter-1.7.0.linux-amd64.tar.gz
+    dest: /tmp/node_exporter.tar.gz
+  when: not node_exporter_binary.stat.exists
+
+- name: Extract node_exporter
+  unarchive:
+    src: /tmp/node_exporter.tar.gz
+    dest: /tmp/
+    remote_src: yes
+  when: not node_exporter_binary.stat.exists
+
+- name: Install node_exporter binary
+  copy:
+    src: /tmp/node_exporter-1.7.0.linux-amd64/node_exporter
+    dest: /usr/local/bin/node_exporter
+    owner: root
+    group: root
+    mode: '0755'
+    remote_src: yes
+  when: not node_exporter_binary.stat.exists
+
+- name: Deploy node_exporter systemd unit
+  template:
+    src: node_exporter.service.j2
+    dest: /etc/systemd/system/node_exporter.service
+    owner: root
+    group: root
+    mode: '0644'
+  notify:
+    - reload systemd
+    - restart node_exporter
+
+- name: Enable and start node_exporter
+  systemd:
+    name: node_exporter
+    enabled: yes
+    state: started
+
+# blackbox_exporter
+- name: Check if blackbox_exporter is already installed
+  stat:
+    path: /usr/local/bin/blackbox_exporter
+  register: blackbox_binary
+
+- name: Download blackbox_exporter tarball
+  get_url:
+    url: https://github.com/prometheus/blackbox_exporter/releases/download/v0.25.0/blackbox_exporter-0.25.0.linux-amd64.tar.gz
+    dest: /tmp/blackbox_exporter.tar.gz
+  when: not blackbox_binary.stat.exists
+
+- name: Extract blackbox_exporter
+  unarchive:
+    src: /tmp/blackbox_exporter.tar.gz
+    dest: /tmp/
+    remote_src: yes
+  when: not blackbox_binary.stat.exists
+
+- name: Install blackbox_exporter binary
+  copy:
+    src: /tmp/blackbox_exporter-0.25.0.linux-amd64/blackbox_exporter
+    dest: /usr/local/bin/blackbox_exporter
+    owner: root
+    group: root
+    mode: '0755'
+    remote_src: yes
+  when: not blackbox_binary.stat.exists
+
+- name: Deploy blackbox_exporter config
+  template:
+    src: blackbox.yml.j2
+    dest: /etc/prometheus/blackbox.yml
+    owner: root
+    group: root
+    mode: '0644'
+  notify: restart blackbox_exporter
+
+- name: Deploy blackbox_exporter systemd unit
+  template:
+    src: blackbox_exporter.service.j2
+    dest: /etc/systemd/system/blackbox_exporter.service
+    owner: root
+    group: root
+    mode: '0644'
+  notify:
+    - reload systemd
+    - restart blackbox_exporter
+
+- name: Enable and start blackbox_exporter
+  systemd:
+    name: blackbox_exporter
+    enabled: yes
+    state: started
+
+# snmp_exporter
+- name: Check if snmp_exporter is already installed
+  stat:
+    path: /usr/local/bin/snmp_exporter
+  register: snmp_binary
+
+- name: Download snmp_exporter tarball
+  get_url:
+    url: https://github.com/prometheus/snmp_exporter/releases/download/v0.26.0/snmp_exporter-0.26.0.linux-amd64.tar.gz
+    dest: /tmp/snmp_exporter.tar.gz
+  when: not snmp_binary.stat.exists
+
+- name: Extract snmp_exporter
+  unarchive:
+    src: /tmp/snmp_exporter.tar.gz
+    dest: /tmp/
+    remote_src: yes
+  when: not snmp_binary.stat.exists
+
+- name: Install snmp_exporter binary
+  copy:
+    src: /tmp/snmp_exporter-0.26.0.linux-amd64/snmp_exporter
+    dest: /usr/local/bin/snmp_exporter
+    owner: root
+    group: root
+    mode: '0755'
+    remote_src: yes
+  when: not snmp_binary.stat.exists
+
+- name: Deploy snmp.yml config
+  template:
+    src: snmp.yml.j2
+    dest: /etc/prometheus/snmp.yml
+    owner: root
+    group: root
+    mode: '0644'
+  notify: restart snmp_exporter
+
+- name: Deploy snmp_exporter systemd unit
+  template:
+    src: snmp_exporter.service.j2
+    dest: /etc/systemd/system/snmp_exporter.service
+    owner: root
+    group: root
+    mode: '0644'
+  notify:
+    - reload systemd
+    - restart snmp_exporter
+
+- name: Enable and start snmp_exporter
+  systemd:
+    name: snmp_exporter
+    enabled: yes
+    state: started
+
+# adguard_exporter
+- name: Check if adguard_exporter is already installed
+  stat:
+    path: /usr/local/bin/adguard_exporter
+  register: adguard_exporter_binary
+
+- name: Install Go (needed to build adguard_exporter)
+  apt:
+    name: golang
+    state: present
+    update_cache: yes
+  when: not adguard_exporter_binary.stat.exists
+
+- name: Build adguard_exporter from source
+  shell: |
+    export HOME=/root
+    go install github.com/henrywhitaker3/adguard-exporter@latest
+    cp /root/go/bin/adguard-exporter /usr/local/bin/adguard_exporter
+  when: not adguard_exporter_binary.stat.exists
+
+- name: Deploy adguard_exporter systemd unit
+  template:
+    src: adguard_exporter.service.j2
+    dest: /etc/systemd/system/adguard_exporter.service
+    owner: root
+    group: root
+    mode: '0644'
+  notify:
+    - reload systemd
+    - restart adguard_exporter
+
+- name: Enable and start adguard_exporter
+  systemd:
+    name: adguard_exporter
+    enabled: yes
+    state: started
+
+=== ./services/watchtower/ansible/roles/exporters/tests/test.yml ===
+#SPDX-License-Identifier: MIT-0
+---
+- hosts: localhost
+  remote_user: root
+  roles:
+    - exporters
+
+=== ./services/watchtower/ansible/roles/exporters/vars/main.yml ===
+#SPDX-License-Identifier: MIT-0
+---
+# vars file for exporters
+
+=== ./services/watchtower/ansible/roles/grafana/defaults/main.yml ===
+#SPDX-License-Identifier: MIT-0
+---
+# defaults file for grafana
+
+=== ./services/watchtower/ansible/roles/grafana/handlers/main.yml ===
+---
+- name: restart grafana
+  systemd:
+    name: grafana-server
+    state: restarted
+
+=== ./services/watchtower/ansible/roles/grafana/meta/main.yml ===
+#SPDX-License-Identifier: MIT-0
+galaxy_info:
+  author: your name
+  description: your role description
+  company: your company (optional)
+
+  # If the issue tracker for your role is not on github, uncomment the
+  # next line and provide a value
+  # issue_tracker_url: http://example.com/issue/tracker
+
+  # Choose a valid license ID from https://spdx.org - some suggested licenses:
+  # - BSD-3-Clause (default)
+  # - MIT
+  # - GPL-2.0-or-later
+  # - GPL-3.0-only
+  # - Apache-2.0
+  # - CC-BY-4.0
+  license: license (GPL-2.0-or-later, MIT, etc)
+
+  min_ansible_version: 2.2
+
+  # If this a Container Enabled role, provide the minimum Ansible Container version.
+  # min_ansible_container_version:
+
+  galaxy_tags: []
+    # List tags for your role here, one per line. A tag is a keyword that describes
+    # and categorizes the role. Users find roles by searching for tags. Be sure to
+    # remove the '[]' above, if you add tags to this list.
+    #
+    # NOTE: A tag is limited to a single word comprised of alphanumeric characters.
+    #       Maximum 20 tags per role.
+
+dependencies: []
+  # List your role dependencies here, one per line. Be sure to remove the '[]' above,
+  # if you add dependencies to this list.
+
+=== ./services/watchtower/ansible/roles/grafana/README.md ===
+Role Name
+=========
+
+A brief description of the role goes here.
+
+Requirements
+------------
+
+Any pre-requisites that may not be covered by Ansible itself or the role should be mentioned here. For instance, if the role uses the EC2 module, it may be a good idea to mention in this section that the boto package is required.
+
+Role Variables
+--------------
+
+A description of the settable variables for this role should go here, including any variables that are in defaults/main.yml, vars/main.yml, and any variables that can/should be set via parameters to the role. Any variables that are read from other roles and/or the global scope (ie. hostvars, group vars, etc.) should be mentioned here as well.
+
+Dependencies
+------------
+
+A list of other roles hosted on Galaxy should go here, plus any details in regards to parameters that may need to be set for other roles, or variables that are used from other roles.
+
+Example Playbook
+----------------
+
+Including an example of how to use your role (for instance, with variables passed in as parameters) is always nice for users too:
+
+    - hosts: servers
+      roles:
+         - { role: username.rolename, x: 42 }
+
+License
+-------
+
+BSD
+
+Author Information
+------------------
+
+An optional section for the role authors to include contact information, or a website (HTML is not allowed).
+
+=== ./services/watchtower/ansible/roles/grafana/tasks/main.yml ===
+---
+- name: Install Grafana GPG key
+  apt_key:
+    url: https://apt.grafana.com/gpg.key
+    state: present
+
+- name: Add Grafana apt repository
+  apt_repository:
+    repo: deb https://apt.grafana.com stable main
+    state: present
+    filename: grafana
+
+- name: Install Grafana
+  apt:
+    name: grafana
+    state: present
+    update_cache: yes
+
+- name: Deploy Grafana config
+  template:
+    src: grafana.ini.j2
+    dest: /etc/grafana/grafana.ini
+    owner: root
+    group: grafana
+    mode: '0640'
+  notify: restart grafana
+
+- name: Deploy Grafana datasource provisioning
+  template:
+    src: datasources.yml.j2
+    dest: /etc/grafana/provisioning/datasources/prometheus.yml
+    owner: root
+    group: grafana
+    mode: '0640'
+  notify: restart grafana
+
+- name: Deploy Grafana dashboard provisioning
+  template:
+    src: dashboards.yml.j2
+    dest: /etc/grafana/provisioning/dashboards/homelab.yml
+    owner: root
+    group: grafana
+    mode: '0640'
+  notify: restart grafana
+
+- name: Create dashboard directory
+  file:
+    path: /var/lib/grafana/dashboards
+    state: directory
+    owner: grafana
+    group: grafana
+    mode: '0755'
+
+- name: Deploy Grafana alerting provisioning
+  template:
+    src: alerting.yml.j2
+    dest: /etc/grafana/provisioning/alerting/sentinel.yml
+    owner: root
+    group: grafana
+    mode: '0640'
+  notify: restart grafana
+
+- name: Deploy Grafana alert rules
+  template:
+    src: alert_rules.yml.j2
+    dest: /etc/grafana/provisioning/alerting/alert_rules.yml
+    owner: root
+    group: grafana
+    mode: '0640'
+  notify: restart grafana
+
+- name: Enable and start Grafana
+  systemd:
+    name: grafana-server
+    enabled: yes
+    state: started
+- name: Ensure Grafana is restarted to pick up provisioning changes
+  systemd:
+    name: grafana-server
+    state: restarted
+
+
+=== ./services/watchtower/ansible/roles/grafana/tests/test.yml ===
+#SPDX-License-Identifier: MIT-0
+---
+- hosts: localhost
+  remote_user: root
+  roles:
+    - grafana
+
+=== ./services/watchtower/ansible/roles/grafana/vars/main.yml ===
+#SPDX-License-Identifier: MIT-0
+---
+# vars file for grafana
+
+=== ./services/watchtower/ansible/roles/netdata/defaults/main.yml ===
+#SPDX-License-Identifier: MIT-0
+---
+# defaults file for netdata
+
+=== ./services/watchtower/ansible/roles/netdata/handlers/main.yml ===
+---
+- name: restart netdata
+  systemd:
+    name: netdata
+    state: restarted
+
+=== ./services/watchtower/ansible/roles/netdata/meta/main.yml ===
+#SPDX-License-Identifier: MIT-0
+galaxy_info:
+  author: your name
+  description: your role description
+  company: your company (optional)
+
+  # If the issue tracker for your role is not on github, uncomment the
+  # next line and provide a value
+  # issue_tracker_url: http://example.com/issue/tracker
+
+  # Choose a valid license ID from https://spdx.org - some suggested licenses:
+  # - BSD-3-Clause (default)
+  # - MIT
+  # - GPL-2.0-or-later
+  # - GPL-3.0-only
+  # - Apache-2.0
+  # - CC-BY-4.0
+  license: license (GPL-2.0-or-later, MIT, etc)
+
+  min_ansible_version: 2.2
+
+  # If this a Container Enabled role, provide the minimum Ansible Container version.
+  # min_ansible_container_version:
+
+  galaxy_tags: []
+    # List tags for your role here, one per line. A tag is a keyword that describes
+    # and categorizes the role. Users find roles by searching for tags. Be sure to
+    # remove the '[]' above, if you add tags to this list.
+    #
+    # NOTE: A tag is limited to a single word comprised of alphanumeric characters.
+    #       Maximum 20 tags per role.
+
+dependencies: []
+  # List your role dependencies here, one per line. Be sure to remove the '[]' above,
+  # if you add dependencies to this list.
+
+=== ./services/watchtower/ansible/roles/netdata/README.md ===
+Role Name
+=========
+
+A brief description of the role goes here.
+
+Requirements
+------------
+
+Any pre-requisites that may not be covered by Ansible itself or the role should be mentioned here. For instance, if the role uses the EC2 module, it may be a good idea to mention in this section that the boto package is required.
+
+Role Variables
+--------------
+
+A description of the settable variables for this role should go here, including any variables that are in defaults/main.yml, vars/main.yml, and any variables that can/should be set via parameters to the role. Any variables that are read from other roles and/or the global scope (ie. hostvars, group vars, etc.) should be mentioned here as well.
+
+Dependencies
+------------
+
+A list of other roles hosted on Galaxy should go here, plus any details in regards to parameters that may need to be set for other roles, or variables that are used from other roles.
+
+Example Playbook
+----------------
+
+Including an example of how to use your role (for instance, with variables passed in as parameters) is always nice for users too:
+
+    - hosts: servers
+      roles:
+         - { role: username.rolename, x: 42 }
+
+License
+-------
+
+BSD
+
+Author Information
+------------------
+
+An optional section for the role authors to include contact information, or a website (HTML is not allowed).
+
+=== ./services/watchtower/ansible/roles/netdata/tasks/main.yml ===
+---
+- name: Check if Netdata is already installed
+  stat:
+    path: /usr/sbin/netdata
+  register: netdata_binary
+
+- name: Download Netdata install script
+  get_url:
+    url: https://my-netdata.io/kickstart.sh
+    dest: /tmp/netdata-kickstart.sh
+    mode: '0755'
+  when: not netdata_binary.stat.exists
+
+- name: Install Netdata
+  shell: /tmp/netdata-kickstart.sh --non-interactive --dont-start-it
+  when: not netdata_binary.stat.exists
+
+- name: Deploy Netdata config
+  template:
+    src: netdata.conf.j2
+    dest: /etc/netdata/netdata.conf
+    owner: netdata
+    group: netdata
+    mode: '0644'
+  notify: restart netdata
+
+- name: Deploy Prometheus exporter config
+  template:
+    src: prometheus.conf.j2
+    dest: /etc/netdata/exporting.conf
+    owner: netdata
+    group: netdata
+    mode: '0644'
+  notify: restart netdata
+
+- name: Enable and start Netdata
+  systemd:
+    name: netdata
+    enabled: yes
+    state: started
+
+=== ./services/watchtower/ansible/roles/netdata/tests/test.yml ===
+#SPDX-License-Identifier: MIT-0
+---
+- hosts: localhost
+  remote_user: root
+  roles:
+    - netdata
+
+=== ./services/watchtower/ansible/roles/netdata/vars/main.yml ===
+#SPDX-License-Identifier: MIT-0
+---
+# vars file for netdata
+
+=== ./services/watchtower/ansible/roles/nut/defaults/main.yml ===
+---
+nut_enabled: false
+nut_ups_name: cyberpower
+nut_ups_driver: usbhid-ups
+nut_ups_port: auto
+nut_monitor_user: monuser
+nut_monitor_password: "{{ vault_nut_monitor_password }}"
+
+=== ./services/watchtower/ansible/roles/nut/handlers/main.yml ===
+---
+- name: restart nut-server
+  systemd:
+    name: nut-server
+    state: restarted
+
+- name: restart nut-monitor
+  systemd:
+    name: nut-monitor
+    state: restarted
+
+- name: reload systemd
+  systemd:
+    daemon_reload: yes
+
+=== ./services/watchtower/ansible/roles/nut/tasks/main.yml ===
+---
+- name: Skip NUT setup if UPS not connected
+  meta: end_play
+  when: not nut_enabled
+
+- name: Install NUT packages
+  apt:
+    name:
+      - nut
+      - nut-client
+      - nut-server
+    state: present
+    update_cache: yes
+
+- name: Deploy ups.conf
+  template:
+    src: ups.conf.j2
+    dest: /etc/nut/ups.conf
+    owner: root
+    group: nut
+    mode: '0640'
+  notify: restart nut-server
+
+- name: Deploy upsd.conf
+  template:
+    src: upsd.conf.j2
+    dest: /etc/nut/upsd.conf
+    owner: root
+    group: nut
+    mode: '0640'
+  notify: restart nut-server
+
+- name: Deploy upsd.users
+  template:
+    src: upsd.users.j2
+    dest: /etc/nut/upsd.users
+    owner: root
+    group: nut
+    mode: '0640'
+  notify: restart nut-server
+
+- name: Deploy upsmon.conf
+  template:
+    src: upsmon.conf.j2
+    dest: /etc/nut/upsmon.conf
+    owner: root
+    group: nut
+    mode: '0640'
+  notify: restart nut-monitor
+
+- name: Deploy nut.conf (mode)
+  template:
+    src: nut.conf.j2
+    dest: /etc/nut/nut.conf
+    owner: root
+    group: nut
+    mode: '0640'
+  notify: restart nut-server
+
+- name: Deploy last gasp Slack alert script
+  template:
+    src: nut-slack-alert.sh.j2
+    dest: /usr/local/bin/nut-slack-alert.sh
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Deploy upssched.conf
+  template:
+    src: upssched.conf.j2
+    dest: /etc/nut/upssched.conf
+    owner: root
+    group: nut
+    mode: '0640'
+  notify: restart nut-monitor
+
+- name: Install nut_exporter
+  get_url:
+    url: https://github.com/DRuggeri/nut_exporter/releases/latest/download/nut_exporter-linux-amd64
+    dest: /usr/local/bin/nut_exporter
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Deploy nut_exporter systemd unit
+  template:
+    src: nut_exporter.service.j2
+    dest: /etc/systemd/system/nut_exporter.service
+    owner: root
+    group: root
+    mode: '0644'
+  notify: reload systemd
+
+- name: Enable and start NUT services
+  systemd:
+    name: "{{ item }}"
+    enabled: yes
+    state: started
+  loop:
+    - nut-server
+    - nut-monitor
+    - nut_exporter
+
+=== ./services/watchtower/ansible/roles/prometheus/defaults/main.yml ===
+#SPDX-License-Identifier: MIT-0
+---
+# defaults file for prometheus
+
+=== ./services/watchtower/ansible/roles/prometheus/handlers/main.yml ===
+---
+- name: reload systemd
+  systemd:
+    daemon_reload: yes
+
+- name: restart prometheus
+  systemd:
+    name: prometheus
+    state: restarted
+
+=== ./services/watchtower/ansible/roles/prometheus/meta/main.yml ===
+#SPDX-License-Identifier: MIT-0
+galaxy_info:
+  author: your name
+  description: your role description
+  company: your company (optional)
+
+  # If the issue tracker for your role is not on github, uncomment the
+  # next line and provide a value
+  # issue_tracker_url: http://example.com/issue/tracker
+
+  # Choose a valid license ID from https://spdx.org - some suggested licenses:
+  # - BSD-3-Clause (default)
+  # - MIT
+  # - GPL-2.0-or-later
+  # - GPL-3.0-only
+  # - Apache-2.0
+  # - CC-BY-4.0
+  license: license (GPL-2.0-or-later, MIT, etc)
+
+  min_ansible_version: 2.2
+
+  # If this a Container Enabled role, provide the minimum Ansible Container version.
+  # min_ansible_container_version:
+
+  galaxy_tags: []
+    # List tags for your role here, one per line. A tag is a keyword that describes
+    # and categorizes the role. Users find roles by searching for tags. Be sure to
+    # remove the '[]' above, if you add tags to this list.
+    #
+    # NOTE: A tag is limited to a single word comprised of alphanumeric characters.
+    #       Maximum 20 tags per role.
+
+dependencies: []
+  # List your role dependencies here, one per line. Be sure to remove the '[]' above,
+  # if you add dependencies to this list.
+
+=== ./services/watchtower/ansible/roles/prometheus/README.md ===
+Role Name
+=========
+
+A brief description of the role goes here.
+
+Requirements
+------------
+
+Any pre-requisites that may not be covered by Ansible itself or the role should be mentioned here. For instance, if the role uses the EC2 module, it may be a good idea to mention in this section that the boto package is required.
+
+Role Variables
+--------------
+
+A description of the settable variables for this role should go here, including any variables that are in defaults/main.yml, vars/main.yml, and any variables that can/should be set via parameters to the role. Any variables that are read from other roles and/or the global scope (ie. hostvars, group vars, etc.) should be mentioned here as well.
+
+Dependencies
+------------
+
+A list of other roles hosted on Galaxy should go here, plus any details in regards to parameters that may need to be set for other roles, or variables that are used from other roles.
+
+Example Playbook
+----------------
+
+Including an example of how to use your role (for instance, with variables passed in as parameters) is always nice for users too:
+
+    - hosts: servers
+      roles:
+         - { role: username.rolename, x: 42 }
+
+License
+-------
+
+BSD
+
+Author Information
+------------------
+
+An optional section for the role authors to include contact information, or a website (HTML is not allowed).
+
+=== ./services/watchtower/ansible/roles/prometheus/tasks/main.yml ===
+---
+- name: Create prometheus system user
+  user:
+    name: prometheus
+    system: yes
+    shell: /usr/sbin/nologin
+    create_home: no
+
+- name: Create prometheus directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: prometheus
+    group: prometheus
+    mode: '0755'
+  loop:
+    - /etc/prometheus
+    - /var/lib/prometheus
+
+- name: Check if Prometheus is already installed
+  stat:
+    path: /usr/local/bin/prometheus
+  register: prometheus_binary
+
+- name: Download Prometheus tarball
+  get_url:
+    url: https://github.com/prometheus/prometheus/releases/download/v2.51.2/prometheus-2.51.2.linux-amd64.tar.gz
+    dest: /tmp/prometheus.tar.gz
+  when: not prometheus_binary.stat.exists
+
+- name: Extract Prometheus
+  unarchive:
+    src: /tmp/prometheus.tar.gz
+    dest: /tmp/
+    remote_src: yes
+  when: not prometheus_binary.stat.exists
+
+- name: Install Prometheus binaries
+  copy:
+    src: "/tmp/prometheus-2.51.2.linux-amd64/{{ item }}"
+    dest: "/usr/local/bin/{{ item }}"
+    owner: root
+    group: root
+    mode: '0755'
+    remote_src: yes
+  loop:
+    - prometheus
+    - promtool
+  when: not prometheus_binary.stat.exists
+
+- name: Deploy Prometheus config
+  template:
+    src: prometheus.yml.j2
+    dest: /etc/prometheus/prometheus.yml
+    owner: prometheus
+    group: prometheus
+    mode: '0644'
+  notify: restart prometheus
+
+- name: Deploy Prometheus systemd unit
+  template:
+    src: prometheus.service.j2
+    dest: /etc/systemd/system/prometheus.service
+    owner: root
+    group: root
+    mode: '0644'
+  notify:
+    - reload systemd
+    - restart prometheus
+
+- name: Enable and start Prometheus
+  systemd:
+    name: prometheus
+    enabled: yes
+    state: started
+
+=== ./services/watchtower/ansible/roles/prometheus/tests/test.yml ===
+#SPDX-License-Identifier: MIT-0
+---
+- hosts: localhost
+  remote_user: root
+  roles:
+    - prometheus
+
+=== ./services/watchtower/ansible/roles/prometheus/vars/main.yml ===
+#SPDX-License-Identifier: MIT-0
+---
+# vars file for prometheus
+
+=== ./services/watchtower/ansible/roles/unbound/defaults/main.yml ===
+#SPDX-License-Identifier: MIT-0
+---
+# defaults file for unbound
+
+=== ./services/watchtower/ansible/roles/unbound/handlers/main.yml ===
+---
+- name: restart unbound
+  systemd:
+    name: unbound
+    state: restarted
+
+- name: restart systemd-resolved
+  systemd:
+    name: systemd-resolved
+    state: restarted
+
+=== ./services/watchtower/ansible/roles/unbound/meta/main.yml ===
+#SPDX-License-Identifier: MIT-0
+galaxy_info:
+  author: your name
+  description: your role description
+  company: your company (optional)
+
+  # If the issue tracker for your role is not on github, uncomment the
+  # next line and provide a value
+  # issue_tracker_url: http://example.com/issue/tracker
+
+  # Choose a valid license ID from https://spdx.org - some suggested licenses:
+  # - BSD-3-Clause (default)
+  # - MIT
+  # - GPL-2.0-or-later
+  # - GPL-3.0-only
+  # - Apache-2.0
+  # - CC-BY-4.0
+  license: license (GPL-2.0-or-later, MIT, etc)
+
+  min_ansible_version: 2.2
+
+  # If this a Container Enabled role, provide the minimum Ansible Container version.
+  # min_ansible_container_version:
+
+  galaxy_tags: []
+    # List tags for your role here, one per line. A tag is a keyword that describes
+    # and categorizes the role. Users find roles by searching for tags. Be sure to
+    # remove the '[]' above, if you add tags to this list.
+    #
+    # NOTE: A tag is limited to a single word comprised of alphanumeric characters.
+    #       Maximum 20 tags per role.
+
+dependencies: []
+  # List your role dependencies here, one per line. Be sure to remove the '[]' above,
+  # if you add dependencies to this list.
+
+=== ./services/watchtower/ansible/roles/unbound/README.md ===
+Role Name
+=========
+
+A brief description of the role goes here.
+
+Requirements
+------------
+
+Any pre-requisites that may not be covered by Ansible itself or the role should be mentioned here. For instance, if the role uses the EC2 module, it may be a good idea to mention in this section that the boto package is required.
+
+Role Variables
+--------------
+
+A description of the settable variables for this role should go here, including any variables that are in defaults/main.yml, vars/main.yml, and any variables that can/should be set via parameters to the role. Any variables that are read from other roles and/or the global scope (ie. hostvars, group vars, etc.) should be mentioned here as well.
+
+Dependencies
+------------
+
+A list of other roles hosted on Galaxy should go here, plus any details in regards to parameters that may need to be set for other roles, or variables that are used from other roles.
+
+Example Playbook
+----------------
+
+Including an example of how to use your role (for instance, with variables passed in as parameters) is always nice for users too:
+
+    - hosts: servers
+      roles:
+         - { role: username.rolename, x: 42 }
+
+License
+-------
+
+BSD
+
+Author Information
+------------------
+
+An optional section for the role authors to include contact information, or a website (HTML is not allowed).
+
+=== ./services/watchtower/ansible/roles/unbound/tasks/main.yml ===
+---
+- name: Install unbound and dns utilities
+  apt:
+    name:
+      - unbound
+      - dnsutils
+    state: present
+    update_cache: yes
+
+- name: Download root hints
+  get_url:
+    url: https://www.internic.net/domain/named.root
+    dest: /var/lib/unbound/root.hints
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Disable systemd-resolved stub listener
+  lineinfile:
+    path: /etc/systemd/resolved.conf
+    regexp: '^#?DNSStubListener='
+    line: 'DNSStubListener=no'
+
+- name: Restart systemd-resolved to release port 53
+  systemd:
+    name: systemd-resolved
+    state: restarted
+
+- name: Deploy unbound config
+  template:
+    src: watchtower.conf.j2
+    dest: /etc/unbound/unbound.conf.d/watchtower.conf
+    owner: root
+    group: root
+    mode: '0644'
+  notify: restart unbound
+
+- name: Enable and start unbound
+  systemd:
+    name: unbound
+    enabled: yes
+    state: started
+
+=== ./services/watchtower/ansible/roles/unbound/tests/test.yml ===
+#SPDX-License-Identifier: MIT-0
+---
+- hosts: localhost
+  remote_user: root
+  roles:
+    - unbound
+
+=== ./services/watchtower/ansible/roles/unbound/vars/main.yml ===
+#SPDX-License-Identifier: MIT-0
+---
+# vars file for unbound
+
+=== ./services/watchtower/Watchtower-Roadmap.md ===
+# Watchtower — Monitoring & DNS Stack Roadmap
+
+> **Hardware:** Asus VM40B · 8GB RAM · 1TB SSD (repurposed from Monolith)
+> **Hostname:** `watchtower` · **Dev machine:** `apex` (MacBook Air M4)
+> **Role:** Always-on DNS resolver + full-stack monitoring node
+> **IaC:** Terraform (Terraform Cloud state) + Ansible + GitHub Actions
+> **Alerts:** Slack → Little Wolf Acres workspace
+
+---
+
+## Stack Overview
+
+| Service | Role | Port |
+|---|---|---|
+| Unbound | Recursive DNS resolver (upstream) | 5335 |
+| AdGuard Home | DNS frontend, ad/tracker filtering | 53, 3000 |
+| Prometheus | Metrics scraping + TSDB | 9090 |
+| node_exporter | Watchtower host metrics | 9100 |
+| blackbox_exporter | Endpoint / ICMP probing | 9115 |
+| snmp_exporter | Omada network gear metrics | 9116 |
+| AdGuard exporter | AGH metrics → Prometheus | 9617 |
+| Netdata | Real-time host observability | 19999 |
+| Grafana | Dashboards + alerting → Slack | 3001 |
+
+---
+
+## Background & Key Decisions
+
+### Context
+
+This project grew out of a conversation mapping the full homelab. The Asus VM40B was an idle mini-PC being used as a doorstop. Rather than buy new hardware, the plan repurposes it with a 1TB SSD migrated from Monolith (where Navidrome's audio library was moved to an 8TB HDD upgrade). The 8TB was chosen over 4TB deliberately — the lab is planned to grow into LLM/AI dev work where model weights, datasets, and training checkpoints will consume storage fast.
+
+### Naming
+
+- **monolith** — the AMD tower running k3s. Named for its role as the single heavy node.
+- **watchtower** — the VM40B monitoring/DNS node. Named for its role: sees everything, never sleeps.
+- **apex** — the MacBook Air M4. All authoring, config, and remote ops originate here.
+- **Little Wolf Acres** — the family Slack workspace receiving Grafana alerts.
+
+### Why `services/` not `projects/`
+
+Projects implies temporary work with a completion state. These are permanent running infrastructure services. Navidrome and Watchtower are services. The rename also maps cleanly to how the industry talks about what runs in production.
+
+### Why Ansible alongside Terraform
+
+Terraform alone is awkward for ongoing config management of a bare Linux box — it's designed for infrastructure declaration, not package installs and service configuration. Ansible owns what's installed and running on Watchtower (packages, systemd units, config files). Terraform owns infrastructure facts (state, firewall declarations, future cloud resources). GitHub Actions orchestrates both. This is the standard real-world pattern and directly relevant to DevOps interview conversations.
+
+### Why Terraform Cloud for state
+
+The existing Monolith Terraform setup stores state locally on the runner, meaning a dead Monolith loses the state file. Terraform Cloud free tier hosts state remotely, survives any node failure, supports multiple workspaces (one per node), and lets GitHub Actions reach state without being tied to a specific runner machine. Two workspaces: `monolith` and `watchtower`.
+
+### Why isolated runners per node
+
+A self-hosted runner has network-level access to everything its host can reach. If one runner managed multiple nodes via SSH, a compromised pipeline job could pivot laterally across the lab. Watchtower's runner uses the `watchtower` label and only manages Watchtower. Monolith's runner uses the `monolith` label and only manages Monolith. Blast radius is contained by design. Watchtower is bootstrapped manually once via SSH from apex, then handed off to GitHub Actions permanently.
+
+### Why no Docker on Watchtower
+
+8GB RAM, always-on services, no orchestration layer. Everything runs as native binaries with systemd units — lighter, simpler to debug, no container runtime overhead. Consistent with Monolith using k3s with containerd rather than Docker.
+
+### Why Grafana alerting not Alertmanager
+
+At this scale Alertmanager adds operational surface area without meaningful benefit. Grafana's built-in alerting handles all required rules and routes directly to Slack.
+
+### Where this conversation left off
+
+PSU on the VM40B needs replacing before any hands-on work begins. Phase 0 (repo housekeeping + Terraform Cloud setup) can be done on apex immediately while waiting for hardware. The file server for family backups (daughter's iPad art, wife's crochet notes) is the next Monolith project after Watchtower is stable — noted in the repo README already.
+
+--------------
+
+## Repo Structure (Target State)
+
+`projects/` is being renamed to `services/` — permanent infrastructure belongs there, not projects. Watchtower moves from `projects/watchtower/` to `services/watchtower/`.
+
+```
+homelab/
+├── nodes/
+│   ├── macbook/          ← apex (dev machine)
+│   ├── amd-tower/        ← Monolith (k3s worker)
+│   └── vm40b/            ← Watchtower (new)
+├── kubernetes/           ← k3s cluster config, manifests, storage
+├── terraform/
+│   ├── monolith/         ← existing
+│   ├── cluster/          ← existing
+│   └── watchtower/       ← new
+│       ├── main.tf
+│       └── variables.tf
+├── services/             ← renamed from projects/
+│   ├── navidrome/        ← moved from projects/audio-server/
+│   └── watchtower/       ← moved from projects/watchtower/
+│       ├── ansible/
+│       │   ├── inventory.ini
+│       │   ├── playbooks/
+│       │   │   ├── dns.yml
+│       │   │   ├── monitoring.yml
+│       │   │   └── exporters.yml
+│       │   └── roles/
+│       │       ├── unbound/
+│       │       ├── adguard/
+│       │       ├── prometheus/
+│       │       ├── exporters/
+│       │       ├── netdata/
+│       │       └── grafana/
+│       └── Watchtower-Roadmap.md
+├── network/omada/
+├── docs/
+├── ansible/
+│   └── monolith/
+│       ├── inventory.ini
+│       ├── playbooks/
+│       │   ├── bootstrap.yml
+│       │   └── node.yml
+│       └── roles/
+│           ├── common/       ← baseline packages, UFW, unattended-upgrades
+│           ├── k3s/          ← replaces curl one-liner in Terraform
+│           ├── node_exporter/← so Watchtower can scrape it
+│           └── runner/       ← GitHub Actions runner as systemd service
+└── .github/
+    └── workflows/
+        ├── provision-k3s.yml       ← existing (monolith label)
+        ├── deploy-k8s-config.yml   ← existing (monolith label)
+        └── deploy-watchtower.yml   ← new (watchtower label)
+```
+
+---
+
+## Runner Security Model
+
+> Each node manages itself. No runner crosses node boundaries via pipeline.
+
+| Runner Label | Installed On | Manages |
+|---|---|---|
+| `monolith` | Monolith (AMD tower) | k3s cluster, Navidrome |
+| `watchtower` | Watchtower (VM40B) | DNS, monitoring stack |
+
+Watchtower is bootstrapped **manually via SSH from apex** — install OS, harden, install GitHub Actions runner. After that, all config changes go through GitHub Actions using `runs-on: [self-hosted, watchtower]`. Monolith's runner never touches Watchtower and vice versa.
+
+---
+
+## Workflow Architecture
+
+```
+apex (MacBook Air M4)
+  └── VS Code / Obsidian / Terminal
+        ├── Terraform → Terraform Cloud (remote state)
+        └── Git push → GitHub
+              └── GitHub Actions
+                    ├── deploy-watchtower.yml
+                    │     runs-on: [self-hosted, watchtower]
+                    │     └── Ansible playbooks → configure Watchtower services
+                    └── deploy-k8s-config.yml
+                          runs-on: [self-hosted, monolith]
+                          ├── kubectl apply → k3s cluster
+                          └── Ansible playbooks → configure Monolith node
+```
+
+---
+
+## Phase 0 — Repo Housekeeping & Dev Environment
+
+> Do this before any Watchtower work begins. Gets the house in order.
+
+### Repo reorganization (on apex)
+
+- [ ] Rename `projects/` → `services/`
+- [ ] Move `projects/audio-server/` → `services/navidrome/`
+- [ ] Move `projects/watchtower/` → `services/watchtower/`
+- [ ] Create `nodes/vm40b/` with `hardware.md`
+- [ ] Create `terraform/watchtower/` stub
+- [ ] Update `README.md` to reflect new structure and both nodes
+- [ ] Update `docs/homelab-overview.md` — replace old drive list with current `df -h` reality
+- [ ] Commit and push — verify nothing breaks in existing workflows
+
+### Terraform Cloud setup
+
+- [ ] Create account at [app.terraform.io](https://app.terraform.io) (free tier)
+- [ ] Create organization (e.g. `speddling-homelab`)
+- [ ] Create two workspaces: `monolith` and `watchtower`
+  - Execution mode: **Local** (runner executes, Terraform Cloud stores state)
+- [ ] Generate Terraform Cloud API token
+- [ ] Add token as GitHub Actions secret: `TF_API_TOKEN`
+- [ ] Add backend block to `terraform/monolith/main.tf`:
+
+```hcl
+terraform {
+  cloud {
+    organization = "speddling-homelab"
+    workspaces {
+      name = "monolith"
+    }
+  }
+}
+```
+
+- [ ] Add backend block to new `terraform/watchtower/main.tf`:
+
+```hcl
+terraform {
+  cloud {
+    organization = "speddling-homelab"
+    workspaces {
+      name = "watchtower"
+    }
+  }
+}
+```
+
+- [ ] Run `terraform init` in both directories — verify state migrates cleanly
+- [ ] Confirm Terraform Cloud UI shows both workspaces with state
+
+### GitHub Actions secrets audit
+
+- [ ] Confirm existing secrets still valid: `SSH_PRIVATE_KEY`, `VM40B_HOST`, `VM40B_USER`
+- [ ] Add `TF_API_TOKEN` (Terraform Cloud)
+- [ ] Add `SLACK_WEBHOOK_URL` (Grafana alert channel — see Phase 8)
+- [ ] **Do not commit Slack URLs, webhook URLs, or IPs to the repo**
+
+### apex dev environment
+
+- [ ] Verify: `terraform`, `ansible`, `git`, `gh`, `k9s` installed via MacPorts
+- [ ] Verify SSH config has both `monolith` and `watchtower` host aliases
+- [ ] Install VS Code extensions: `HashiCorp Terraform`, `Ansible`, `Remote-SSH`
+
+---
+
+## Phase 1 — Hardware & OS Prep
+
+> Physical access to VM40B required. Done manually from apex via SSH after install.
+
+- [ ] Install 1TB SSD into VM40B (2.5" SATA bay) — confirm BIOS detects it
+- [ ] Download Ubuntu Server 24.04 LTS — flash to USB (Balena Etcher or `dd`)
+- [ ] Boot and install — minimal install, OpenSSH server checked, no snaps
+- [ ] Set hostname during install: `watchtower`
+- [ ] Set static DHCP reservation in Omada controller by MAC address (do this before first boot if possible)
+- [ ] Harden SSH immediately after first login:
+  - [ ] `PasswordAuthentication no`
+  - [ ] `PermitRootLogin no`
+  - [ ] `AllowUsers <your-user>`
+  - [ ] Copy public key from apex: `ssh-copy-id watchtower`
+- [ ] `sudo apt update && sudo apt upgrade -y`
+- [ ] Install baseline packages: `curl wget git htop ufw`
+- [ ] Configure UFW — LAN only, no public exposure
+
+```bash
+sudo ufw default deny incoming
+sudo ufw default allow outgoing
+sudo ufw allow from 192.168.x.0/24 to any port 22 proto tcp
+sudo ufw allow from 192.168.x.0/24 to any port 53
+sudo ufw allow from 192.168.x.0/24 to any port 3000 proto tcp
+sudo ufw allow from 192.168.x.0/24 to any port 3001 proto tcp
+sudo ufw allow from 192.168.x.0/24 to any port 9090 proto tcp
+sudo ufw allow from 192.168.x.0/24 to any port 19999 proto tcp
+sudo ufw enable
+```
+
+- [ ] Enable `unattended-upgrades`: `sudo apt install unattended-upgrades -y`
+- [ ] Verify SSH from apex: `ssh watchtower`
+- [ ] Add `nodes/vm40b/hardware.md` to repo with confirmed specs and `df -h` output
+
+---
+
+## Phase 2 — GitHub Actions Runner (Watchtower)
+
+> Bootstrap manually. After this, GitHub Actions takes over.
+
+- [ ] SSH into Watchtower from apex
+- [ ] In GitHub repo → Settings → Actions → Runners → New self-hosted runner
+- [ ] Select Linux x64 — follow the generated install commands
+- [ ] When prompted for labels, add: `self-hosted,watchtower`
+- [ ] Install runner as a systemd service:
+
+```bash
+sudo ./svc.sh install
+sudo ./svc.sh start
+systemctl status actions.runner.*
+```
+
+- [ ] Verify runner shows as **Idle** in GitHub → Settings → Actions → Runners
+- [ ] Write `.github/workflows/deploy-watchtower.yml` on apex:
+
+```yaml
+name: Deploy Watchtower Config
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'services/watchtower/**'
+      - 'terraform/watchtower/**'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, watchtower]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
+
+      - name: Terraform Init & Apply
+        working-directory: terraform/watchtower
+        run: |
+          terraform init
+          terraform apply -auto-approve
+
+      - name: Run Ansible — DNS
+        run: |
+          ansible-playbook \
+            -i services/watchtower/ansible/inventory.ini \
+            services/watchtower/ansible/playbooks/dns.yml
+
+      - name: Run Ansible — Monitoring
+        run: |
+          ansible-playbook \
+            -i services/watchtower/ansible/inventory.ini \
+            services/watchtower/ansible/playbooks/monitoring.yml
+
+      - name: Run Ansible — Exporters
+        run: |
+          ansible-playbook \
+            -i services/watchtower/ansible/inventory.ini \
+            services/watchtower/ansible/playbooks/exporters.yml
+```
+
+- [ ] Push workflow — verify it appears in GitHub Actions tab
+- [ ] Run manually via `workflow_dispatch` with a no-op playbook to confirm runner picks it up
+
+---
+
+## Phase 3 — Ansible Scaffold
+
+> Authored on apex · roles deployed to Watchtower via GitHub Actions
+
+- [ ] Install Ansible on apex: `sudo port install ansible`
+- [ ] Create `services/watchtower/ansible/inventory.ini`:
+
+```ini
+[watchtower]
+watchtower ansible_host=192.168.x.x ansible_user=<your-user> ansible_ssh_private_key_file=~/.ssh/id_ed25519
+
+[watchtower:vars]
+ansible_python_interpreter=/usr/bin/python3
+```
+
+- [ ] Create role scaffolds using `ansible-galaxy role init`:
+
+```bash
+cd services/watchtower/ansible/roles
+ansible-galaxy role init unbound
+ansible-galaxy role init adguard
+ansible-galaxy role init prometheus
+ansible-galaxy role init exporters
+ansible-galaxy role init netdata
+ansible-galaxy role init grafana
+```
+
+- [ ] Write `playbooks/dns.yml` — applies `unbound` and `adguard` roles
+- [ ] Write `playbooks/monitoring.yml` — applies `prometheus`, `netdata`, `grafana` roles
+- [ ] Write `playbooks/exporters.yml` — applies `exporters` role
+- [ ] Test locally from apex before committing: `ansible-playbook -i inventory.ini playbooks/dns.yml --check`
+
+---
+
+## Phase 4 — DNS Layer (Unbound + AdGuard Home)
+
+> Ansible roles: `unbound`, `adguard`
+
+### Unbound role
+
+- [ ] Task: install via apt (`unbound`)
+- [ ] Template: `/etc/unbound/unbound.conf.d/watchtower.conf`
+  - Listen on `127.0.0.1:5335`
+  - Root hints enabled
+  - DNSSEC validation on
+  - Cache tuning: `rrset-cache-size: 256m`, `msg-cache-size: 128m`
+- [ ] Task: disable and mask `systemd-resolved` stub listener
+- [ ] Handler: restart unbound on config change
+- [ ] Verify: `dig @127.0.0.1 -p 5335 google.com`
+
+### AdGuard Home role
+
+- [ ] Task: download and run AGH installer script
+- [ ] Task: complete initial setup via AGH API (automate wizard)
+- [ ] Template: AGH config — upstream DNS `127.0.0.1:5335`
+- [ ] Blocklists to configure: Hagezi Multi Normal, OISD Big, Steven Black
+- [ ] Enable DNSSEC
+- [ ] Local DNS rewrites for homelab:
+  - `watchtower.local` → Watchtower IP
+  - `grafana.local` → Watchtower IP
+  - `navidrome.local` → Monolith IP
+  - `monolith.local` → Monolith IP
+- [ ] Lock AGH web UI to LAN CIDR only
+
+### Omada integration
+
+- [ ] In OC200: set primary DNS to Watchtower static IP
+- [ ] Set secondary DNS to `1.1.1.1` (fallback if Watchtower is down)
+- [ ] Verify DNS resolution from a LAN client
+- [ ] Verify ad blocking is active
+
+---
+
+## Phase 5 — Prometheus
+
+> Ansible role: `prometheus` · Native binary, no Docker
+
+- [ ] Task: create `prometheus` system user (no login shell, no home)
+- [ ] Task: download Prometheus binary (x86_64) from GitHub releases
+- [ ] Task: install to `/usr/local/bin/prometheus`
+- [ ] Template: `/etc/prometheus/prometheus.yml`
+
+```yaml
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: 'watchtower'
+    static_configs:
+      - targets: ['localhost:9100']
+
+  - job_name: 'blackbox'
+    static_configs:
+      - targets: ['localhost:9115']
+
+  - job_name: 'adguard'
+    static_configs:
+      - targets: ['localhost:9617']
+
+  - job_name: 'monolith'
+    static_configs:
+      - targets: ['monolith.local:9100']
+
+  - job_name: 'snmp-omada'
+    static_configs:
+      - targets: ['<omada-ip>']
+    metrics_path: /snmp
+    params:
+      module: [if_mib]
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - target_label: __address__
+        replacement: localhost:9116
+```
+
+- [ ] Template: `/etc/systemd/system/prometheus.service`
+  - `--storage.tsdb.retention.time=30d`
+  - `--storage.tsdb.retention.size=50GB`
+  - `--storage.tsdb.path=/var/lib/prometheus`
+- [ ] Handler: daemon-reload and restart on config change
+- [ ] Verify UI at `http://watchtower.local:9090`
+
+---
+
+## Phase 6 — Exporters
+
+> Ansible role: `exporters`
+
+### node_exporter — Watchtower
+
+- [ ] Task: install binary, create system user
+- [ ] Template: systemd unit
+- [ ] Verify: `curl localhost:9100/metrics`
+
+### node_exporter — Monolith
+
+- [ ] Add to Monolith via existing Terraform/pipeline or manual install
+- [ ] Confirm `monolith.local:9100` is reachable from Watchtower
+- [ ] Add scrape target already in `prometheus.yml` above
+
+### blackbox_exporter
+
+- [ ] Task: install binary + systemd unit
+- [ ] Configure probe modules: `http_2xx`, `icmp`, `tcp_connect`
+- [ ] Probe targets: ER605, EAP245s, Navidrome, Grafana, GitHub, apex
+- [ ] Verify endpoint probing in Prometheus
+
+### snmp_exporter
+
+- [ ] Task: install binary + systemd unit
+- [ ] Enable SNMP v2c on ER605 and EAP245s via Omada controller
+- [ ] Build MIB config with `generator.yml` for TP-Link OIDs
+- [ ] Verify interface counter scraping
+
+### AdGuard Home exporter
+
+- [ ] Install `adguard_exporter` (ebrianne/adguard-exporter)
+- [ ] Configure AGH API credentials — store as Ansible vault variable, not plaintext
+- [ ] Systemd unit
+- [ ] Verify metrics endpoint: `curl localhost:9617/metrics`
+
+---
+
+## Phase 7 — Netdata
+
+> Ansible role: `netdata` · Real-time host metrics complement to Prometheus
+
+- [ ] Task: install via official kickstart script (`--dont-start-it` flag)
+- [ ] Template: `/etc/netdata/netdata.conf`
+  - Bind to LAN IP only
+  - Disable Netdata Cloud (on-prem only)
+- [ ] Task: `systemctl enable --now netdata`
+- [ ] Verify dashboard: `http://watchtower.local:19999`
+- [ ] Optional: enable Prometheus exporting endpoint in `exporting.conf`
+
+---
+
+## Phase 8 — Grafana
+
+> Ansible role: `grafana`
+
+- [ ] Task: add Grafana OSS apt repo, install `grafana`
+- [ ] Template: `/etc/grafana/grafana.ini`
+  - Bind to LAN IP
+  - `disable_gravatar = true`
+  - `allow_sign_up = false`
+  - Change default admin password (store in Ansible vault)
+- [ ] Task: `systemctl enable --now grafana-server`
+- [ ] Add Prometheus data source (can be automated via Grafana API in Ansible)
+- [ ] Import community dashboards
+
+| Dashboard | Grafana ID |
+|---|---|
+| Node Exporter Full | 1860 |
+| Blackbox Exporter | 7587 |
+| AdGuard Home | 13330 |
+| Kubernetes / k3s cluster | 15661 |
+| SNMP Interface Stats | 11169 |
+
+- [ ] Build custom homelab overview dashboard:
+  - DNS query rate + block rate (AGH)
+  - Watchtower CPU / RAM / disk / network
+  - Monolith node health
+  - Uptime probes — ER605, APs, Navidrome, GitHub
+  - Omada AP client counts + throughput
+
+---
+
+## Phase 9 — Alerting (Grafana → Slack)
+
+> Slack workspace: Little Wolf Acres
+> Webhook URL stored as GitHub secret `SLACK_WEBHOOK_URL` — never committed to repo
+
+- [ ] In Slack: create `#homelab-alerts` channel
+- [ ] Create Incoming Webhook for that channel (Slack App Directory → Incoming Webhooks)
+- [ ] In Grafana → Alerting → Contact Points: add Slack contact point
+  - Webhook URL: paste from secret (entered manually in Grafana UI, not in repo)
+  - Channel: `#homelab-alerts`
+- [ ] Create notification policy — route all alerts to Slack contact point
+- [ ] Define alert rules:
+
+| Alert | Condition |
+|---|---|
+| Watchtower CPU high | > 80% sustained 5m |
+| Watchtower disk high | > 85% used |
+| DNS resolver down | blackbox probe fails > 2m |
+| Monolith unreachable | node_exporter scrape fails > 2m |
+| Any endpoint down | blackbox probe fails > 2m |
+| Prometheus scrape gap | any target missing > 5m |
+
+- [ ] Test alert: temporarily set a threshold to trigger, confirm Slack message arrives in `#homelab-alerts`
+- [ ] Test recovery: confirm Slack sends resolved notification
+
+---
+
+## Phase 10 — Ongoing Maintenance
+
+- [ ] Verify `unattended-upgrades` active: `systemctl status unattended-upgrades`
+- [ ] Set up logrotate for Prometheus, Grafana, AGH: `/etc/logrotate.d/`
+- [ ] Monthly: check Prometheus storage size — `du -sh /var/lib/prometheus`
+- [ ] Keep Ansible role package versions pinned — bump intentionally via PR, not automatically
+- [ ] All config changes go through GitHub Actions — no manual edits on Watchtower directly
+- [ ] Any manual deviation gets documented immediately in this file
+
+---
+
+## Reference
+
+### Useful commands from apex
+
+```bash
+# SSH to nodes
+ssh watchtower
+ssh monolith
+
+# Check all Watchtower services
+ssh watchtower "systemctl status prometheus grafana-server netdata adguardhome unbound"
+
+# Tail a service log
+ssh watchtower "journalctl -fu prometheus"
+ssh watchtower "journalctl -fu adguardhome"
+
+# Run a single Ansible playbook manually
+ansible-playbook -i services/watchtower/ansible/inventory.ini \
+  services/watchtower/ansible/playbooks/dns.yml
+
+# Ansible dry run (check mode)
+ansible-playbook -i services/watchtower/ansible/inventory.ini \
+  services/watchtower/ansible/playbooks/monitoring.yml --check
+
+# Terraform plan for Watchtower
+cd terraform/watchtower && terraform plan
+```
+
+### Port reference — UFW rules on Watchtower
+
+| Port | Protocol | Service | Allowed from |
+|---|---|---|---|
+| 22 | TCP | SSH | apex IP only |
+| 53 | TCP+UDP | AdGuard Home DNS | LAN |
+| 3000 | TCP | AdGuard Home UI | LAN |
+| 3001 | TCP | Grafana | LAN |
+| 9090 | TCP | Prometheus | LAN |
+| 19999 | TCP | Netdata | LAN |
+| 9100 | TCP | node_exporter | Watchtower only |
+| 9115 | TCP | blackbox_exporter | Watchtower only |
+| 9116 | TCP | snmp_exporter | Watchtower only |
+| 9617 | TCP | AGH exporter | Watchtower only |
+
+### Ansible vault note
+
+Sensitive values (AGH API credentials, Grafana admin password) go in an encrypted Ansible vault file, not plaintext in vars. To edit:
+
+```bash
+ansible-vault edit services/watchtower/ansible/group_vars/all/vault.yml
+```
+
+Store the vault password in macOS Keychain or a local `.vault_pass` file excluded via `.gitignore`.
+
+---
+
+## Related Notes
+
+- [[Monolith — K3s Cluster]]
+- [[Omada Network Config]]
+- [[Navidrome — Audio Server]]
+- [[GitHub Actions — Homelab Pipelines]]
+- [[apex — MacBook Air M4 Dev Environment]]
+- [[Terraform Cloud — State Management]]
+
+---
+
+*Last updated: 2026-04-21*
+*Status: 🟡 In Progress — awaiting hardware (PSU replacement)*
+
+=== ./terraform/README.md ===
+# Terraform Skeleton
+

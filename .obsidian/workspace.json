@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "docs/network.md",
+                "file": "docs/homelab-setup-notes.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "network"
+              "title": "homelab-setup-notes"
             }
           }
         ]
@@ -186,10 +186,11 @@
   },
   "active": "165dadc935b0cab3",
   "lastOpenFiles": [
+    "homelab-dump.txt",
+    "docs/network.md",
     "README.md",
     "docs/homelab-setup-notes.md",
     "docs/storage.md",
-    "docs/network.md",
     "docs/Monolith Upgrades?.md",
     "docs/homelab-state.md",
     "docs/K9s Reference.md",
@@ -220,7 +221,6 @@
     "docs/homelab-overview.md",
     "nodes/macbook/hardware.md",
     "nodes/amd-tower/hardware.md",
-    "docs/DEPRECIATED --- homelab-technical-walkthru.md",
-    "Untitled.md"
+    "docs/DEPRECIATED --- homelab-technical-walkthru.md"
   ]
 }
