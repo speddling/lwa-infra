@@ -1,0 +1,45 @@
+---
+- name: Create tmobile_exporter system user
+  ansible.builtin.user:
+    name: tmobile_exporter
+    system: true
+    shell: /usr/sbin/nologin
+    create_home: false
+
+- name: Install python3-requests
+  ansible.builtin.apt:
+    name: python3-requests
+    state: present
+    update_cache: true
+
+- name: Create exporter directory
+  ansible.builtin.file:
+    path: /opt/tmobile_exporter
+    state: directory
+    owner: tmobile_exporter
+    group: tmobile_exporter
+    mode: '0755'
+
+- name: Deploy exporter script
+  ansible.builtin.copy:
+    src: tmobile_exporter.py
+    dest: /opt/tmobile_exporter/tmobile_exporter.py
+    owner: tmobile_exporter
+    group: tmobile_exporter
+    mode: '0755'
+  notify: Restart tmobile_exporter
+
+- name: Deploy systemd unit
+  ansible.builtin.template:
+    src: tmobile_exporter.service.j2
+    dest: /etc/systemd/system/tmobile_exporter.service
+    mode: '0644'
+  notify:
+    - Reload systemd
+    - Restart tmobile_exporter
+
+- name: Enable and start tmobile_exporter
+  ansible.builtin.systemd:
+    name: tmobile_exporter
+    enabled: true
+    state: started

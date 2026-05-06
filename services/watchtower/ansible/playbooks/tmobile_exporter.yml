@@ -1,0 +1,6 @@
+---
+- name: Deploy T-Mobile Exporter
+  hosts: watchtower
+  become: true
+  roles:
+    - tmobile_exporter
