@@ -63,3 +63,6 @@ scrape_configs:
         target_label: instance
       - target_label: __address__
         replacement: localhost:9116
+  - job_name: 'tmobile'
+    static_configs:
+      - targets: ['localhost:9719']
