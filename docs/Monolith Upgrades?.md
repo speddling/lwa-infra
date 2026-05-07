@@ -3,7 +3,12 @@
 
 ---
 
+## Actual Upgrade May 7th 2026
 
+Ordered: 
+	Ryzen 7 5700G
+	Corsair 2x 16GB 3200Mhz CL16
+	Seagate BarraCuda Compute 4TB 256MB cache
 
 ---
 
