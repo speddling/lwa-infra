@@ -127,16 +127,16 @@ Always-on DNS resolver and full-stack monitoring node. Never runs workloads. See
 
 ### UFW Rules
 
-| Port | Protocol | Service | Allowed From |
-|---|---|---|---|
-| 22 | TCP | SSH | Apex (192.168.0.19) only |
-| 53 | TCP+UDP | AdGuard Home DNS | LAN |
-| 3000 | TCP | AdGuard Home UI | LAN |
-| 3001 | TCP | Grafana | LAN |
-| 9090 | TCP | Prometheus | LAN |
-| 9116 | TCP | snmp_exporter | LAN |
-| 9618 | TCP | adguard_exporter | LAN |
-| 19999 | TCP | Netdata | LAN |
+| Port  | Protocol | Service          | Allowed From  |
+| ----- | -------- | ---------------- | ------------- |
+| 22    | TCP      | SSH              | apex & studio |
+| 53    | TCP+UDP  | AdGuard Home DNS | LAN           |
+| 3000  | TCP      | AdGuard Home UI  | LAN           |
+| 3001  | TCP      | Grafana          | LAN           |
+| 9090  | TCP      | Prometheus       | LAN           |
+| 9116  | TCP      | snmp_exporter    | LAN           |
+| 9618  | TCP      | adguard_exporter | LAN           |
+| 19999 | TCP      | Netdata          | LAN           |
 
 ### IaC
 
@@ -166,6 +166,7 @@ Always-on DNS resolver and full-stack monitoring node. Never runs workloads. See
 | Storage  | Boot 512GB NVMe               |
 |          | 256GB SSD                     |
 |          | 512GB SSD                     |
+|          | 4TB HDD                       |
 |          | 2TB HDD                       |
 
 ### Role
@@ -201,12 +202,22 @@ Primary k3s node. Runs all workloads. Named for its role as the single heavy nod
 
 ## Apex
 
-| Spec | Detail |
-|---|---|
-| Machine | MacBook Pro |
-| Hostname | `apex` |
-| IP | 192.168.0.19 (DHCP MAC-bound) |
-| Role | Primary workstation — all authoring, config, remote ops originate here |
+| Spec     | Detail                                                                 |
+| -------- | ---------------------------------------------------------------------- |
+| Machine  | MacBook Air M4                                                         |
+| Hostname | `apex`                                                                 |
+| IP       | 192.168.0.19 (DHCP MAC-bound)                                          |
+| Role     | Primary workstation — all authoring, config, remote ops originate here |
+
+## Studio
+
+
+| Spec     | Detail                                                       |
+| -------- | ------------------------------------------------------------ |
+| Machine  | Dell Precision                                               |
+| Hostname |                                                              |
+| IP       | 192.168.0.                                                   |
+| Role     | Personal Laptop & DAW - Reaper with an M-Audio Air 192 \| 14 |
 
 
 ---
