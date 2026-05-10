@@ -1,5 +1,5 @@
 # Little Wolf Acres — Homelab Current State
-> Last updated: April 2026 · Authored on apex · All IaC in `speddling/homelab` repo
+> Last updated: May 2026 · Authored on apex · All IaC in `speddling/homelab` repo
 
 ---
 
