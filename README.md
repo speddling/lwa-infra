@@ -4,9 +4,13 @@ Personal Kubernetes home lab documentation, configurations, and manifests.
 
 ## Hardware
 - **Control Plane / Workstation** - 
-	- MacBook Air M4 running macOS (apex)
+	- MacBook Air M4 16gb 256gb  (apex)
 - **Worker Node** - 
-	- AMD A10, ASRock AB350 Pro4, 16GB RAM, Fractal Design Define R4 (monolith)
+	- AMD Ryzen 7 5700G
+	- Noctia NH-D9L
+	- ASRock AB350 Pro4
+	- 32GB DDR4 3200 CL16 
+	- Fractal Design Define R4 (monolith)
 - Monitoring Node - 
 	- Asus VM40B, 8GB RAM, 1TB SSD (watchtower)
 
@@ -30,11 +34,12 @@ Personal Kubernetes home lab documentation, configurations, and manifests.
 - Linux Samba share - for Wife & Daughter's file backups
 - Minecraft Server for the Wife and Daughter
 
-## Next Project
+## Current Project
 - rewire closet then reconfigure Omada setup.
 
 ## Pending Projects
-- Upgrade Worker Node hardware with Ryzen, max ram, and 8TB HDD
+- Private Client space / jumpbox
+- music-library & specific fileshare mirror back up
 
 ## Status
 Online
