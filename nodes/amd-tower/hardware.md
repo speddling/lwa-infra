@@ -5,13 +5,6 @@
 - Fractal Design Define R4 (Monolith)
 - Noctua cooler 
 
-- ****Storage**** 
-- ~~512gb NVMe - boot~~
-- ~~512gb SSD~~ 
-- ~~256gb SSD~~  
-- ~~2tb HDD~~
-- 1tb SSD - media library
-
 ```bash
 df -h
 
