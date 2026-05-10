@@ -8,7 +8,7 @@
 | sda     | 465.8G | SATA SSD | `/mnt/ssd-a`   | k8s local-path provisioner (PVC storage)      |
 | sdb     | 238.5G | SATA SSD | `/mnt/ssd-b`   | isolated `work space` and  `client jumpbox`   |
 | sdc     | 3.6T   | SATA HDD | `/mnt/hdd-c`   | Music library / fileserver / bulk drive space |
-| sdd     | 1.8T   | SATA HDD | `/mnt/hdd-d`   | music                                         |
+| sdd     | 1.8T   | SATA HDD | `/mnt/hdd-d`   | music-library / specific file mirror          |
 
 > **Note:** The AB350 Pro4 throttles NVMe to PCIe 2.0 x2. The unallocated NVMe space is intentional headroom for future growth, not an oversight.
 
@@ -51,28 +51,11 @@ The music library is mounted directly via `hostPath` in the Navidrome deployment
 
 ---
 
-## Planned Changes
 
-### 8TB HDD Upgrade
-When the 8TB HDD arrives to replace the 2TB:
-
-1. Install 8TB, identify device with `lsblk`
-2. Format: `sudo mkfs.ext4 /dev/sdX`
-3. Mount temporarily: `sudo mount /dev/sdX /mnt/hdd-new`
-4. Rsync music library: `sudo rsync -av /mnt/lab-backups/ /mnt/hdd-new/`
-5. Update `/etc/fstab` — replace `sdc` UUID with new drive UUID, change mount point to `/mnt/hdd`
-6. Unmount old, mount new: `sudo umount /mnt/lab-backups && sudo mount -a`
-7. Update `deployment.yaml` hostPath: `/mnt/lab-backups/music-library` → `/mnt/hdd/music-library`
-8. Redeploy via GitHub Actions: `deploy-navidrome.yml`
-9. Navidrome will rescan the library automatically within 1 hour (or trigger manually)
-
-> DB loss on redeploy is acceptable — library reindexes automatically, playlists must be recreated manually.
-
----
 
 ## Post-Watchtower Cleanup
 - Remove UFW from fileserver Ansible playbook — firewall policy will be managed at the network layer via ER605 / Watchtower
 
 ---
 
-*Last updated: 2026-04-23*
+*Last updated: 2026-05-09*
