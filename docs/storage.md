@@ -14,7 +14,8 @@
 
 ---
 
-## Mount Points
+## Mount Points 
+`needs updating`
 
 All mounts are UUID-based in `/etc/fstab` to survive drive reordering on reboot.
 

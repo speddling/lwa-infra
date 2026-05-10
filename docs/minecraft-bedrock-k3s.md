@@ -304,16 +304,6 @@ Then re-run the workflow with `import_world: true`.
 | **No automatic backups** | Consider adding a K3s `CronJob` to tarball the PVC data |
 | **`.mcworld` is gitignored** | `services/minecraft/files/*.mcworld` — keep world data out of version control |
 
----
-
-## Resource Allocation (AMD A10 / 16GB RAM)
-
-| Resource | Request | Limit |
-|---|---|---|
-| Memory | 1Gi | 3Gi |
-| CPU | 500m | 2000m |
-
-Leaves plenty of headroom on the node for other services (Navidrome, monitoring stack, etc.).
 
 ---
 

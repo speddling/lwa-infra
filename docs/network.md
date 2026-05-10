@@ -66,5 +66,5 @@ All other devices use dynamic DHCP leases.
 - Detection event counts
 
 ---
-*Last updated: 2026-04-30*
+*Last updated: 2026-05-09
 

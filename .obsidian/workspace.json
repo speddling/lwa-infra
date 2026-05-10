@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "docs/homelab-state.md",
+                "file": "README.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "homelab-state"
+              "title": "README"
             }
           }
         ]
@@ -187,9 +187,10 @@
   "active": "165dadc935b0cab3",
   "lastOpenFiles": [
     "docs/storage.md",
+    "docs/network.md",
     "docs/minecraft-bedrock-k3s.md",
-    "docs/Monolith Upgrades?.md",
     "docs/homelab-state.md",
+    "docs/Monolith Upgrades?.md",
     "services/watchtower/ansible/roles/tmobile_exporter/handlers/main.yml",
     "services/watchtower/ansible/roles/tmobile_exporter/tasks/main.yml",
     "services/watchtower/ansible/playbooks/tmobile_exporter.yml",
@@ -220,7 +221,6 @@
     "services/watchtower/ansible/node_modules/@anthropic-ai/sdk/src/internal/README.md",
     "services/watchtower/ansible/node_modules/@anthropic-ai/sdk/src/core/README.md",
     "services/watchtower/ansible/node_modules/@aws-crypto/sha256-browser/node_modules/@smithy/util-buffer-from/README.md",
-    "services/watchtower/ansible/node_modules/@aws-crypto/sha256-browser/node_modules/@smithy/util-utf8/README.md",
-    "services/watchtower/ansible/node_modules/@mariozechner/pi-ai/README.md"
+    "services/watchtower/ansible/node_modules/@aws-crypto/sha256-browser/node_modules/@smithy/util-utf8/README.md"
   ]
 }
