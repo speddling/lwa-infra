@@ -96,8 +96,4 @@ groups:
         labels:
           severity: info
         annotations:
-          description: |
-            🏠 Little Wolf Acres — Daily Summary
-            Watchtower: {{ "{{" }} if (query "up{job='watchtower'}" | first | value) == 1 {{ "}}" }}✅ Up{{ "{{" }} else {{ "}}" }}🔴 Down{{ "{{" }} end {{ "}}" }}
-            Monolith: {{ "{{" }} if (query "up{job='monolith'}" | first | value) == 1 {{ "}}" }}✅ Up{{ "{{" }} else {{ "}}" }}🔴 Down{{ "{{" }} end {{ "}}" }}
-            AdGuard: {{ "{{" }} if (query "up{job='adguard'}" | first | value) == 1 {{ "}}" }}✅ Up{{ "{{" }} else {{ "}}" }}🔴 Down{{ "{{" }} end {{ "}}" }}
+          description: "🏠 Little Wolf Acres — Daily Summary. Check Grafana for full status: http://grafana.local:3001"
