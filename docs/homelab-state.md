@@ -189,6 +189,15 @@ Alerting is owned by **Prometheus + Alertmanager**. Grafana is display-only.
 |          | 4TB HDD — `/mnt/hdd-c` — music library / fileserver / bulk storage |
 |          | 2TB HDD — `/mnt/hdd-d` — mirror of music-library and Samba share from hdd-c |
 
+### Upgrade Roadmap
+
+| Order | Item | Notes |
+|---|---|---|
+| 1 | RAM — 2×16GB DDR4-3200 | Bring to 64GB. Cheap now, immediate headroom for k3s and CPU inference |
+| 2 | PSU — 850W (Seasonic or Corsair RMx) | Required before GPU. Current Antec EA-380D Green (380W) cannot support a discrete GPU |
+| 3 | Case fans — Noctua 140mm | Same time as PSU or GPU. Define R4 fits 140mm well |
+| 4 | GPU — RTX 3090 (24GB VRAM) | Local LLM unlock. 24GB VRAM fits 7B full quality, 13B quantized. Do not buy a smaller card first — 12GB VRAM is a real constraint for model sizes worth running |
+
 ### Role
 
 Primary k3s worker node and household services platform. Hosts all Kubernetes workloads including Navidrome, Minecraft, and family fileshares. Named for its role as the single monolithic compute node — a deliberate single-node architecture expandable to a multi-node cluster if needed.
@@ -295,6 +304,19 @@ gh workflow run deploy-watchtower.yml
 
 ## Pending Work
 
+### Hardware
+
+| Item | Priority | Notes |
+| ---- | -------- | ----- |
+| RAM — 2×16GB DDR4-3200 | High | Bring Monolith to 64GB |
+| PSU — 850W | High | Required before GPU. Current 380W insufficient |
+| Case fans — Noctua 140mm | Medium | Same time as PSU or GPU |
+| GPU — RTX 3090 24GB | Medium | Local LLM development unlock. Hold out for 24GB, don't settle for 12GB |
+| UPS — CyberPower CP1500PFCLCD | Low | NUT role ready, waiting on hardware budget |
+| JetStream managed switch | Low | Replaces unmanaged TL-SG1210P, enables SNMP per-port stats |
+
+### Software
+
 | Item | Priority | Notes |
 | ---- | -------- | ----- |
 | Daily summary scheduled time | Medium | Currently always firing — should fire once daily at set time |
@@ -304,11 +326,9 @@ gh workflow run deploy-watchtower.yml
 | hdd-d mirror — Ansible rsync role + systemd timer | Medium | Nightly mirror of music-library and Samba share from hdd-c to hdd-d |
 | Switch .local to littlewolfacres.com rewrites | Medium | Update AdGuard Home rewrites and all references in repo |
 | ArgoCD — GitOps for k3s | Medium | Migrate from kubectl apply chains to GitOps |
-| Synapse — Claude Desktop config on apex | Low | Add `http://monolith.littlewolfacres.com:30800/sse` to `claude_desktop_config.json` after first deploy |
 | Loki — log aggregation | Low | Add to Watchtower stack |
 | Obelisk — client workspace on `/mnt/ssd-b` | Low | Isolated client environment, reserved name |
-| JetStream managed switch | Low | Replaces unmanaged TL-SG1210P, enables SNMP per-port stats |
-| UPS — CyberPower CP1500PFCLCD | Low | NUT role ready, waiting on hardware budget |
+| Synapse — health endpoint | Low | Add /health route to FastMCP app for proper k8s probes |
 
 ---
 

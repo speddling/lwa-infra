@@ -74,4 +74,3 @@ jobs:
         run: |
           kubectl get pods -n synapse
           kubectl get svc -n synapse
-          curl -sf http://localhost:30800/health && echo "Health check passed"
