@@ -90,6 +90,14 @@ dig @192.168.0.21 monolith.littlewolfacres.com
 4. Update `homelab-state.md` DNS rewrites table
 5. Commit via `docs/*` branch
 
+### Omada DHCP Settings
+
+Search domain and other DHCP options are at:
+**Omada Cloud Portal → Settings → Wired Networks → LAN → Edit → DHCP Server**
+
+- Domain Name: `littlewolfacres.com` (pushes search domain to all DHCP clients)
+- DNS Server: `192.168.0.21` (Watchtower)
+
 ---
 
 ## SNMP Testing (run on watchtower)
