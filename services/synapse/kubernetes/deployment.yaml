@@ -57,5 +57,3 @@ spec:
           hostPath:
             path: /mnt/hdd-c
             type: Directory
-      imagePullSecrets:
-        - name: ghcr-pull-secret
