@@ -186,6 +186,7 @@
   },
   "active": "165dadc935b0cab3",
   "lastOpenFiles": [
+    "services/fileserver/ansible/group_vars/all/vault.yml",
     "docs/synapse.md",
     "services/synapse/kubernetes/service.yaml",
     "services/synapse/kubernetes/deployment.yaml",
@@ -220,7 +221,6 @@
     "services/watchtower/ansible/node_modules/openai/src/resources/responses/api.md",
     "services/watchtower/ansible/node_modules/openai/src/resources/realtime/api.md",
     "services/watchtower/ansible/node_modules/openai/src/resources/conversations/api.md",
-    "services/watchtower/ansible/node_modules/openai/src/internal/qs/README.md",
-    "services/watchtower/ansible/node_modules/openai/src/internal/qs/LICENSE.md"
+    "services/watchtower/ansible/node_modules/openai/src/internal/qs/README.md"
   ]
 }

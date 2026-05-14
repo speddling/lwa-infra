@@ -1,12 +1,12 @@
-# TODO: vault these credentials before sharing this repo publicly
-# Run: ansible-vault encrypt services/fileserver/ansible/group_vars/all/vars.yml
-# Then move passwords into vault.yml and reference here
+# Samba user accounts and share paths
+# Passwords are stored in vault.yml — run:
+#   ansible-vault encrypt services/fileserver/ansible/group_vars/all/vault.yml
 
 samba_user: vault
-samba_password: "bubbie"      # ← replace before deploying
+samba_password: "{{ vault_samba_password }}"
 
 james_user: james
-james_password: "junia"         # ← replace before deploying
+james_password: "{{ vault_james_password }}"
 
 vault_share_name: vault
 vault_share_path: /mnt/ssd-b/vault

@@ -88,6 +88,24 @@ groups:
         annotations:
           description: "Monolith disk usage on / is above 80% (current: {{ "{{" }} $value | printf \"%.1f\" {{ "}}" }}%)"
 
+      - alert: MonolithLowDiskHddC
+        expr: (1 - (node_filesystem_avail_bytes{instance="monolith.littlewolfacres.com:9100",mountpoint="/mnt/hdd-c"} / node_filesystem_size_bytes{instance="monolith.littlewolfacres.com:9100",mountpoint="/mnt/hdd-c"})) * 100 > 80
+        for: 5m
+        labels:
+          severity: critical
+          host: monolith
+        annotations:
+          description: "Monolith disk usage on /mnt/hdd-c (music/bulk) is above 80% (current: {{ "{{" }} $value | printf \"%.1f\" {{ "}}" }}%)"
+
+      - alert: MonolithLowDiskHddD
+        expr: (1 - (node_filesystem_avail_bytes{instance="monolith.littlewolfacres.com:9100",mountpoint="/mnt/hdd-d"} / node_filesystem_size_bytes{instance="monolith.littlewolfacres.com:9100",mountpoint="/mnt/hdd-d"})) * 100 > 80
+        for: 5m
+        labels:
+          severity: warning
+          host: monolith
+        annotations:
+          description: "Monolith disk usage on /mnt/hdd-d (mirror) is above 80% (current: {{ "{{" }} $value | printf \"%.1f\" {{ "}}" }}%)"
+
       # ── Daily summary (dead man's switch) ───────────────────────────────────
 
       - alert: DailySummary
@@ -96,4 +114,4 @@ groups:
         labels:
           severity: info
         annotations:
-          description: "🏠 Little Wolf Acres — Daily Summary. Check Grafana for full status: http://grafana.local:3001"
+          description: "🏠 Little Wolf Acres — Daily Summary. Check Grafana for full status: http://grafana.littlewolfacres.com:3001"

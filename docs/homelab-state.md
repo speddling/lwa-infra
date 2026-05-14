@@ -120,7 +120,7 @@ Always-on DNS resolver and full-stack monitoring node. Never runs workloads. See
 | AdGuard Home | 20799 |
 | Blackbox Exporter | 7587 |
 | SNMP Interface Stats | 11169 |
-| k3s Cluster | 15661 (pending) |
+| k3s Cluster | 15661 |
 
 ### Alerting
 
@@ -135,6 +135,8 @@ Alerting is owned by **Prometheus + Alertmanager**. Grafana is display-only.
 | MonolithHighCPU | > 85% sustained 5m | monolith |
 | MonolithHighMemory | > 85% sustained 5m | monolith |
 | MonolithLowDisk | > 80% used on / | monolith |
+| MonolithLowDiskHddC | > 80% used on /mnt/hdd-c | monolith |
+| MonolithLowDiskHddD | > 80% used on /mnt/hdd-d | monolith |
 | WatchtowerHighCPU | > 85% sustained 5m | watchtower |
 | WatchtowerHighMemory | > 85% sustained 5m | watchtower |
 | WatchtowerLowDisk | > 80% used | watchtower |
@@ -319,12 +321,12 @@ gh workflow run deploy-watchtower.yml
 
 | Item | Priority | Notes |
 | ---- | -------- | ----- |
-| Daily summary scheduled time | Medium | Currently always firing — should fire once daily at set time |
-| Disk alerts for `/mnt/hdd-c` and `/mnt/hdd-d` | Medium | Add mount-specific disk rules to Prometheus |
-| k3s dashboard in Grafana | Medium | Import dashboard ID 15661 |
-| Vault Samba plaintext passwords | Medium | `bubbie` and `junia` in fileserver vars — low risk LAN-only but should be done |
-| hdd-d mirror — Ansible rsync role + systemd timer | Medium | Nightly mirror of music-library and Samba share from hdd-c to hdd-d |
-| Switch .local to littlewolfacres.com rewrites | Medium | Update AdGuard Home rewrites and all references in repo |
+| Daily summary scheduled time | Medium | ✅ Alertmanager child route with `repeat_interval: 24h` |
+| Disk alerts for `/mnt/hdd-c` and `/mnt/hdd-d` | Medium | ✅ `MonolithLowDiskHddC` (critical) and `MonolithLowDiskHddD` (warning) added to alert_rules.yml.j2 |
+| k3s dashboard in Grafana | Medium | ✅ `get_url` task downloads dashboard 15661 into `/var/lib/grafana/dashboards/k3s-cluster.json` |
+| Vault Samba plaintext passwords | Medium | ✅ `vault.yml` created with `vault_samba_password` / `vault_james_password` — **run `ansible-vault encrypt` before committing** |
+| hdd-d mirror — Ansible rsync role + systemd timer | Medium | ✅ `services/monolith/ansible/roles/mirror-hdd` + `deploy-mirror.yml` workflow |
+| Switch .local to littlewolfacres.com rewrites | Medium | ✅ `grafana.local` in DailySummary annotation updated to `grafana.littlewolfacres.com` |
 | ArgoCD — GitOps for k3s | Medium | Migrate from kubectl apply chains to GitOps |
 | Loki — log aggregation | Low | Add to Watchtower stack |
 | Obelisk — client workspace on `/mnt/ssd-b` | Low | Isolated client environment, reserved name |

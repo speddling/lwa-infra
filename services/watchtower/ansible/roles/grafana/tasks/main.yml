@@ -51,6 +51,15 @@
     group: grafana
     mode: '0755'
 
+- name: Download k3s cluster dashboard (ID 15661)
+  ansible.builtin.get_url:
+    url: https://grafana.com/api/dashboards/15661/revisions/latest/download
+    dest: /var/lib/grafana/dashboards/k3s-cluster.json
+    owner: grafana
+    group: grafana
+    mode: '0644'
+  notify: restart grafana
+
 - name: Deploy Grafana alerting provisioning
   template:
     src: alerting.yml.j2
