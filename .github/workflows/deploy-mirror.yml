@@ -28,11 +28,9 @@ jobs:
           sudo apt-get install -y ansible
 
       - name: Syntax check
+        working-directory: services/monolith/ansible
         run: |
-          ansible-playbook \
-            -i services/monolith/ansible/inventory.ini \
-            services/monolith/ansible/playbooks/mirror.yml \
-            --syntax-check
+          ansible-playbook -i inventory.ini playbooks/mirror.yml --syntax-check
 
   deploy:
     name: Deploy
@@ -54,7 +52,6 @@ jobs:
           sudo apt-get install -y ansible
 
       - name: Run mirror playbook
+        working-directory: services/monolith/ansible
         run: |
-          ansible-playbook \
-            -i services/monolith/ansible/inventory.ini \
-            services/monolith/ansible/playbooks/mirror.yml
+          ansible-playbook -i inventory.ini playbooks/mirror.yml
