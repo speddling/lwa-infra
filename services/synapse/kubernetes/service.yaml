@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: synapse
+  namespace: synapse
+spec:
+  type: NodePort
+  selector:
+    app: synapse
+  ports:
+    - port: 8080
+      targetPort: 8080
+      nodePort: 30800  # Access via http://monolith.littlewolfacres.com:30800/sse

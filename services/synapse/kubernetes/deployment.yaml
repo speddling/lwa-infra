@@ -1,0 +1,63 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: synapse
+  namespace: synapse
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: synapse
+  template:
+    metadata:
+      labels:
+        app: synapse
+    spec:
+      serviceAccountName: synapse
+      containers:
+        - name: synapse
+          image: ghcr.io/speddling/synapse:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+              name: sse
+          envFrom:
+            - configMapRef:
+                name: synapse-config
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "128Mi"
+            limits:
+              cpu: "200m"
+              memory: "256Mi"
+          volumeMounts:
+            - name: ssd-a
+              mountPath: /mnt/ssd-a
+              readOnly: true
+            - name: hdd-c
+              mountPath: /mnt/hdd-c
+              readOnly: true
+      volumes:
+        - name: ssd-a
+          hostPath:
+            path: /mnt/ssd-a
+            type: Directory
+        - name: hdd-c
+          hostPath:
+            path: /mnt/hdd-c
+            type: Directory
+      imagePullSecrets:
+        - name: ghcr-pull-secret

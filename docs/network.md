@@ -8,15 +8,29 @@ All static assignments are DHCP MAC-bound in the ER605. Do not set static IPs at
 | ------------- | ------------------ | ------------------------------------------ |
 | 192.168.0.4   | Big Brother        | Reolink NVR / Camera Controller            |
 | 192.168.0.7   | OC200              | Omada Network Controller                   |
-| 192.168.0.19  | Apex               | MacBook Pro — Primary Workstation          |
+| 192.168.0.19  | Apex               | MacBook Air M4 — Primary Workstation       |
 | 192.168.0.20  | Monolith           | k3s Node — Primary Server                  |
-| 192.168.0.21  | Watchtower         | Ansible / DNS / Network Services (pending) |
+| 192.168.0.21  | Watchtower         | DNS / Monitoring Stack                     |
 | 192.168.0.109 | Studio             | Ubuntu Studio — DAW / KDE Workstation      |
 | 192.168.0.1   | ER605 v2.0         | Gigabit Multi-WAN VPN Router               |
 | 192.168.0.2   | EAP245-Foyer       | Access Point / Mesh                        |
 | 192.168.0.5   | EAP245-Yarn-Studio | Access Point / Mesh                        |
 
 All other devices use dynamic DHCP leases.
+
+---
+
+## Workspaces
+
+Named k3s namespaces and logical environments on Monolith with reserved identities.
+
+| Name | Namespace | Host | Purpose | Status |
+|---|---|---|---|---|
+| Synapse | `synapse` | monolith | MCP/AI tooling — Claude's interface to the homelab and coursework | ✅ Active |
+| Obelisk | `obelisk` | monolith (`/mnt/ssd-b`) | Client workspace — isolated environment | 🔜 Reserved |
+
+- **Synapse** is accessible at `http://monolith.littlewolfacres.com:30800/sse` (apex only, UFW restricted)
+- **Obelisk** will be isolated at the namespace, storage, and network level when built
 
 ---
 
@@ -66,5 +80,4 @@ All other devices use dynamic DHCP leases.
 - Detection event counts
 
 ---
-*Last updated: 2026-05-09
-
+*Last updated: 2026-05-14*

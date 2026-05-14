@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: synapse-config
+  namespace: synapse
+data:
+  PROMETHEUS_URL: "http://192.168.0.21:9090"
+  # Comma-separated host paths the server may read.
+  # Must match the volumeMounts in deployment.yaml.
+  ALLOWED_READ_PATHS: "/mnt/ssd-a,/mnt/hdd-c"

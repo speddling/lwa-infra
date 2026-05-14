@@ -168,7 +168,6 @@ Alerting is owned by **Prometheus + Alertmanager**. Grafana is display-only.
 ### Pending
 
 - **NUT (UPS monitoring)** — role is written and ready, waiting for CyberPower CP1500PFCLCD hardware
-- **Fix self-hosted runner** — not reporting final status to GitHub, requiring bypass to merge PRs
 
 ---
 
@@ -188,15 +187,15 @@ Alerting is owned by **Prometheus + Alertmanager**. Grafana is display-only.
 |          | 512GB SSD — `/mnt/ssd-a` — k8s local-path provisioner |
 |          | 256GB SSD — `/mnt/ssd-b` — isolated workspace / client jumpbox |
 |          | 4TB HDD — `/mnt/hdd-c` — music library / fileserver / bulk storage |
-|          | 2TB HDD — `/mnt/hdd-d` — music library / fileshare mirror |
+|          | 2TB HDD — `/mnt/hdd-d` — mirror of music-library and Samba share from hdd-c |
 
 ### Role
 
 Primary k3s worker node and household services platform. Hosts all Kubernetes workloads including Navidrome, Minecraft, and family fileshares. Named for its role as the single monolithic compute node — a deliberate single-node architecture expandable to a multi-node cluster if needed.
 
-**Pending**
-- [ ] Client workspace — isolated environment on `/mnt/ssd-b` for Swiss lift-and-shift work
-- [ ] MCP server space — local Model Context Protocol servers for AI tooling
+**Workspaces**
+- [x] Synapse — MCP/AI tooling namespace. Claude's interface to the homelab and coursework. (see `docs/synapse.md`)
+- [ ] Obelisk — client workspace on `/mnt/ssd-b` (reserved name, future)
 
 ### Services
 
@@ -206,6 +205,7 @@ Primary k3s worker node and household services platform. Hosts all Kubernetes wo
 | Navidrome | Music streaming server | ✅ Running |
 | Samba | File share (family backups, media) | ✅ Running |
 | node_exporter | Host metrics → Prometheus on Watchtower | ✅ Running |
+| Synapse | MCP server — AI tooling namespace | ✅ Running |
 
 ### SSH Access
 
@@ -229,6 +229,7 @@ Primary k3s worker node and household services platform. Hosts all Kubernetes wo
 |---|---|---|---|
 | 22 | TCP | SSH | apex, studio |
 | 9100 | TCP | node_exporter | watchtower |
+| 30800 | TCP | Synapse MCP server | apex only |
 | 445 | TCP | Samba | LAN |
 | 139 | TCP | Samba (NetBIOS) | LAN |
 
@@ -259,7 +260,7 @@ Primary k3s worker node and household services platform. Hosts all Kubernetes wo
 ## Git Workflow
 
 All changes go through a branch → PR → merge to master flow.
-Direct pushes to master are disabled via branch protection.
+Direct pushes to master are disabled via branch protection (Branches rule).
 
 ```bash
 # Start new work
@@ -296,18 +297,16 @@ gh workflow run deploy-watchtower.yml
 
 | Item | Priority | Notes |
 | ---- | -------- | ----- |
-| Fix self-hosted runner status reporting | High | Runner not reporting final status to GitHub — requires bypass to merge PRs |
-| Remove bypass actor from branch ruleset | High | Added temporarily — remove after runner is fixed |
 | Daily summary scheduled time | Medium | Currently always firing — should fire once daily at set time |
 | Disk alerts for `/mnt/hdd-c` and `/mnt/hdd-d` | Medium | Add mount-specific disk rules to Prometheus |
 | k3s dashboard in Grafana | Medium | Import dashboard ID 15661 |
 | Vault Samba plaintext passwords | Medium | `bubbie` and `junia` in fileserver vars — low risk LAN-only but should be done |
-| hdd-d mirror — Ansible rsync role + systemd timer | Medium | Nightly mirror of music-library and studio-archive from hdd-c to hdd-d |
+| hdd-d mirror — Ansible rsync role + systemd timer | Medium | Nightly mirror of music-library and Samba share from hdd-c to hdd-d |
 | Switch .local to littlewolfacres.com rewrites | Medium | Update AdGuard Home rewrites and all references in repo |
 | ArgoCD — GitOps for k3s | Medium | Migrate from kubectl apply chains to GitOps |
+| Synapse — Claude Desktop config on apex | Low | Add `http://monolith.littlewolfacres.com:30800/sse` to `claude_desktop_config.json` after first deploy |
 | Loki — log aggregation | Low | Add to Watchtower stack |
-| Client workspace on `/mnt/ssd-b` | Low | Isolated Swiss client environment |
-| Local MCP server on Monolith | Low | AI tooling without data leaving the network |
+| Obelisk — client workspace on `/mnt/ssd-b` | Low | Isolated client environment, reserved name |
 | JetStream managed switch | Low | Replaces unmanaged TL-SG1210P, enables SNMP per-port stats |
 | UPS — CyberPower CP1500PFCLCD | Low | NUT role ready, waiting on hardware budget |
 
