@@ -30,17 +30,23 @@ dns:
   enable_dnssec: true
   filtering_enabled: true
   filters_update_interval: 24
+  search_domains:
+    - littlewolfacres.com
 
 filtering:
   rewrites:
-    - domain: watchtower.local
+    - domain: watchtower.littlewolfacres.com
       answer: 192.168.0.21
-    - domain: grafana.local
+    - domain: grafana.littlewolfacres.com
       answer: 192.168.0.21
-    - domain: monolith.local
+    - domain: monolith.littlewolfacres.com
       answer: 192.168.0.20
-    - domain: navidrome.local
+    - domain: navidrome.littlewolfacres.com
       answer: 192.168.0.20
+    - domain: apex.littlewolfacres.com
+      answer: 192.168.0.19
+    - domain: studio.littlewolfacres.com
+      answer: 192.168.0.109
 
 filters:
   - enabled: true
