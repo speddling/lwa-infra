@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# mirror-hdd.sh — nightly rsync mirror of hdd-c → hdd-d
+# Managed by Ansible. Do not edit manually.
+
+set -euo pipefail
+
+SOURCE="{{ mirror_source }}"
+DEST="{{ mirror_dest }}"
+LOG="{{ mirror_log }}"
+
+echo "=== $(date --iso-8601=seconds) mirror-hdd start ===" >> "$LOG"
+
+rsync \
+  --archive \
+  --delete \
+  --human-readable \
+  --stats \
+  --log-file="$LOG" \
+  "$SOURCE" \
+  "$DEST"
+
+echo "=== $(date --iso-8601=seconds) mirror-hdd complete ===" >> "$LOG"

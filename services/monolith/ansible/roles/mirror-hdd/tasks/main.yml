@@ -1,0 +1,43 @@
+---
+- name: Install rsync
+  ansible.builtin.apt:
+    name: rsync
+    state: present
+    update_cache: false
+
+- name: Deploy mirror script
+  ansible.builtin.template:
+    src: mirror-hdd.sh.j2
+    dest: /usr/local/bin/mirror-hdd.sh
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Deploy mirror-hdd systemd service unit
+  ansible.builtin.template:
+    src: mirror-hdd.service.j2
+    dest: /etc/systemd/system/mirror-hdd.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify:
+    - reload systemd
+    - restart mirror timer
+
+- name: Deploy mirror-hdd systemd timer unit
+  ansible.builtin.template:
+    src: mirror-hdd.timer.j2
+    dest: /etc/systemd/system/mirror-hdd.timer
+    owner: root
+    group: root
+    mode: "0644"
+  notify:
+    - reload systemd
+    - restart mirror timer
+
+- name: Enable and start mirror-hdd timer
+  ansible.builtin.systemd:
+    name: mirror-hdd.timer
+    enabled: true
+    state: started
+    daemon_reload: true

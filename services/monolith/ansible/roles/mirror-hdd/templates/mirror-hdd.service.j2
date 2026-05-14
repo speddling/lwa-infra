@@ -1,0 +1,14 @@
+[Unit]
+Description=Mirror hdd-c to hdd-d (nightly rsync)
+After=local-fs.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/mirror-hdd.sh
+StandardOutput=journal
+StandardError=journal
+# Allow up to 6 hours for a full sync before systemd kills it
+TimeoutStartSec=21600
+
+[Install]
+WantedBy=multi-user.target

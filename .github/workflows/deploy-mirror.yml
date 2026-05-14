@@ -1,0 +1,60 @@
+name: Deploy Mirror (hdd-c → hdd-d)
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'services/monolith/ansible/roles/mirror-hdd/**'
+      - 'services/monolith/ansible/playbooks/mirror.yml'
+      - '.github/workflows/deploy-mirror.yml'
+  workflow_dispatch:
+
+jobs:
+  validate:
+    name: Validate
+    runs-on: [self-hosted, monolith]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Write vault password
+        run: |
+          mkdir -p ~/homelab
+          echo '${{ secrets.ANSIBLE_VAULT_PASSWORD }}' > ~/homelab/.vault_pass
+          chmod 600 ~/homelab/.vault_pass
+
+      - name: Install Ansible
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ansible
+
+      - name: Syntax check
+        run: |
+          ansible-playbook \
+            -i services/monolith/ansible/inventory.ini \
+            services/monolith/ansible/playbooks/mirror.yml \
+            --syntax-check
+
+  deploy:
+    name: Deploy
+    needs: validate
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    runs-on: [self-hosted, monolith]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Write vault password
+        run: |
+          mkdir -p ~/homelab
+          echo '${{ secrets.ANSIBLE_VAULT_PASSWORD }}' > ~/homelab/.vault_pass
+          chmod 600 ~/homelab/.vault_pass
+
+      - name: Install Ansible
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ansible
+
+      - name: Run mirror playbook
+        run: |
+          ansible-playbook \
+            -i services/monolith/ansible/inventory.ini \
+            services/monolith/ansible/playbooks/mirror.yml

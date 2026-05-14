@@ -1,0 +1,9 @@
+---
+- name: reload systemd
+  ansible.builtin.systemd:
+    daemon_reload: true
+
+- name: restart mirror timer
+  ansible.builtin.systemd:
+    name: mirror-hdd.timer
+    state: restarted

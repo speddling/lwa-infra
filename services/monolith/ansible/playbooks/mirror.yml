@@ -1,0 +1,7 @@
+---
+- name: Configure hdd-c → hdd-d nightly mirror
+  hosts: monolith
+  become: true
+
+  roles:
+    - mirror-hdd
