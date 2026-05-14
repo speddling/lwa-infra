@@ -321,12 +321,12 @@ gh workflow run deploy-watchtower.yml
 
 | Item | Priority | Notes |
 | ---- | -------- | ----- |
-| Daily summary scheduled time | Medium | ✅ Alertmanager child route with `repeat_interval: 24h` |
-| Disk alerts for `/mnt/hdd-c` and `/mnt/hdd-d` | Medium | ✅ `MonolithLowDiskHddC` (critical) and `MonolithLowDiskHddD` (warning) added to alert_rules.yml.j2 |
-| k3s dashboard in Grafana | Medium | ✅ `get_url` task downloads dashboard 15661 into `/var/lib/grafana/dashboards/k3s-cluster.json` |
-| Vault Samba plaintext passwords | Medium | ✅ `vault.yml` encrypted with ansible-vault — `vault_samba_password` / `vault_james_password` |
-| hdd-d mirror — Ansible rsync role + systemd timer | Medium | ✅ `services/monolith/ansible/roles/mirror-hdd` + `deploy-mirror.yml` workflow |
-| Switch .local to littlewolfacres.com rewrites | Medium | ✅ `grafana.local` in DailySummary annotation updated to `grafana.littlewolfacres.com` |
+| Daily summary scheduled time | Medium | ✅ Deployed — Alertmanager child route with `repeat_interval: 24h` |
+| Disk alerts for `/mnt/hdd-c` and `/mnt/hdd-d` | Medium | ✅ Deployed — `MonolithLowDiskHddC` (critical) and `MonolithLowDiskHddD` (warning) |
+| k3s dashboard in Grafana | Medium | ✅ Deployed — dashboard 15661 provisioned at `/var/lib/grafana/dashboards/k3s-cluster.json` |
+| Vault Samba plaintext passwords | Medium | ✅ Deployed — `vault.yml` encrypted with ansible-vault |
+| hdd-d mirror — Ansible rsync role + systemd timer | Medium | ✅ Deployed — nightly rsync at 02:00, timer active on monolith |
+| Switch .local to littlewolfacres.com rewrites | Medium | ✅ Deployed — `grafana.littlewolfacres.com` in DailySummary annotation |
 | ArgoCD — GitOps for k3s | Medium | Migrate from kubectl apply chains to GitOps |
 | Loki — log aggregation | Low | Add to Watchtower stack |
 | Obelisk — client workspace on `/mnt/ssd-b` | Low | Isolated client environment, reserved name |
