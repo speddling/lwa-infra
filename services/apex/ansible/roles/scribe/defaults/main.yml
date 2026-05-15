@@ -1,0 +1,22 @@
+---
+# Scribe role defaults — override in playbook vars or host_vars as needed.
+
+# Network
+scribe_port: 8765
+
+# Repo roots — colon-separated list of absolute paths Scribe is allowed to
+# operate on. The default is the homelab repo only.
+scribe_repo_roots: "/Users/speddling/homelab"
+
+# Python venv location (resolved relative to the running user's home)
+scribe_venv: "{{ ansible_env.HOME }}/.venv/scribe"
+
+# launchd log file (stdout + stderr)
+scribe_log: "{{ ansible_env.HOME }}/Library/Logs/scribe.log"
+
+# Where server.py lives inside the checked-out repo
+scribe_src_dir: "{{ ansible_env.HOME }}/homelab/services/apex/scribe"
+
+# launchd service label / plist name
+scribe_label: "com.littlewolfacres.scribe"
+scribe_plist: "{{ ansible_env.HOME }}/Library/LaunchAgents/com.littlewolfacres.scribe.plist"

@@ -1,0 +1,80 @@
+---
+# roles/scribe/tasks/main.yml
+
+# 1. SSH authorized key for GitHub Actions -------------------------------------
+
+- name: Ensure ~/.ssh exists
+  file:
+    path: "{{ ansible_env.HOME }}/.ssh"
+    state: directory
+    mode: "0700"
+
+- name: Authorize GitHub Actions deploy key
+  authorized_key:
+    user: "{{ ansible_user_id }}"
+    key: "{{ lookup('file', role_path + '/../files/github_actions_deploy.pub') }}"
+    state: present
+    comment: github-actions-scribe-deploy
+
+# 2. Python venv ----------------------------------------------------------------
+
+- name: Ensure Python venv exists for Scribe
+  command:
+    cmd: python3 -m venv {{ scribe_venv }}
+    creates: "{{ scribe_venv }}/bin/python"
+
+- name: Install Scribe Python dependencies
+  pip:
+    requirements: "{{ scribe_src_dir }}/requirements.txt"
+    virtualenv: "{{ scribe_venv }}"
+    state: present
+
+# 3. LaunchAgents directory ----------------------------------------------------
+
+- name: Ensure ~/Library/LaunchAgents exists
+  file:
+    path: "{{ ansible_env.HOME }}/Library/LaunchAgents"
+    state: directory
+    mode: "0755"
+
+# 4. Deploy the launchd plist --------------------------------------------------
+
+- name: Deploy Scribe launchd plist
+  template:
+    src: com.littlewolfacres.scribe.plist.j2
+    dest: "{{ scribe_plist }}"
+    mode: "0644"
+  register: plist_result
+
+# 5. Load / restart the service ------------------------------------------------
+
+# Unload first (idempotent — ignore error when not loaded).
+- name: Unload Scribe service (if running)
+  command: launchctl unload {{ scribe_plist }}
+  when: plist_result.changed
+  failed_when: false
+
+- name: Load Scribe service
+  command: launchctl load {{ scribe_plist }}
+  when: plist_result.changed
+
+# On first deploy, plist_result may not be changed if the file already exists
+# but the service isn't running yet — ensure it is loaded regardless.
+- name: Ensure Scribe service is loaded (bootstrap if not already)
+  command: launchctl list {{ scribe_label }}
+  register: svc_check
+  failed_when: false
+  changed_when: false
+
+- name: Load Scribe service (first install)
+  command: launchctl load {{ scribe_plist }}
+  when: svc_check.rc != 0
+
+# 6. Smoke-test ----------------------------------------------------------------
+
+- name: Wait for Scribe to start listening
+  wait_for:
+    host: 127.0.0.1
+    port: "{{ scribe_port }}"
+    timeout: 15
+    msg: "Scribe did not start within 15 seconds — check {{ scribe_log }}"
