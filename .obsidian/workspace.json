@@ -186,6 +186,7 @@
   },
   "active": "bffb361906a7587a",
   "lastOpenFiles": [
+    "services/apex/ansible/roles/scribe/files/github_actions_deploy.pub",
     "services/apex/ansible/roles/scribe/files",
     "services/apex/ansible/files/github_actions_deploy.pub",
     "services/apex/ansible/files",
@@ -196,7 +197,6 @@
     "services/apex/ansible/inventory.ini",
     "services/apex/ansible/ansible.cfg",
     "services/apex/scribe/requirements.txt",
-    "services/apex/scribe/server.py",
     "services/monolith/ansible/roles/mirror-hdd/README.md",
     "docs/scribe.md",
     "docs/synapse.md",

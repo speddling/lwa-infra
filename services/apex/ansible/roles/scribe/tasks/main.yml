@@ -18,10 +18,14 @@
 
 # 2. Python venv ----------------------------------------------------------------
 
-- name: Ensure Python venv exists for Scribe
+- name: Ensure Python venv exists for Scribe (Homebrew Python)
   command:
-    cmd: python3 -m venv {{ scribe_venv }}
+    cmd: "{{ scribe_python }} -m venv {{ scribe_venv }}"
     creates: "{{ scribe_venv }}/bin/python"
+
+- name: Upgrade pip inside venv
+  command: "{{ scribe_venv }}/bin/pip install --upgrade pip"
+  changed_when: false
 
 - name: Install Scribe Python dependencies
   pip:
@@ -48,7 +52,6 @@
 
 # 5. Load / restart the service ------------------------------------------------
 
-# Unload first (idempotent — ignore error when not loaded).
 - name: Unload Scribe service (if running)
   command: launchctl unload {{ scribe_plist }}
   when: plist_result.changed
@@ -58,8 +61,6 @@
   command: launchctl load {{ scribe_plist }}
   when: plist_result.changed
 
-# On first deploy, plist_result may not be changed if the file already exists
-# but the service isn't running yet — ensure it is loaded regardless.
 - name: Ensure Scribe service is loaded (bootstrap if not already)
   command: launchctl list {{ scribe_label }}
   register: svc_check

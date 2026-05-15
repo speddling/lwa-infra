@@ -1,2 +1,2 @@
 # Scribe MCP server dependencies
-mcp[cli]>=1.0
+mcp>=1.0
