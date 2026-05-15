@@ -1,15 +1,4 @@
-# Samba user accounts and share paths
-# Passwords are stored in vault.yml — run:
-#   ansible-vault encrypt services/fileserver/ansible/group_vars/all/vault.yml
-
-samba_user: vault
-samba_password: "{{ vault_samba_password }}"
-
-james_user: james
-james_password: "{{ vault_james_password }}"
-
-vault_share_name: vault
-vault_share_path: /mnt/ssd-b/vault
-
-studio_share_name: studio-archive
-studio_share_path: /mnt/lab-backups/studio-archive
+# All Samba variables (samba_user, james_user, share names and paths)
+# are now defined in ansible/vars/main.yml.
+# Secrets (vault_samba_password, vault_james_password) are in ansible/vars/vault.yml.
+# This file is intentionally empty — kept for directory structure consistency.

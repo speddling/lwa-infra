@@ -1,26 +1,10 @@
 ---
-# Scribe role defaults — override in playbook vars or host_vars as needed.
+# Scribe role defaults
+# All values (scribe_port, scribe_repo_roots, scribe_python, scribe_venv,
+# scribe_label) are defined in ansible/vars/main.yml.
+# Override here only for non-standard apex configurations.
 
-# Network
-scribe_port: 8765
-
-# Repo roots — colon-separated list of absolute paths Scribe is allowed to
-# operate on. The default is the homelab repo only.
-scribe_repo_roots: "/Users/speddling/homelab"
-
-# Python interpreter — use MacPorts 3.12 (stable). 3.14 is pre-release and
-# causes pip platform-tag issues with packages that require Python >=3.10.
-scribe_python: "/opt/local/bin/python3.12"
-
-# Python venv location
-scribe_venv: "{{ ansible_env.HOME }}/.venv/scribe"
-
-# launchd log file (stdout + stderr)
-scribe_log: "{{ ansible_env.HOME }}/Library/Logs/scribe.log"
-
-# Where server.py lives inside the checked-out repo
+# Derived paths — kept here as they compose from central vars
 scribe_src_dir: "{{ ansible_env.HOME }}/homelab/services/apex/scribe"
-
-# launchd service label / plist name
-scribe_label: "com.littlewolfacres.scribe"
-scribe_plist: "{{ ansible_env.HOME }}/Library/LaunchAgents/com.littlewolfacres.scribe.plist"
+scribe_log:     "{{ ansible_env.HOME }}/Library/Logs/scribe.log"
+scribe_plist:   "{{ ansible_env.HOME }}/Library/LaunchAgents/{{ scribe_label }}"

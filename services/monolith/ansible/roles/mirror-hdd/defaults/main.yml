@@ -1,10 +1,5 @@
 ---
-# Source and destination for the nightly mirror
-mirror_source: /mnt/hdd-c/
-mirror_dest: /mnt/hdd-d/
-
-# Systemd timer schedule — nightly at 02:00
-mirror_on_calendar: "*-*-* 02:00:00"
-
-# Log file location on monolith
-mirror_log: /var/log/mirror-hdd.log
+# mirror-hdd role defaults
+# All values (mirror_source, mirror_dest, mirror_on_calendar, mirror_log)
+# are defined in ansible/vars/main.yml.
+# Override here only if you need a non-standard mirror on a specific host.

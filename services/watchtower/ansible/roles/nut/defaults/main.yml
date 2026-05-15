@@ -1,7 +1,5 @@
 ---
-nut_enabled: false
-nut_ups_name: cyberpower
-nut_ups_driver: usbhid-ups
-nut_ups_port: auto
-nut_monitor_user: monuser
-nut_monitor_password: "{{ vault_nut_monitor_password }}"
+# nut role defaults
+# All values (nut_enabled, nut_ups_name, nut_ups_driver, nut_ups_port,
+# nut_monitor_user) are defined in ansible/vars/main.yml.
+# Override here only for non-standard UPS configurations.

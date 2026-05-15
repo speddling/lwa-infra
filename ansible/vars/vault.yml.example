@@ -1,0 +1,42 @@
+# =============================================================================
+# ansible/vars/vault.yml.example
+# =============================================================================
+# Template showing every secret variable name used across the homelab.
+# DO NOT commit the real vault.yml in plaintext.
+#
+# To create the consolidated vault:
+#
+#   1. Decrypt existing per-service vaults to extract current values:
+#        ansible-vault decrypt services/watchtower/ansible/group_vars/all/vault.yml --output=/tmp/wt-vault.yml
+#        ansible-vault decrypt services/fileserver/ansible/group_vars/all/vault.yml --output=/tmp/fs-vault.yml
+#
+#   2. Copy this file and fill in the real values:
+#        cp ansible/vars/vault.yml.example ansible/vars/vault.yml
+#        # edit ansible/vars/vault.yml with real secrets
+#
+#   3. Encrypt the consolidated vault:
+#        ansible-vault encrypt ansible/vars/vault.yml
+#
+#   4. Remove the old per-service vault files:
+#        rm services/watchtower/ansible/group_vars/all/vault.yml
+#        rm services/fileserver/ansible/group_vars/all/vault.yml
+#
+#   5. Clean up temp files:
+#        rm /tmp/wt-vault.yml /tmp/fs-vault.yml
+# =============================================================================
+
+# Alertmanager → Slack
+vault_slack_webhook_url: "https://hooks.slack.com/services/REPLACE_ME"
+
+# Samba (fileserver)
+vault_samba_password: "REPLACE_ME"
+vault_james_password: "REPLACE_ME"
+
+# NUT UPS monitor user
+vault_nut_monitor_password: "REPLACE_ME"
+
+# Reolink NVR admin password
+vault_reolink_nvr_password: "REPLACE_ME"
+
+# SNMP (community string stored in vault for snmp_exporter)
+vault_snmp_community: "REPLACE_ME"

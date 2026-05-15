@@ -1,0 +1,140 @@
+---
+# =============================================================================
+# Little Wolf Acres — Shared Ansible Variables
+# =============================================================================
+# Single source of truth for all non-secret infrastructure values.
+# Every Ansible playbook in this repo includes this file via vars_files.
+#
+# Secrets live in ansible/vars/vault.yml (ansible-vault encrypted).
+# Reference secrets here as: "{{ vault_<name> }}"
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Network — IP addresses
+# -----------------------------------------------------------------------------
+ip_er605:              "192.168.0.1"
+ip_eap245_foyer:       "192.168.0.2"
+ip_reolink_nvr:        "192.168.0.4"
+ip_eap245_yarn_studio: "192.168.0.5"
+ip_apex:               "192.168.0.19"
+ip_monolith:           "192.168.0.20"
+ip_watchtower:         "192.168.0.21"
+ip_studio:             "192.168.0.109"
+
+# -----------------------------------------------------------------------------
+# Network — Hostnames and FQDNs
+# -----------------------------------------------------------------------------
+homelab_domain:    "littlewolfacres.com"
+fqdn_apex:         "apex.littlewolfacres.com"
+fqdn_monolith:     "monolith.littlewolfacres.com"
+fqdn_watchtower:   "watchtower.littlewolfacres.com"
+fqdn_grafana:      "grafana.littlewolfacres.com"
+fqdn_navidrome:    "navidrome.littlewolfacres.com"
+fqdn_studio:       "studio.littlewolfacres.com"
+
+# -----------------------------------------------------------------------------
+# Ports
+# -----------------------------------------------------------------------------
+port_ssh:                22
+port_dns:                53
+port_samba_netbios:      139
+port_samba:              445
+port_unbound:            5335
+port_adguard_ui:         3000
+port_grafana:            3001
+port_prometheus:         9090
+port_alertmanager:       9093
+port_node_exporter:      9100
+port_blackbox_exporter:  9115
+port_snmp_exporter:      9116
+port_adguard_exporter:   9618
+port_tmobile_exporter:   9719
+port_reolink_exporter:   9720
+port_netdata:            19999
+port_synapse_mcp:        30800
+port_scribe:             8765
+
+# -----------------------------------------------------------------------------
+# SSH / Ansible connection
+# -----------------------------------------------------------------------------
+ansible_ssh_key:         "~/.ssh/id_ed25519"
+
+# Per-host users (referenced in inventory or playbook connection vars)
+ssh_user_monolith:       "gh-runner"
+ssh_user_watchtower:     "speddling"
+ssh_user_apex:           "speddling"
+
+# -----------------------------------------------------------------------------
+# Monolith — storage mount points
+# -----------------------------------------------------------------------------
+monolith_ssd_a:    "/mnt/ssd-a"    # k8s local-path provisioner
+monolith_ssd_b:    "/mnt/ssd-b"    # isolated workspace / client jumpbox
+monolith_hdd_c:    "/mnt/hdd-c"    # music library / bulk storage
+monolith_hdd_d:    "/mnt/hdd-d"    # nightly mirror of hdd-c
+
+# -----------------------------------------------------------------------------
+# Monolith — hdd mirror
+# -----------------------------------------------------------------------------
+mirror_source:      "/mnt/hdd-c/"
+mirror_dest:        "/mnt/hdd-d/"
+mirror_on_calendar: "*-*-* 02:00:00"
+mirror_log:         "/var/log/mirror-hdd.log"
+
+# -----------------------------------------------------------------------------
+# Monolith — Samba file shares
+# -----------------------------------------------------------------------------
+samba_user:          "vault"
+james_user:          "james"
+vault_share_name:    "vault"
+vault_share_path:    "/mnt/ssd-b/vault"
+studio_share_name:   "studio-archive"
+studio_share_path:   "/mnt/lab-backups/studio-archive"
+# Passwords: vault_samba_password, vault_james_password (see vault.yml)
+
+# -----------------------------------------------------------------------------
+# Watchtower — Alertmanager
+# -----------------------------------------------------------------------------
+alertmanager_slack_channel:          "#sentinel"
+alertmanager_slack_username:         "Watchtower"
+alertmanager_slack_icon:             ":sentinel:"
+alertmanager_resolve_timeout:        "5m"
+alertmanager_group_wait:             "30s"
+alertmanager_group_interval:         "5m"
+alertmanager_repeat_interval:        "4h"
+alertmanager_daily_repeat_interval:  "24h"
+# Webhook URL: vault_slack_webhook_url (see vault.yml)
+
+# -----------------------------------------------------------------------------
+# Watchtower — SNMP
+# -----------------------------------------------------------------------------
+snmp_community:     "littlewolfacres"
+snmp_auth_module:   "littlewolfacres_v2"
+# SNMPv3 user: vault_snmp_v3_user (see vault.yml)
+
+# -----------------------------------------------------------------------------
+# Watchtower — Reolink NVR exporter
+# -----------------------------------------------------------------------------
+reolink_nvr_host:     "{{ ip_reolink_nvr }}"
+reolink_nvr_user:     "admin"
+reolink_scrape_port:  "{{ port_reolink_exporter }}"
+reolink_poll_interval: 30
+# NVR password: vault_reolink_nvr_password (see vault.yml)
+
+# -----------------------------------------------------------------------------
+# Watchtower — NUT (UPS monitoring)
+# -----------------------------------------------------------------------------
+nut_enabled:         false
+nut_ups_name:        "cyberpower"
+nut_ups_driver:      "usbhid-ups"
+nut_ups_port:        "auto"
+nut_monitor_user:    "monuser"
+# Monitor password: vault_nut_monitor_password (see vault.yml)
+
+# -----------------------------------------------------------------------------
+# Apex — Scribe MCP server
+# -----------------------------------------------------------------------------
+scribe_port:        "{{ port_scribe }}"
+scribe_repo_roots:  "/Users/speddling/homelab"
+scribe_python:      "/opt/local/bin/python3.12"
+scribe_venv:        "~/.venv/scribe"
+scribe_label:       "com.littlewolfacres.scribe"

@@ -5,7 +5,7 @@ global:
 alerting:
   alertmanagers:
     - static_configs:
-        - targets: ['localhost:9093']
+        - targets: ['localhost:{{ port_alertmanager }}']
 
 rule_files:
   - /etc/prometheus/alert_rules.yml
@@ -13,67 +13,69 @@ rule_files:
 scrape_configs:
   - job_name: 'watchtower'
     static_configs:
-      - targets: ['localhost:9100']
+      - targets: ['localhost:{{ port_node_exporter }}']
 
   - job_name: 'blackbox'
     static_configs:
-      - targets: ['localhost:9115']
+      - targets: ['localhost:{{ port_blackbox_exporter }}']
 
   - job_name: 'adguard'
     static_configs:
-      - targets: ['localhost:9618']
+      - targets: ['localhost:{{ port_adguard_exporter }}']
 
   - job_name: 'monolith'
     static_configs:
-      - targets: ['monolith.littlewolfacres.com:9100']
+      - targets: ['{{ fqdn_monolith }}:{{ port_node_exporter }}']
 
   - job_name: 'snmp-er605'
     static_configs:
-      - targets: ['192.168.0.1']
+      - targets: ['{{ ip_er605 }}']
     metrics_path: /snmp
     params:
       module: [if_mib]
-      auth: [littlewolfacres_v2]
+      auth: ['{{ snmp_auth_module }}']
     relabel_configs:
       - source_labels: [__address__]
         target_label: __param_target
       - source_labels: [__param_target]
         target_label: instance
       - target_label: __address__
-        replacement: localhost:9116
+        replacement: localhost:{{ port_snmp_exporter }}
 
   - job_name: 'snmp-eap-yarn-studio'
     static_configs:
-      - targets: ['192.168.0.5']
+      - targets: ['{{ ip_eap245_yarn_studio }}']
     metrics_path: /snmp
     params:
       module: [if_mib]
-      auth: [littlewolfacres_v2]
+      auth: ['{{ snmp_auth_module }}']
     relabel_configs:
       - source_labels: [__address__]
         target_label: __param_target
       - source_labels: [__param_target]
         target_label: instance
       - target_label: __address__
-        replacement: localhost:9116
+        replacement: localhost:{{ port_snmp_exporter }}
 
   - job_name: 'snmp-eap-foyer'
     static_configs:
-      - targets: ['192.168.0.2']
+      - targets: ['{{ ip_eap245_foyer }}']
     metrics_path: /snmp
     params:
       module: [if_mib]
-      auth: [littlewolfacres_v2]
+      auth: ['{{ snmp_auth_module }}']
     relabel_configs:
       - source_labels: [__address__]
         target_label: __param_target
       - source_labels: [__param_target]
         target_label: instance
       - target_label: __address__
-        replacement: localhost:9116
+        replacement: localhost:{{ port_snmp_exporter }}
+
   - job_name: 'tmobile'
     static_configs:
-      - targets: ['localhost:9719']
+      - targets: ['localhost:{{ port_tmobile_exporter }}']
+
   - job_name: 'reolink_nvr'
     static_configs:
-      - targets: ['localhost:9720']
+      - targets: ['localhost:{{ port_reolink_exporter }}']

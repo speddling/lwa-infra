@@ -10,11 +10,11 @@ ExecStart=/usr/bin/python3 /opt/reolink_exporter/reolink_exporter.py
 Restart=on-failure
 RestartSec=10
 
-Environment=NVR_HOST=192.168.0.4
-Environment=NVR_USER=admin
+Environment=NVR_HOST={{ reolink_nvr_host }}
+Environment=NVR_USER={{ reolink_nvr_user }}
 Environment=NVR_PASSWORD={{ vault_reolink_nvr_password }}
-Environment=SCRAPE_PORT=9720
-Environment=POLL_INTERVAL=30
+Environment=SCRAPE_PORT={{ reolink_scrape_port }}
+Environment=POLL_INTERVAL={{ reolink_poll_interval }}
 
 # Hardening
 NoNewPrivileges=true

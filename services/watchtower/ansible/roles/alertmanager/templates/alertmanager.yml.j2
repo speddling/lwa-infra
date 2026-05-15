@@ -1,27 +1,27 @@
 global:
-  resolve_timeout: 5m
+  resolve_timeout: {{ alertmanager_resolve_timeout }}
   slack_api_url: '{{ vault_slack_webhook_url }}'
 
 route:
   group_by: ['alertname', 'severity']
-  group_wait: 30s
-  group_interval: 5m
-  repeat_interval: 4h
+  group_wait: {{ alertmanager_group_wait }}
+  group_interval: {{ alertmanager_group_interval }}
+  repeat_interval: {{ alertmanager_repeat_interval }}
   receiver: sentinel
   routes:
     - matchers:
         - alertname = DailySummary
       receiver: sentinel
       group_wait: 0s
-      group_interval: 24h
-      repeat_interval: 24h
+      group_interval: {{ alertmanager_daily_repeat_interval }}
+      repeat_interval: {{ alertmanager_daily_repeat_interval }}
 
 receivers:
   - name: sentinel
     slack_configs:
-      - channel: '#sentinel'
-        username: 'Watchtower'
-        icon_emoji: ':sentinel:'
+      - channel: '{{ alertmanager_slack_channel }}'
+        username: '{{ alertmanager_slack_username }}'
+        icon_emoji: '{{ alertmanager_slack_icon }}'
         send_resolved: true
         title: '{{ "{{" }} if eq .Status "firing" {{ "}}" }}🔴 {{ "{{" }} else {{ "}}" }}✅ {{ "{{" }} end {{ "}}" }}{{ "{{" }} .CommonLabels.alertname {{ "}}" }}'
         text: |

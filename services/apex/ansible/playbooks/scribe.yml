@@ -1,11 +1,11 @@
 ---
-# deploy-scribe.yml
-# Run with:  ansible-playbook playbooks/scribe.yml
-# from:      services/apex/ansible/
-
 - name: Deploy Scribe — Claude's git control plane
   hosts: apex
   gather_facts: true
+
+  vars_files:
+    - "{{ playbook_dir }}/../../../../ansible/vars/main.yml"
+    - "{{ playbook_dir }}/../../../../ansible/vars/vault.yml"
 
   roles:
     - scribe

@@ -2,5 +2,10 @@
 - name: Deploy T-Mobile Exporter
   hosts: watchtower
   become: true
+
+  vars_files:
+    - "{{ playbook_dir }}/../../../../ansible/vars/main.yml"
+    - "{{ playbook_dir }}/../../../../ansible/vars/vault.yml"
+
   roles:
     - tmobile_exporter

@@ -4,7 +4,8 @@
   become: true
 
   vars_files:
-    - ../group_vars/all/vars.yml
+    - "{{ playbook_dir }}/../../../../ansible/vars/main.yml"
+    - "{{ playbook_dir }}/../../../../ansible/vars/vault.yml"
 
   tasks:
     - name: Install Samba and dependencies
@@ -51,8 +52,8 @@
       ansible.builtin.expect:
         command: smbpasswd -a {{ samba_user }}
         responses:
-          "New SMB password:": "{{ samba_password }}"
-          "Retype new SMB password:": "{{ samba_password }}"
+          "New SMB password:": "{{ vault_samba_password }}"
+          "Retype new SMB password:": "{{ vault_samba_password }}"
       no_log: true
       changed_when: false
 
@@ -64,8 +65,8 @@
       ansible.builtin.expect:
         command: smbpasswd -a {{ james_user }}
         responses:
-          "New SMB password:": "{{ james_password }}"
-          "Retype new SMB password:": "{{ james_password }}"
+          "New SMB password:": "{{ vault_james_password }}"
+          "Retype new SMB password:": "{{ vault_james_password }}"
       no_log: true
       changed_when: false
 
