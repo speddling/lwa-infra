@@ -1,7 +1,22 @@
 ---
 # roles/scribe/tasks/main.yml
 
-# 1. Python venv ----------------------------------------------------------------
+# 1. SSH authorized key for GitHub Actions -------------------------------------
+
+- name: Ensure ~/.ssh exists
+  file:
+    path: "{{ ansible_env.HOME }}/.ssh"
+    state: directory
+    mode: "0700"
+
+- name: Authorize GitHub Actions deploy key
+  authorized_key:
+    user: "{{ ansible_user_id }}"
+    key: "{{ lookup('file', role_path + '/../files/github_actions_deploy.pub') }}"
+    state: present
+    comment: github-actions-scribe-deploy
+
+# 2. Python venv ----------------------------------------------------------------
 
 - name: Ensure Python venv exists for Scribe
   command:
@@ -14,7 +29,7 @@
     virtualenv: "{{ scribe_venv }}"
     state: present
 
-# 2. LaunchAgents directory ----------------------------------------------------
+# 3. LaunchAgents directory ----------------------------------------------------
 
 - name: Ensure ~/Library/LaunchAgents exists
   file:
@@ -22,7 +37,7 @@
     state: directory
     mode: "0755"
 
-# 3. Deploy the launchd plist --------------------------------------------------
+# 4. Deploy the launchd plist --------------------------------------------------
 
 - name: Deploy Scribe launchd plist
   template:
@@ -31,7 +46,7 @@
     mode: "0644"
   register: plist_result
 
-# 4. Load / restart the service ------------------------------------------------
+# 5. Load / restart the service ------------------------------------------------
 
 # Unload first (idempotent — ignore error when not loaded).
 - name: Unload Scribe service (if running)
@@ -55,7 +70,7 @@
   command: launchctl load {{ scribe_plist }}
   when: svc_check.rc != 0
 
-# 5. Smoke-test ----------------------------------------------------------------
+# 6. Smoke-test ----------------------------------------------------------------
 
 - name: Wait for Scribe to start listening
   wait_for:
