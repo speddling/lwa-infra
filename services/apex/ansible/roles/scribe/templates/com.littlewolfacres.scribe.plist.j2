@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+
+  <key>Label</key>
+  <string>{{ scribe_label }}</string>
+
+  <!-- Python interpreter from the dedicated venv; server.py lives in-repo -->
+  <key>ProgramArguments</key>
+  <array>
+    <string>{{ scribe_venv }}/bin/python</string>
+    <string>{{ scribe_src_dir }}/server.py</string>
+  </array>
+
+  <!-- All runtime config lives here — never in tool parameters -->
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>SCRIBE_PORT</key>
+    <string>{{ scribe_port }}</string>
+    <!-- Colon-separated list of repos Scribe is permitted to operate on -->
+    <key>SCRIBE_REPO_ROOTS</key>
+    <string>{{ scribe_repo_roots }}</string>
+    <!-- Inherit the user's PATH so git and gh CLI are on $PATH -->
+    <key>PATH</key>
+    <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+  </dict>
+
+  <!-- Start on login; keep alive on crash -->
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+
+  <!-- Single log file for both stdout and stderr -->
+  <key>StandardOutPath</key>
+  <string>{{ scribe_log }}</string>
+  <key>StandardErrorPath</key>
+  <string>{{ scribe_log }}</string>
+
+</dict>
+</plist>
