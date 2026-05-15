@@ -29,6 +29,8 @@ jobs:
 
       - name: Syntax check
         working-directory: services/monolith/ansible
+        env:
+          ANSIBLE_ROLES_PATH: ./roles
         run: |
           ansible-playbook -i inventory.ini playbooks/mirror.yml --syntax-check
 
@@ -53,5 +55,7 @@ jobs:
 
       - name: Run mirror playbook
         working-directory: services/monolith/ansible
+        env:
+          ANSIBLE_ROLES_PATH: ./roles
         run: |
           ansible-playbook -i inventory.ini playbooks/mirror.yml
