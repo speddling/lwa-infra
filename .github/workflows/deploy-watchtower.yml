@@ -6,12 +6,14 @@ on:
     paths:
       - 'services/watchtower/**'
       - 'terraform/watchtower/**'
+      - 'ansible/vars/**'
       - '.github/workflows/deploy-watchtower.yml'
   pull_request:
     branches: [master]
     paths:
       - 'services/watchtower/**'
       - 'terraform/watchtower/**'
+      - 'ansible/vars/**'
       - '.github/workflows/deploy-watchtower.yml'
   workflow_dispatch:
 
