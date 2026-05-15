@@ -12,7 +12,7 @@
 - name: Authorize GitHub Actions deploy key
   authorized_key:
     user: "{{ ansible_user_id }}"
-    key: "{{ lookup('file', role_path + '/../files/github_actions_deploy.pub') }}"
+    key: "{{ lookup('file', role_path + '/files/github_actions_deploy.pub') }}"
     state: present
     comment: github-actions-scribe-deploy
 
