@@ -1,17 +1,18 @@
 """
 scribe — Claude's git control plane for apex
 
-Gives Claude the full git workflow — branch, stage, commit, push, and open a
-PR — without requiring manual terminal work. Counterpart to Synapse: Synapse
-gives Claude eyes inside the cluster; Scribe gives Claude the ability to
-commit what it builds.
+Gives Claude the full git workflow — branch, stage, commit, push, open a PR,
+and sync back to main — without requiring manual terminal work. Counterpart to
+Synapse: Synapse gives Claude eyes inside the cluster; Scribe gives Claude the
+ability to commit what it builds.
 
 Tools:
-  git_status   Show current branch, staged/unstaged changes, untracked files
+  git_status   Show current branch, staged/unstaged changes, and untracked files
   git_branch   Create and checkout a new branch (git checkout -b <name>)
   git_commit   Stage an explicit list of paths and commit with a message
   git_push     Push the current branch to origin, setting upstream
   git_pr       Open a GitHub PR via gh pr create
+  git_sync     Checkout main (or master) and pull — housekeeping after a merge
 
 Transport: Streamable HTTP via FastMCP
 Auth:      None — apex firewall restricts the port to LAN only
@@ -107,6 +108,28 @@ def _current_branch(repo: pathlib.Path) -> str:
         check=True,
     )
     return result.stdout.strip()
+
+
+def _default_branch(repo: pathlib.Path) -> str:
+    """Detect whether the repo's primary branch is 'main' or 'master'."""
+    result = subprocess.run(
+        ["git", "symbolic-ref", "refs/remotes/origin/HEAD"],
+        cwd=repo,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode == 0:
+        # refs/remotes/origin/HEAD -> refs/remotes/origin/main
+        return result.stdout.strip().split("/")[-1]
+    # Fallback: check which protected branch exists locally
+    for branch in ("main", "master"):
+        r = subprocess.run(
+            ["git", "rev-parse", "--verify", branch],
+            cwd=repo, capture_output=True, text=True,
+        )
+        if r.returncode == 0:
+            return branch
+    return "main"
 
 
 def _assert_not_protected(branch: str) -> None:
@@ -258,6 +281,25 @@ def git_pr(title: str, body: str, repo: Optional[str] = None) -> str:
         repo_path,
     )
     return f"PR opened from branch '{branch}'.\n{out}"
+
+
+@mcp.tool()
+def git_sync(repo: Optional[str] = None) -> str:
+    """Checkout the default branch (main/master) and pull latest from origin.
+
+    Run this after a PR is merged to leave the repo in a clean, up-to-date
+    state for the next session. Safe to call at any time — it will not lose
+    uncommitted work (git will refuse to switch branches if the working tree
+    is dirty).
+
+    Args:
+        repo: Repo name or full path. Optional when only one root is configured.
+    """
+    repo_path = _resolve_repo(repo)
+    default = _default_branch(repo_path)
+    _run(["git", "checkout", default], repo_path)
+    out = _run(["git", "pull", "--ff-only", "origin", default], repo_path)
+    return f"Synced to '{default}'.\n{out}"
 
 
 # ---------------------------------------------------------------------------
