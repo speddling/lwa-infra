@@ -22,9 +22,9 @@
     <!-- Colon-separated list of repos Scribe is permitted to operate on -->
     <key>SCRIBE_REPO_ROOTS</key>
     <string>{{ scribe_repo_roots }}</string>
-    <!-- Inherit the user's PATH so git and gh CLI are on $PATH -->
+    <!-- MacPorts first, then standard paths — ensures git and gh are found -->
     <key>PATH</key>
-    <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+    <string>/opt/local/bin:/opt/local/sbin:/usr/local/bin:/usr/bin:/bin</string>
   </dict>
 
   <!-- Start on login; keep alive on crash -->

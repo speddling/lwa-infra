@@ -1,5 +1,5 @@
 # Little Wolf Acres — Homelab Current State
-> Last updated: 2026-05-14 · Authored on apex · All IaC in `speddling/homelab` repo
+> Last updated: 2026-05-15 · Authored on apex · All IaC in `speddling/homelab` repo
 
 ---
 
@@ -128,6 +128,7 @@ Alerting is owned by **Prometheus + Alertmanager**. Grafana is display-only.
 
 - **Pipeline:** Prometheus evaluates rules → fires to Alertmanager → routes to `#sentinel` in Slack
 - **Contact point:** Sentinel → `#sentinel` in Little Wolf Acres Slack
+- **Daily summary:** Alertmanager child route with `repeat_interval: 24h` — always-firing canary that confirms pipeline health
 
 | Alert | Condition | Scope |
 |---|---|---|
@@ -141,7 +142,6 @@ Alerting is owned by **Prometheus + Alertmanager**. Grafana is display-only.
 | WatchtowerHighMemory | > 85% sustained 5m | watchtower |
 | WatchtowerLowDisk | > 80% used | watchtower |
 | WatchtowerNodeExporterDown | Scrape fails > 1m | watchtower |
-| AdGuardHomeDown | Scrape fails > 1m | watchtower |
 | DailySummary | Always firing — canary for pipeline health | all |
 
 ### UFW Rules
@@ -204,9 +204,13 @@ Alerting is owned by **Prometheus + Alertmanager**. Grafana is display-only.
 
 Primary k3s worker node and household services platform. Hosts all Kubernetes workloads including Navidrome, Minecraft, and family fileshares. Named for its role as the single monolithic compute node — a deliberate single-node architecture expandable to a multi-node cluster if needed.
 
-**Workspaces**
-- [x] Synapse — MCP/AI tooling namespace. Claude's interface to the homelab and coursework. (see `docs/synapse.md`)
-- [ ] Obelisk — client workspace on `/mnt/ssd-b` (reserved name, future)
+### Workspaces
+
+| Name | Status | Description |
+|---|---|---|
+| Synapse | ✅ Active | MCP/AI tooling namespace. Claude's interface to the homelab. See `docs/synapse.md` |
+| Obelisk | Reserved | Client workspace on `/mnt/ssd-b` — isolated environment, future build |
+| Rommie | Reserved | Local LLM workspace — pending GPU hardware. *"Ship made flesh"* |
 
 ### Services
 
@@ -214,9 +218,10 @@ Primary k3s worker node and household services platform. Hosts all Kubernetes wo
 |---|---|---|
 | k3s | Kubernetes (single-node cluster) | ✅ Running |
 | Navidrome | Music streaming server | ✅ Running |
-| Samba | File share (family backups, media) | ✅ Running |
+| Samba | File share — passwords vaulted via ansible-vault | ✅ Running |
 | node_exporter | Host metrics → Prometheus on Watchtower | ✅ Running |
 | Synapse | MCP server — AI tooling namespace | ✅ Running |
+| hdd-d mirror | Nightly rsync from hdd-c → hdd-d via systemd timer at 02:00 | ✅ Running |
 
 ### SSH Access
 
@@ -253,7 +258,20 @@ Primary k3s worker node and household services platform. Hosts all Kubernetes wo
 | Machine  | MacBook Air M4 (2025) 16GB                                             |
 | Hostname | `apex`                                                                 |
 | IP       | 192.168.0.19 (DHCP MAC-bound)                                          |
-| Role     | Primary workstation — all authoring, config, remote ops originate here |
+| Role     | Primary workstation — all authoring, config, and remote ops originate here |
+
+### Services
+
+| Service | Role | Port | Status |
+|---|---|---|---|
+| Scribe | MCP server — Claude's git control plane | 8765 | ✅ Running |
+
+### IaC
+
+| Layer | Tool | Location |
+|---|---|---|
+| Config | Ansible | `services/apex/ansible/` |
+| Pipeline | GitHub Actions | `.github/workflows/deploy-scribe.yml` |
 
 ---
 
@@ -270,24 +288,25 @@ Primary k3s worker node and household services platform. Hosts all Kubernetes wo
 
 ## Git Workflow
 
-All changes go through a branch → PR → merge to master flow.
-Direct pushes to master are disabled via branch protection (Branches rule).
+All changes go through a branch → PR → merge to main flow.
+Direct pushes to main are disabled via branch protection.
+
+Claude handles the full workflow via Scribe (see `docs/scribe.md`). Human action required only at PR review and merge.
 
 ```bash
 # Start new work
-cd ~/homelab
-git checkout -b feature/description-of-change
+git checkout -b feat/description-of-change
 
 # Commit and push branch
-git add .
+git add <explicit paths>
 git commit -m "feat: description of change"
-git push -u origin feature/description-of-change
+git push -u origin feat/description-of-change
 
 # Open PR via GitHub CLI
 gh pr create --title "feat: description" --body "What and why"
 
-# PR triggers validate job (Ansible syntax-check + Terraform validate)
-# Merge PR to master triggers deploy job
+# After merge — sync local repo back to main
+git checkout main && git pull
 
 # Trigger a workflow manually
 gh workflow run deploy-watchtower.yml
@@ -297,7 +316,7 @@ gh workflow run deploy-watchtower.yml
 
 | Prefix | Use |
 |---|---|
-| `feature/*` | New capabilities or services |
+| `feat/*` | New capabilities or services |
 | `fix/*` | Bug fixes |
 | `docs/*` | Documentation only — does not trigger deploy |
 | `chore/*` | Maintenance, dependency updates |
@@ -313,7 +332,7 @@ gh workflow run deploy-watchtower.yml
 | RAM — 2×16GB DDR4-3200 | High | Bring Monolith to 64GB |
 | PSU — 850W | High | Required before GPU. Current 380W insufficient |
 | Case fans — Noctua 140mm | Medium | Same time as PSU or GPU |
-| GPU — RTX 3090 24GB | Medium | Local LLM development unlock. Hold out for 24GB, don't settle for 12GB |
+| GPU — RTX 3090 24GB | Medium | Local LLM / Rommie unlock. Hold out for 24GB, don't settle for 12GB |
 | UPS — CyberPower CP1500PFCLCD | Low | NUT role ready, waiting on hardware budget |
 | JetStream managed switch | Low | Replaces unmanaged TL-SG1210P, enables SNMP per-port stats |
 
@@ -321,13 +340,7 @@ gh workflow run deploy-watchtower.yml
 
 | Item | Priority | Notes |
 | ---- | -------- | ----- |
-| Daily summary scheduled time | Medium | ✅ Deployed — Alertmanager child route with `repeat_interval: 24h` |
-| Disk alerts for `/mnt/hdd-c` and `/mnt/hdd-d` | Medium | ✅ Deployed — `MonolithLowDiskHddC` (critical) and `MonolithLowDiskHddD` (warning) |
-| k3s dashboard in Grafana | Medium | ✅ Deployed — dashboard 15661 provisioned at `/var/lib/grafana/dashboards/k3s-cluster.json` |
-| Vault Samba plaintext passwords | Medium | ✅ Deployed — `vault.yml` encrypted with ansible-vault |
-| hdd-d mirror — Ansible rsync role + systemd timer | Medium | ✅ Deployed — nightly rsync at 02:00, timer active on monolith |
-| Switch .local to littlewolfacres.com rewrites | Medium | ✅ Deployed — `grafana.littlewolfacres.com` in DailySummary annotation |
-| ArgoCD — GitOps for k3s | Medium | Migrate from kubectl apply chains to GitOps |
+| ArgoCD — GitOps for k3s | Medium | Migrate from kubectl apply chains to GitOps. Next build. |
 | Loki — log aggregation | Low | Add to Watchtower stack |
 | Obelisk — client workspace on `/mnt/ssd-b` | Low | Isolated client environment, reserved name |
 | Synapse — health endpoint | Low | Add /health route to FastMCP app for proper k8s probes |
