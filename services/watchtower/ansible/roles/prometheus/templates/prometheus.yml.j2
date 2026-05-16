@@ -14,6 +14,12 @@ scrape_configs:
   - job_name: 'watchtower'
     static_configs:
       - targets: ['localhost:{{ port_node_exporter }}']
+    # Relabel instance from localhost:9100 → watchtower so Grafana dashboards
+    # (e.g. Node Exporter Full, ID 1860) display a meaningful hostname in
+    # the $node variable, and alert rules can filter by name rather than address.
+    relabel_configs:
+      - target_label: instance
+        replacement: watchtower
 
   - job_name: 'blackbox'
     static_configs:
@@ -25,7 +31,11 @@ scrape_configs:
 
   - job_name: 'monolith'
     static_configs:
+      # Static label pins the instance name to 'monolith' so dashboards and
+      # alert rules are consistent regardless of FQDN changes.
       - targets: ['{{ fqdn_monolith }}:{{ port_node_exporter }}']
+        labels:
+          instance: monolith
 
   - job_name: 'snmp-er605'
     static_configs:

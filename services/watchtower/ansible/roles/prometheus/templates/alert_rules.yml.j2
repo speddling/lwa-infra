@@ -6,7 +6,7 @@ groups:
       # ── Watchtower host ──────────────────────────────────────────────────────
 
       - alert: WatchtowerHighCPU
-        expr: 100 - (avg(rate(node_cpu_seconds_total{mode="idle",instance="localhost:9100"}[5m])) * 100) > 85
+        expr: 100 - (avg(rate(node_cpu_seconds_total{mode="idle",instance="watchtower"}[5m])) * 100) > 85
         for: 5m
         labels:
           severity: warning
@@ -15,7 +15,7 @@ groups:
           description: "Watchtower CPU usage is above 85% for 5 minutes (current: {{ "{{" }} $value | printf \"%.1f\" {{ "}}" }}%)"
 
       - alert: WatchtowerHighMemory
-        expr: (1 - (node_memory_MemAvailable_bytes{instance="localhost:9100"} / node_memory_MemTotal_bytes{instance="localhost:9100"})) * 100 > 85
+        expr: (1 - (node_memory_MemAvailable_bytes{instance="watchtower"} / node_memory_MemTotal_bytes{instance="watchtower"})) * 100 > 85
         for: 5m
         labels:
           severity: warning
@@ -24,7 +24,7 @@ groups:
           description: "Watchtower memory usage is above 85% for 5 minutes (current: {{ "{{" }} $value | printf \"%.1f\" {{ "}}" }}%)"
 
       - alert: WatchtowerLowDisk
-        expr: (1 - (node_filesystem_avail_bytes{instance="localhost:9100",mountpoint="/"} / node_filesystem_size_bytes{instance="localhost:9100",mountpoint="/"})) * 100 > 80
+        expr: (1 - (node_filesystem_avail_bytes{instance="watchtower",mountpoint="/"} / node_filesystem_size_bytes{instance="watchtower",mountpoint="/"})) * 100 > 80
         for: 5m
         labels:
           severity: critical
@@ -105,4 +105,3 @@ groups:
           host: monolith
         annotations:
           description: "Monolith disk usage on /mnt/hdd-d (mirror) is above 80% (current: {{ "{{" }} $value | printf \"%.1f\" {{ "}}" }}%)"
-

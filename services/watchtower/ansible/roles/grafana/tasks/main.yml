@@ -60,6 +60,15 @@
     mode: '0644'
   notify: restart grafana
 
+- name: Download Node Exporter Full dashboard (ID 1860)
+  ansible.builtin.get_url:
+    url: https://grafana.com/api/dashboards/1860/revisions/latest/download
+    dest: /var/lib/grafana/dashboards/node-exporter-full.json
+    owner: grafana
+    group: grafana
+    mode: '0644'
+  notify: restart grafana
+
 - name: Deploy Grafana alerting provisioning
   template:
     src: alerting.yml.j2
@@ -87,4 +96,3 @@
   systemd:
     name: grafana-server
     state: restarted
-

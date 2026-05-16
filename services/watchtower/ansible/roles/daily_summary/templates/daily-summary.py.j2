@@ -74,9 +74,10 @@ mn_up      = query('up{job="monolith"}')
 adguard_up = query('up{job="adguard"}')
 
 # Watchtower — CPU 12 h average, current memory & disk
-wt_cpu  = query('100 - (avg(avg_over_time(rate(node_cpu_seconds_total{mode="idle",instance="localhost:9100"}[5m])[12h:5m])) * 100)')
-wt_mem  = query('(1 - (node_memory_MemAvailable_bytes{instance="localhost:9100"} / node_memory_MemTotal_bytes{instance="localhost:9100"})) * 100')
-wt_disk = query('(1 - (node_filesystem_avail_bytes{instance="localhost:9100",mountpoint="/"} / node_filesystem_size_bytes{instance="localhost:9100",mountpoint="/"})) * 100')
+# Filter by instance="watchtower" — set via Prometheus relabel_configs in prometheus.yml.j2
+wt_cpu  = query('100 - (avg(avg_over_time(rate(node_cpu_seconds_total{mode="idle",instance="watchtower"}[5m])[12h:5m])) * 100)')
+wt_mem  = query('(1 - (node_memory_MemAvailable_bytes{instance="watchtower"} / node_memory_MemTotal_bytes{instance="watchtower"})) * 100')
+wt_disk = query('(1 - (node_filesystem_avail_bytes{instance="watchtower",mountpoint="/"} / node_filesystem_size_bytes{instance="watchtower",mountpoint="/"})) * 100')
 
 # Monolith — CPU 12 h average, current memory, root/hdd-c/hdd-d disks
 # Filter by job rather than instance label — resilient to hostname changes.
