@@ -1,0 +1,30 @@
+name: Deploy k3s Manifests
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'kubernetes/manifests/**'
+      - '.github/workflows/deploy-k3s-manifests.yml'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Apply manifests to k3s
+    runs-on: [self-hosted, monolith]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Apply kube-state-metrics
+        run: |
+          sudo k3s kubectl apply -f kubernetes/manifests/kube-state-metrics.yml
+
+      - name: Wait for kube-state-metrics rollout
+        run: |
+          sudo k3s kubectl rollout status deployment/kube-state-metrics \
+            -n kube-system --timeout=120s
+
+      - name: Verify
+        run: |
+          sudo k3s kubectl get pods -n kube-system | grep kube-state-metrics

@@ -11,6 +11,10 @@
 - name: Apply k3s manifests
   hosts: monolith
   become: yes
+  vars:
+    # Run as speddling when invoked from Apex — gh-runner is only reachable
+    # by the self-hosted runner on Monolith itself, not via SSH from Apex.
+    ansible_user: speddling
 
   vars_files:
     - "{{ playbook_dir }}/../../../../ansible/vars/main.yml"
