@@ -17,19 +17,6 @@ modules:
       - 1.3.6.1.2.1.2.2    # ifTable
       - 1.3.6.1.2.1.31.1.1  # ifXTable (64-bit counters + ifName/ifAlias)
 
-    # Enrich every metric's ifIndex label with the human-readable ifDescr and
-    # ifName so dashboards can filter by interface name rather than raw index.
-    lookups:
-      - source_indexes: [ifIndex]
-        lookup: ifDescr              # adds label ifDescr="eth0"
-        drop_source_indexes: false
-      - source_indexes: [ifIndex]
-        lookup: ifName               # adds label ifName="eth0"
-        drop_source_indexes: false
-      - source_indexes: [ifIndex]
-        lookup: ifAlias              # adds label ifAlias
-        drop_source_indexes: false
-
     metrics:
       # ── Interface identity ────────────────────────────────────────────────
       - name: ifDescr
