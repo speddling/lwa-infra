@@ -37,6 +37,46 @@ scrape_configs:
         labels:
           instance: monolith
 
+  # ── Blackbox probes ──────────────────────────────────────────────────────
+  # Each job uses the blackbox exporter as a proxy to probe a target.
+  # probe_success{instance="..."} is the key metric — 1=up, 0=down.
+  # Add targets here; the Blackbox Exporter dashboard (ID 7587) reads them.
+
+  - job_name: 'blackbox-http'
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+    static_configs:
+      - targets:
+          - 'http://{{ fqdn_grafana }}:{{ port_grafana }}'
+          - 'http://{{ fqdn_navidrome }}'
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: localhost:{{ port_blackbox_exporter }}
+
+  - job_name: 'blackbox-icmp'
+    metrics_path: /probe
+    params:
+      module: [icmp]
+    static_configs:
+      - targets:
+          - '{{ ip_monolith }}'
+          - '{{ ip_watchtower }}'
+          - '1.1.1.1'
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: localhost:{{ port_blackbox_exporter }}
+
+  # ── SNMP ─────────────────────────────────────────────────────────────────
+
   - job_name: 'snmp-er605'
     static_configs:
       - targets: ['{{ ip_er605 }}']
@@ -89,3 +129,9 @@ scrape_configs:
   - job_name: 'reolink_nvr'
     static_configs:
       - targets: ['localhost:{{ port_reolink_exporter }}']
+
+  # ── k3s / Monolith ───────────────────────────────────────────────────────
+
+  - job_name: 'kube-state-metrics'
+    static_configs:
+      - targets: ['{{ fqdn_monolith }}:{{ port_kube_state_metrics }}']

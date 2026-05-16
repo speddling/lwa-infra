@@ -52,6 +52,7 @@ port_tmobile_exporter:   9719
 port_reolink_exporter:   9720
 port_netdata:            19999
 port_synapse_mcp:        30800
+port_kube_state_metrics: 30900   # NodePort on Monolith; 30800 taken by synapse-mcp
 port_scribe:             8765
 port_argus_mcp:          9800
 
