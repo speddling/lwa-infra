@@ -51,6 +51,15 @@
     group: grafana
     mode: '0755'
 
+- name: Download Node Exporter Full dashboard (ID 1860)
+  ansible.builtin.get_url:
+    url: https://grafana.com/api/dashboards/1860/revisions/latest/download
+    dest: /var/lib/grafana/dashboards/node-exporter-full.json
+    owner: grafana
+    group: grafana
+    mode: '0644'
+  notify: restart grafana
+
 - name: Download k3s cluster dashboard (ID 15661)
   ansible.builtin.get_url:
     url: https://grafana.com/api/dashboards/15661/revisions/latest/download
@@ -60,10 +69,28 @@
     mode: '0644'
   notify: restart grafana
 
-- name: Download Node Exporter Full dashboard (ID 1860)
+- name: Download Blackbox Exporter dashboard (ID 7587)
   ansible.builtin.get_url:
-    url: https://grafana.com/api/dashboards/1860/revisions/latest/download
-    dest: /var/lib/grafana/dashboards/node-exporter-full.json
+    url: https://grafana.com/api/dashboards/7587/revisions/latest/download
+    dest: /var/lib/grafana/dashboards/blackbox-exporter.json
+    owner: grafana
+    group: grafana
+    mode: '0644'
+  notify: restart grafana
+
+- name: Deploy SNMP interfaces dashboard (custom)
+  ansible.builtin.copy:
+    src: snmp-interfaces.json
+    dest: /var/lib/grafana/dashboards/snmp-interfaces.json
+    owner: grafana
+    group: grafana
+    mode: '0644'
+  notify: restart grafana
+
+- name: Deploy Reolink NVR dashboard (custom)
+  ansible.builtin.copy:
+    src: reolink-nvr.json
+    dest: /var/lib/grafana/dashboards/reolink-nvr.json
     owner: grafana
     group: grafana
     mode: '0644'
@@ -92,6 +119,7 @@
     name: grafana-server
     enabled: yes
     state: started
+
 - name: Ensure Grafana is restarted to pick up provisioning changes
   systemd:
     name: grafana-server

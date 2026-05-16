@@ -1,0 +1,44 @@
+---
+# Applies k3s manifests from the repo to Monolith.
+# Run from apex:
+#   cd ~/homelab/services/monolith/ansible
+#   ansible-playbook -i inventory.ini playbooks/k3s-manifests.yml
+#
+# This playbook is intentionally separate from monitoring.yml so manifests
+# can be applied independently without touching node_exporter config.
+# ArgoCD will replace this once set up.
+
+- name: Apply k3s manifests
+  hosts: monolith
+  become: yes
+
+  vars_files:
+    - "{{ playbook_dir }}/../../../../ansible/vars/main.yml"
+
+  tasks:
+    - name: Create manifests staging directory
+      ansible.builtin.file:
+        path: /tmp/k3s-manifests
+        state: directory
+        mode: '0755'
+
+    - name: Copy kube-state-metrics manifest
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/../../../../kubernetes/manifests/kube-state-metrics.yml"
+        dest: /tmp/k3s-manifests/kube-state-metrics.yml
+        mode: '0644'
+
+    - name: Apply kube-state-metrics manifest
+      ansible.builtin.command:
+        cmd: k3s kubectl apply -f /tmp/k3s-manifests/kube-state-metrics.yml
+      register: ksm_apply
+      changed_when: "'configured' in ksm_apply.stdout or 'created' in ksm_apply.stdout"
+
+    - name: Show apply output
+      ansible.builtin.debug:
+        msg: "{{ ksm_apply.stdout_lines }}"
+
+    - name: Wait for kube-state-metrics to be ready
+      ansible.builtin.command:
+        cmd: k3s kubectl rollout status deployment/kube-state-metrics -n kube-system --timeout=120s
+      changed_when: false
