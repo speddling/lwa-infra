@@ -60,6 +60,13 @@
     mode: '0644'
   notify: restart grafana
 
+- name: Patch Node Exporter Full datasource variable
+  ansible.builtin.replace:
+    path: /var/lib/grafana/dashboards/node-exporter-full.json
+    regexp: '\$\{DS_PROMETHEUS[^}]*\}'
+    replace: 'PBFA97CFB590B2093'
+  notify: restart grafana
+
 - name: Download k3s cluster dashboard (ID 15661)
   ansible.builtin.get_url:
     url: https://grafana.com/api/dashboards/15661/revisions/latest/download
@@ -67,6 +74,13 @@
     owner: grafana
     group: grafana
     mode: '0644'
+  notify: restart grafana
+
+- name: Patch k3s cluster datasource variable
+  ansible.builtin.replace:
+    path: /var/lib/grafana/dashboards/k3s-cluster.json
+    regexp: '\$\{DS_PROMETHEUS[^}]*\}'
+    replace: 'PBFA97CFB590B2093'
   notify: restart grafana
 
 - name: Download Blackbox Exporter dashboard (ID 7587)
@@ -78,10 +92,26 @@
     mode: '0644'
   notify: restart grafana
 
+- name: Patch Blackbox Exporter datasource variable
+  ansible.builtin.replace:
+    path: /var/lib/grafana/dashboards/blackbox-exporter.json
+    regexp: '\$\{DS_PROMETHEUS[^}]*\}'
+    replace: 'PBFA97CFB590B2093'
+  notify: restart grafana
+
 - name: Deploy SNMP interfaces dashboard (custom)
   ansible.builtin.copy:
     src: snmp-interfaces.json
     dest: /var/lib/grafana/dashboards/snmp-interfaces.json
+    owner: grafana
+    group: grafana
+    mode: '0644'
+  notify: restart grafana
+
+- name: Deploy T-Mobile 5G Gateway dashboard (custom)
+  ansible.builtin.copy:
+    src: tmobile-gateway.json
+    dest: /var/lib/grafana/dashboards/tmobile-gateway.json
     owner: grafana
     group: grafana
     mode: '0644'
