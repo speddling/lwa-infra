@@ -1,6 +1,6 @@
 ---
 - name: Skip NUT setup if UPS not connected
-  meta: end_play
+  meta: end_role
   when: not nut_enabled
 
 - name: Install NUT packages

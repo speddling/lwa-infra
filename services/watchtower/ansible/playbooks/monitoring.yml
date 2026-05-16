@@ -12,6 +12,6 @@
     - alertmanager
     - netdata
     - grafana
-    - nut
     - daily_summary
     - argus
+    - nut
