@@ -1,102 +1,101 @@
 ---
-- name: Skip NUT setup if UPS not connected
-  meta: end_role
-  when: not nut_enabled
+- name: Configure NUT (UPS monitoring)
+  when: nut_enabled
+  block:
+    - name: Install NUT packages
+      apt:
+        name:
+          - nut
+          - nut-client
+          - nut-server
+        state: present
+        update_cache: yes
 
-- name: Install NUT packages
-  apt:
-    name:
-      - nut
-      - nut-client
-      - nut-server
-    state: present
-    update_cache: yes
+    - name: Deploy ups.conf
+      template:
+        src: ups.conf.j2
+        dest: /etc/nut/ups.conf
+        owner: root
+        group: nut
+        mode: '0640'
+      notify: restart nut-server
 
-- name: Deploy ups.conf
-  template:
-    src: ups.conf.j2
-    dest: /etc/nut/ups.conf
-    owner: root
-    group: nut
-    mode: '0640'
-  notify: restart nut-server
+    - name: Deploy upsd.conf
+      template:
+        src: upsd.conf.j2
+        dest: /etc/nut/upsd.conf
+        owner: root
+        group: nut
+        mode: '0640'
+      notify: restart nut-server
 
-- name: Deploy upsd.conf
-  template:
-    src: upsd.conf.j2
-    dest: /etc/nut/upsd.conf
-    owner: root
-    group: nut
-    mode: '0640'
-  notify: restart nut-server
+    - name: Deploy upsd.users
+      template:
+        src: upsd.users.j2
+        dest: /etc/nut/upsd.users
+        owner: root
+        group: nut
+        mode: '0640'
+      notify: restart nut-server
 
-- name: Deploy upsd.users
-  template:
-    src: upsd.users.j2
-    dest: /etc/nut/upsd.users
-    owner: root
-    group: nut
-    mode: '0640'
-  notify: restart nut-server
+    - name: Deploy upsmon.conf
+      template:
+        src: upsmon.conf.j2
+        dest: /etc/nut/upsmon.conf
+        owner: root
+        group: nut
+        mode: '0640'
+      notify: restart nut-monitor
 
-- name: Deploy upsmon.conf
-  template:
-    src: upsmon.conf.j2
-    dest: /etc/nut/upsmon.conf
-    owner: root
-    group: nut
-    mode: '0640'
-  notify: restart nut-monitor
+    - name: Deploy nut.conf (mode)
+      template:
+        src: nut.conf.j2
+        dest: /etc/nut/nut.conf
+        owner: root
+        group: nut
+        mode: '0640'
+      notify: restart nut-server
 
-- name: Deploy nut.conf (mode)
-  template:
-    src: nut.conf.j2
-    dest: /etc/nut/nut.conf
-    owner: root
-    group: nut
-    mode: '0640'
-  notify: restart nut-server
+    - name: Deploy last gasp Slack alert script
+      template:
+        src: nut-slack-alert.sh.j2
+        dest: /usr/local/bin/nut-slack-alert.sh
+        owner: root
+        group: root
+        mode: '0755'
 
-- name: Deploy last gasp Slack alert script
-  template:
-    src: nut-slack-alert.sh.j2
-    dest: /usr/local/bin/nut-slack-alert.sh
-    owner: root
-    group: root
-    mode: '0755'
+    - name: Deploy upssched.conf
+      template:
+        src: upssched.conf.j2
+        dest: /etc/nut/upssched.conf
+        owner: root
+        group: nut
+        mode: '0640'
+      notify: restart nut-monitor
 
-- name: Deploy upssched.conf
-  template:
-    src: upssched.conf.j2
-    dest: /etc/nut/upssched.conf
-    owner: root
-    group: nut
-    mode: '0640'
-  notify: restart nut-monitor
+    - name: Install nut_exporter
+      get_url:
+        url: https://github.com/DRuggeri/nut_exporter/releases/latest/download/nut_exporter-linux-amd64
+        dest: /usr/local/bin/nut_exporter
+        owner: root
+        group: root
+        mode: '0755'
 
-- name: Install nut_exporter
-  get_url:
-    url: https://github.com/DRuggeri/nut_exporter/releases/latest/download/nut_exporter-linux-amd64
-    dest: /usr/local/bin/nut_exporter
-    owner: root
-    group: root
-    mode: '0755'
+    - name: Deploy nut_exporter systemd unit
+      template:
+        src: nut_exporter.service.j2
+        dest: /etc/systemd/system/nut_exporter.service
+        owner: root
+        group: root
+        mode: '0644'
+      notify: reload systemd
 
-- name: Deploy nut_exporter systemd unit
-  template:
-    src: nut_exporter.service.j2
-    dest: /etc/systemd/system/nut_exporter.service
-    owner: root
-    group: root
-    mode: '0644'
-  notify: reload systemd
-
-- name: Enable and start NUT services
-  systemd:
-    name: "{{ item }}"
-    enabled: yes
-    state: started
-  loop:
-    - nut-server
-    - nut-monitor
-    - nut_exporter
+    - name: Enable and start NUT services
+      systemd:
+        name: "{{ item }}"
+        enabled: yes
+        state: started
+      loop:
+        - nut-server
+        - nut-monitor
+        - nut_exporter
