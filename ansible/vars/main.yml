@@ -53,6 +53,7 @@ port_reolink_exporter:   9720
 port_netdata:            19999
 port_synapse_mcp:        30800
 port_scribe:             8765
+port_argus_mcp:          9800
 
 # -----------------------------------------------------------------------------
 # SSH / Ansible connection

@@ -1,0 +1,78 @@
+---
+- name: Create argus system user
+  user:
+    name: "{{ argus_user }}"
+    system: yes
+    shell: /bin/false
+    home: "{{ argus_dest_dir }}"
+    create_home: no
+
+- name: Create argus destination directory
+  file:
+    path: "{{ argus_dest_dir }}"
+    state: directory
+    owner: "{{ argus_user }}"
+    group: "{{ argus_user }}"
+    mode: '0755'
+
+- name: Deploy argus server script
+  copy:
+    src: "{{ argus_src_dir }}/server.py"
+    dest: "{{ argus_script }}"
+    owner: "{{ argus_user }}"
+    group: "{{ argus_user }}"
+    mode: '0644'
+  notify: restart argus
+
+- name: Deploy argus requirements
+  copy:
+    src: "{{ argus_src_dir }}/requirements.txt"
+    dest: "{{ argus_dest_dir }}/requirements.txt"
+    owner: "{{ argus_user }}"
+    group: "{{ argus_user }}"
+    mode: '0644'
+
+- name: Ensure Python venv exists for argus
+  command:
+    cmd: python3 -m venv {{ argus_venv }}
+    creates: "{{ argus_venv }}/bin/python"
+  become_user: "{{ argus_user }}"
+
+- name: Install argus Python dependencies
+  pip:
+    requirements: "{{ argus_dest_dir }}/requirements.txt"
+    virtualenv: "{{ argus_venv }}"
+    state: present
+  become_user: "{{ argus_user }}"
+  notify: restart argus
+
+- name: Deploy argus systemd service
+  template:
+    src: argus.service.j2
+    dest: /etc/systemd/system/argus.service
+    owner: root
+    group: root
+    mode: '0644'
+  notify: restart argus
+
+- name: Allow argus port through UFW from apex only
+  ufw:
+    rule: allow
+    port: "{{ port_argus_mcp }}"
+    proto: tcp
+    src: "{{ ip_apex }}"
+    comment: "Argus MCP — apex only"
+
+- name: Enable and start argus
+  systemd:
+    name: argus
+    enabled: yes
+    state: started
+    daemon_reload: yes
+
+- name: Wait for argus to start
+  wait_for:
+    host: 127.0.0.1
+    port: "{{ port_argus_mcp }}"
+    timeout: 20
+    msg: "Argus did not start within 20 seconds — check journalctl -u argus"

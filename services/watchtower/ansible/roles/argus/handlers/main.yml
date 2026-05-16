@@ -1,0 +1,6 @@
+---
+- name: restart argus
+  systemd:
+    name: argus
+    state: restarted
+    daemon_reload: yes

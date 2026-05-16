@@ -1,0 +1,10 @@
+---
+# Argus role defaults — all central values come from ansible/vars/main.yml.
+# Only derived paths live here to keep the role self-contained.
+
+argus_src_dir:  "{{ playbook_dir }}/../../argus"
+argus_dest_dir: "/opt/argus"
+argus_venv:     "/opt/argus/venv"
+argus_script:   "/opt/argus/server.py"
+argus_user:     "argus"
+argus_log:      "/var/log/argus.log"

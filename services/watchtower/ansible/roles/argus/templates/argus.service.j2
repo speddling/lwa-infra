@@ -1,0 +1,26 @@
+[Unit]
+Description=Argus — Watchtower MCP server for Little Wolf Acres
+Documentation=https://github.com/speddling/homelab/blob/master/docs/argus.md
+After=network-online.target prometheus.service alertmanager.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User={{ argus_user }}
+Group={{ argus_user }}
+WorkingDirectory={{ argus_dest_dir }}
+ExecStart={{ argus_venv }}/bin/python {{ argus_script }}
+Restart=on-failure
+RestartSec=5
+
+Environment="ARGUS_PORT={{ port_argus_mcp }}"
+Environment="PROMETHEUS_URL=http://localhost:{{ port_prometheus }}"
+Environment="ALERTMANAGER_URL=http://localhost:{{ port_alertmanager }}"
+Environment="ALLOWED_READ_PATHS=/etc/alertmanager,/etc/prometheus,/etc/systemd/system,/usr/local/bin,/opt/argus"
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=argus
+
+[Install]
+WantedBy=multi-user.target

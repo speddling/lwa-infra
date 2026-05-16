@@ -61,14 +61,17 @@ chore/*   Maintenance, dependency updates
 | Prometheus + Grafana + Alertmanager | watchtower | Ansible | ✅ Online |
 | Synapse | monolith | FastMCP · Kubernetes | ✅ Online |
 | Scribe | apex | FastMCP · launchd · Ansible | ✅ Online |
+| Argus | watchtower | FastMCP · systemd · Ansible | ✅ Online |
 
 ## AI Tooling
 
-Two MCP servers give Claude structured, safe access to the homelab:
+Three MCP servers give Claude structured, safe access to the homelab:
 
 **Synapse** (`monolith:30800`) — Claude's eyes on the cluster. Read-only access to k3s pod state, Prometheus metrics, Alertmanager alerts, and the monolith filesystem. Deployed as a Kubernetes service. See `docs/synapse.md`.
 
 **Scribe** (`apex:8765`) — Claude's git control plane. Branch, stage, commit, push, and open PRs against this repo — with branch protection and path allowlisting baked in at the server level. Deployed as a launchd service on apex. See `docs/scribe.md`.
+
+**Argus** (`watchtower:9800`) — Claude's eyes on the monitoring layer. Read-only access to live Alertmanager and Prometheus configs, systemd service and timer state, journald logs, and the Alertmanager and Prometheus HTTP APIs. Deployed as a systemd service on watchtower. See `docs/argus.md`.
 
 ## Custom Exporters
 
