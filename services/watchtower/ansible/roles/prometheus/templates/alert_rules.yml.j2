@@ -62,7 +62,7 @@ groups:
           description: "Monolith is unreachable — node_exporter scrape failed. k3s workloads may be affected."
 
       - alert: MonolithHighCPU
-        expr: 100 - (avg(rate(node_cpu_seconds_total{mode="idle",instance="monolith.littlewolfacres.com:9100"}[5m])) * 100) > 85
+        expr: 100 - (avg(rate(node_cpu_seconds_total{mode="idle",job="monolith"}[5m])) * 100) > 85
         for: 5m
         labels:
           severity: warning
@@ -71,7 +71,7 @@ groups:
           description: "Monolith CPU usage is above 85% for 5 minutes (current: {{ "{{" }} $value | printf \"%.1f\" {{ "}}" }}%)"
 
       - alert: MonolithHighMemory
-        expr: (1 - (node_memory_MemAvailable_bytes{instance="monolith.littlewolfacres.com:9100"} / node_memory_MemTotal_bytes{instance="monolith.littlewolfacres.com:9100"})) * 100 > 85
+        expr: (1 - (node_memory_MemAvailable_bytes{job="monolith"} / node_memory_MemTotal_bytes{job="monolith"})) * 100 > 85
         for: 5m
         labels:
           severity: warning
@@ -80,7 +80,7 @@ groups:
           description: "Monolith memory usage is above 85% for 5 minutes (current: {{ "{{" }} $value | printf \"%.1f\" {{ "}}" }}%)"
 
       - alert: MonolithLowDisk
-        expr: (1 - (node_filesystem_avail_bytes{instance="monolith.littlewolfacres.com:9100",mountpoint="/"} / node_filesystem_size_bytes{instance="monolith.littlewolfacres.com:9100",mountpoint="/"})) * 100 > 80
+        expr: (1 - (node_filesystem_avail_bytes{job="monolith",mountpoint="/"} / node_filesystem_size_bytes{job="monolith",mountpoint="/"})) * 100 > 80
         for: 5m
         labels:
           severity: critical
@@ -89,7 +89,7 @@ groups:
           description: "Monolith disk usage on / is above 80% (current: {{ "{{" }} $value | printf \"%.1f\" {{ "}}" }}%)"
 
       - alert: MonolithLowDiskHddC
-        expr: (1 - (node_filesystem_avail_bytes{instance="monolith.littlewolfacres.com:9100",mountpoint="/mnt/hdd-c"} / node_filesystem_size_bytes{instance="monolith.littlewolfacres.com:9100",mountpoint="/mnt/hdd-c"})) * 100 > 80
+        expr: (1 - (node_filesystem_avail_bytes{job="monolith",mountpoint="/mnt/hdd-c"} / node_filesystem_size_bytes{job="monolith",mountpoint="/mnt/hdd-c"})) * 100 > 80
         for: 5m
         labels:
           severity: critical
@@ -98,7 +98,7 @@ groups:
           description: "Monolith disk usage on /mnt/hdd-c (music/bulk) is above 80% (current: {{ "{{" }} $value | printf \"%.1f\" {{ "}}" }}%)"
 
       - alert: MonolithLowDiskHddD
-        expr: (1 - (node_filesystem_avail_bytes{instance="monolith.littlewolfacres.com:9100",mountpoint="/mnt/hdd-d"} / node_filesystem_size_bytes{instance="monolith.littlewolfacres.com:9100",mountpoint="/mnt/hdd-d"})) * 100 > 80
+        expr: (1 - (node_filesystem_avail_bytes{job="monolith",mountpoint="/mnt/hdd-d"} / node_filesystem_size_bytes{job="monolith",mountpoint="/mnt/hdd-d"})) * 100 > 80
         for: 5m
         labels:
           severity: warning

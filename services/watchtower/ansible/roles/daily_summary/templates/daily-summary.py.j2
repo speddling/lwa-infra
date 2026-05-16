@@ -24,6 +24,7 @@ import sys
 import urllib.request
 import urllib.parse
 from datetime import datetime
+from zoneinfo import ZoneInfo
 
 
 # ---------------------------------------------------------------------------
@@ -64,7 +65,7 @@ def up_icon(val):
 # ---------------------------------------------------------------------------
 # Gather metrics
 # ---------------------------------------------------------------------------
-now    = datetime.now()
+now    = datetime.now(ZoneInfo("America/New_York"))
 period = "Morning" if now.hour < 12 else "Evening"
 
 # Service availability
@@ -78,11 +79,12 @@ wt_mem  = query('(1 - (node_memory_MemAvailable_bytes{instance="localhost:9100"}
 wt_disk = query('(1 - (node_filesystem_avail_bytes{instance="localhost:9100",mountpoint="/"} / node_filesystem_size_bytes{instance="localhost:9100",mountpoint="/"})) * 100')
 
 # Monolith — CPU 12 h average, current memory, root/hdd-c/hdd-d disks
-mn_cpu    = query(f'100 - (avg(avg_over_time(rate(node_cpu_seconds_total{{mode="idle",instance="{MONOLITH}"}}[5m])[12h:5m])) * 100)')
-mn_mem    = query(f'(1 - (node_memory_MemAvailable_bytes{{instance="{MONOLITH}"}} / node_memory_MemTotal_bytes{{instance="{MONOLITH}"}})) * 100')
-mn_disk   = query(f'(1 - (node_filesystem_avail_bytes{{instance="{MONOLITH}",mountpoint="/"}} / node_filesystem_size_bytes{{instance="{MONOLITH}",mountpoint="/"}}) ) * 100')
-mn_disk_c = query(f'(1 - (node_filesystem_avail_bytes{{instance="{MONOLITH}",mountpoint="/mnt/hdd-c"}} / node_filesystem_size_bytes{{instance="{MONOLITH}",mountpoint="/mnt/hdd-c"}})) * 100')
-mn_disk_d = query(f'(1 - (node_filesystem_avail_bytes{{instance="{MONOLITH}",mountpoint="/mnt/hdd-d"}} / node_filesystem_size_bytes{{instance="{MONOLITH}",mountpoint="/mnt/hdd-d"}})) * 100')
+# Filter by job rather than instance label — resilient to hostname changes.
+mn_cpu    = query('100 - (avg(avg_over_time(rate(node_cpu_seconds_total{mode="idle",job="monolith"}[5m])[12h:5m])) * 100)')
+mn_mem    = query('(1 - (node_memory_MemAvailable_bytes{job="monolith"} / node_memory_MemTotal_bytes{job="monolith"})) * 100')
+mn_disk   = query('(1 - (node_filesystem_avail_bytes{job="monolith",mountpoint="/"} / node_filesystem_size_bytes{job="monolith",mountpoint="/"})) * 100')
+mn_disk_c = query('(1 - (node_filesystem_avail_bytes{job="monolith",mountpoint="/mnt/hdd-c"} / node_filesystem_size_bytes{job="monolith",mountpoint="/mnt/hdd-c"})) * 100')
+mn_disk_d = query('(1 - (node_filesystem_avail_bytes{job="monolith",mountpoint="/mnt/hdd-d"} / node_filesystem_size_bytes{job="monolith",mountpoint="/mnt/hdd-d"})) * 100')
 
 # ---------------------------------------------------------------------------
 # TODO: DNS stats (AdGuard exporter — see docs/daily-summary.md §Roadmap)
