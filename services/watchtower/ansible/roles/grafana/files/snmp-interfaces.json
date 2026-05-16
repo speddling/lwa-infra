@@ -79,13 +79,13 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
-          "expr": "rate(ifHCInOctets{job=~\"snmp-.*\", instance=~\"$device\", ifOperStatus=\"up\"}[$__rate_interval]) * 8",
+          "expr": "rate(ifHCInOctets{job=~\"snmp-.*\", instance=~\"$device\"}[$__rate_interval]) * 8",
           "legendFormat": "▲ {{instance}} {{ifDescr}}",
           "refId": "A"
         },
         {
           "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
-          "expr": "rate(ifHCOutOctets{job=~\"snmp-.*\", instance=~\"$device\", ifOperStatus=\"up\"}[$__rate_interval]) * 8",
+          "expr": "rate(ifHCOutOctets{job=~\"snmp-.*\", instance=~\"$device\"}[$__rate_interval]) * 8",
           "legendFormat": "▼ {{instance}} {{ifDescr}}",
           "refId": "B"
         }
