@@ -87,6 +87,15 @@
     mode: '0644'
   notify: restart grafana
 
+- name: Deploy T-Mobile 5G Gateway dashboard (custom)
+  ansible.builtin.copy:
+    src: tmobile-gateway.json
+    dest: /var/lib/grafana/dashboards/tmobile-gateway.json
+    owner: grafana
+    group: grafana
+    mode: '0644'
+  notify: restart grafana
+
 - name: Deploy Reolink NVR dashboard (custom)
   ansible.builtin.copy:
     src: reolink-nvr.json

@@ -1,0 +1,356 @@
+{
+  "__inputs": [],
+  "__requires": [
+    { "type": "grafana", "id": "grafana", "name": "Grafana", "version": "8.0.0" },
+    { "type": "datasource", "id": "prometheus", "name": "Prometheus", "version": "1.0.0" }
+  ],
+  "annotations": { "list": [] },
+  "description": "T-Mobile Home Internet gateway — signal quality, registration status, uptime and device info (Sagemcom F5688W).",
+  "editable": true,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "id": 100,
+      "title": "Gateway Status",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            { "options": { "0": { "color": "red", "text": "No" }, "1": { "color": "green", "text": "Yes" } }, "type": "value" }
+          ],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "green", "value": 1 }] },
+          "color": { "mode": "thresholds" },
+          "noValue": "—"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 4, "x": 0, "y": 1 },
+      "id": 1,
+      "options": { "colorMode": "background", "graphMode": "none", "justifyMode": "center", "reduceOptions": { "calcs": ["lastNotNull"] }, "textMode": "auto" },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+          "expr": "tmobile_registered{job=\"tmobile\"}",
+          "legendFormat": "Registered",
+          "refId": "A"
+        }
+      ],
+      "title": "Registered",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            { "options": { "0": { "color": "green", "text": "Home" }, "1": { "color": "yellow", "text": "Roaming" } }, "type": "value" }
+          ],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 1 }] },
+          "color": { "mode": "thresholds" },
+          "noValue": "—"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 4, "x": 4, "y": 1 },
+      "id": 2,
+      "options": { "colorMode": "background", "graphMode": "none", "justifyMode": "center", "reduceOptions": { "calcs": ["lastNotNull"] }, "textMode": "auto" },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+          "expr": "tmobile_roaming{job=\"tmobile\"}",
+          "legendFormat": "Roaming",
+          "refId": "A"
+        }
+      ],
+      "title": "Roaming",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            { "options": { "0": { "color": "orange", "text": "IPv4 only" }, "1": { "color": "green", "text": "Enabled" } }, "type": "value" }
+          ],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "orange", "value": null }, { "color": "green", "value": 1 }] },
+          "color": { "mode": "thresholds" },
+          "noValue": "—"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 4, "x": 8, "y": 1 },
+      "id": 3,
+      "options": { "colorMode": "background", "graphMode": "none", "justifyMode": "center", "reduceOptions": { "calcs": ["lastNotNull"] }, "textMode": "auto" },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+          "expr": "tmobile_ipv6_enabled{job=\"tmobile\"}",
+          "legendFormat": "IPv6",
+          "refId": "A"
+        }
+      ],
+      "title": "IPv6",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "color": { "mode": "fixed", "fixedColor": "blue" },
+          "noValue": "—"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 4, "x": 12, "y": 1 },
+      "id": 4,
+      "options": { "colorMode": "none", "graphMode": "none", "justifyMode": "center", "reduceOptions": { "calcs": ["lastNotNull"] }, "textMode": "auto" },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+          "expr": "tmobile_uptime_seconds{job=\"tmobile\"}",
+          "legendFormat": "Uptime",
+          "refId": "A"
+        }
+      ],
+      "title": "Uptime",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": {
+        "defaults": { "color": { "mode": "thresholds" }, "noValue": "—" },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 8, "x": 16, "y": 1 },
+      "id": 5,
+      "options": { "colorMode": "none", "graphMode": "none", "justifyMode": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "/^(model|software_version|update_state)$/", "values": false }, "textMode": "auto" },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+          "expr": "tmobile_device_info{job=\"tmobile\"}",
+          "legendFormat": "",
+          "refId": "A",
+          "instant": true,
+          "format": "table"
+        }
+      ],
+      "title": "Device Info",
+      "type": "stat"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 5 },
+      "id": 101,
+      "title": "5G Signal Quality",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": {
+        "defaults": {
+          "min": 0, "max": 5,
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "orange", "value": 2 }, { "color": "green", "value": 4 }] },
+          "color": { "mode": "thresholds" },
+          "noValue": "—"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 6, "w": 4, "x": 0, "y": 6 },
+      "id": 6,
+      "options": { "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"] }, "showThresholdLabels": false, "showThresholdMarkers": true },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+          "expr": "tmobile_5g_bars{job=\"tmobile\"}",
+          "legendFormat": "{{band}}",
+          "refId": "A"
+        }
+      ],
+      "title": "5G Signal Bars",
+      "type": "gauge"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "dBm",
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "orange", "value": -110 }, { "color": "green", "value": -95 }] },
+          "color": { "mode": "thresholds" },
+          "noValue": "—"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 6, "w": 5, "x": 4, "y": 6 },
+      "id": 7,
+      "options": { "colorMode": "background", "graphMode": "area", "justifyMode": "auto", "reduceOptions": { "calcs": ["lastNotNull"] }, "textMode": "value_and_name" },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+          "expr": "tmobile_5g_rsrp_dbm{job=\"tmobile\"}",
+          "legendFormat": "RSRP {{band}}",
+          "refId": "A"
+        }
+      ],
+      "title": "5G RSRP (Reference Signal Power)",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "dB",
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "orange", "value": -15 }, { "color": "green", "value": -10 }] },
+          "color": { "mode": "thresholds" },
+          "noValue": "—"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 6, "w": 5, "x": 9, "y": 6 },
+      "id": 8,
+      "options": { "colorMode": "background", "graphMode": "area", "justifyMode": "auto", "reduceOptions": { "calcs": ["lastNotNull"] }, "textMode": "value_and_name" },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+          "expr": "tmobile_5g_rsrq_db{job=\"tmobile\"}",
+          "legendFormat": "RSRQ {{band}}",
+          "refId": "A"
+        }
+      ],
+      "title": "5G RSRQ (Signal Quality)",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "dB",
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "orange", "value": 0 }, { "color": "green", "value": 13 }] },
+          "color": { "mode": "thresholds" },
+          "noValue": "—"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 6, "w": 5, "x": 14, "y": 6 },
+      "id": 9,
+      "options": { "colorMode": "background", "graphMode": "area", "justifyMode": "auto", "reduceOptions": { "calcs": ["lastNotNull"] }, "textMode": "value_and_name" },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+          "expr": "tmobile_5g_sinr_db{job=\"tmobile\"}",
+          "legendFormat": "SINR {{band}}",
+          "refId": "A"
+        }
+      ],
+      "title": "5G SINR (Signal-to-Noise)",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "dBm",
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "orange", "value": -100 }, { "color": "green", "value": -85 }] },
+          "color": { "mode": "thresholds" },
+          "noValue": "—"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 6, "w": 5, "x": 19, "y": 6 },
+      "id": 10,
+      "options": { "colorMode": "background", "graphMode": "area", "justifyMode": "auto", "reduceOptions": { "calcs": ["lastNotNull"] }, "textMode": "value_and_name" },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+          "expr": "tmobile_5g_rssi_dbm{job=\"tmobile\"}",
+          "legendFormat": "RSSI {{band}}",
+          "refId": "A"
+        }
+      ],
+      "title": "5G RSSI",
+      "type": "stat"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 12 },
+      "id": 102,
+      "title": "Signal History",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "dB",
+          "custom": { "lineWidth": 1, "fillOpacity": 10 },
+          "color": { "mode": "palette-classic" }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 13 },
+      "id": 11,
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+          "expr": "tmobile_5g_rsrp_dbm{job=\"tmobile\"}",
+          "legendFormat": "RSRP {{band}}",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+          "expr": "tmobile_5g_rsrq_db{job=\"tmobile\"}",
+          "legendFormat": "RSRQ {{band}}",
+          "refId": "B"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+          "expr": "tmobile_5g_sinr_db{job=\"tmobile\"}",
+          "legendFormat": "SINR {{band}}",
+          "refId": "C"
+        }
+      ],
+      "title": "5G Signal Quality History",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": {
+        "defaults": {
+          "min": 0, "max": 5,
+          "custom": { "lineWidth": 1, "fillOpacity": 10 },
+          "color": { "mode": "palette-classic" }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 13 },
+      "id": 12,
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+          "expr": "tmobile_5g_bars{job=\"tmobile\"}",
+          "legendFormat": "Bars {{band}}",
+          "refId": "A"
+        }
+      ],
+      "title": "5G Signal Bars History",
+      "type": "timeseries"
+    }
+  ],
+  "refresh": "1m",
+  "schemaVersion": 38,
+  "tags": ["tmobile", "gateway", "5g", "homelab"],
+  "templating": { "list": [] },
+  "time": { "from": "now-6h", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "T-Mobile 5G Gateway",
+  "uid": "lwa-tmobile-gateway",
+  "version": 1
+}
