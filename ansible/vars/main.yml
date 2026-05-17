@@ -96,13 +96,6 @@ music_share_path:    "/mnt/hdd-c/music-library"
 # Passwords: vault_samba_password, vault_james_password (see vault.yml)
 
 # -----------------------------------------------------------------------------
-# Studio — Samba client mount
-# -----------------------------------------------------------------------------
-studio_music_mount:        "/music-library"
-studio_music_creds_file:   "/etc/samba/studio-music-creds"
-ssh_user_studio:           "james"
-
-# -----------------------------------------------------------------------------
 # Watchtower — Alertmanager
 # -----------------------------------------------------------------------------
 alertmanager_slack_channel:          "#sentinel"

@@ -4,6 +4,71 @@
 
 ---
 
+## Navidrome
+
+### Music Library — Mounting on Studio
+
+Navidrome reads from `/mnt/hdd-c/music-library` on Monolith via a k3s hostPath volume. To add new music or edit metadata from Studio, mount the `music-library` Samba share. **This is a one-time manual setup on Studio** — there is no Ansible automation for it.
+
+```bash
+# 1. Install CIFS support
+sudo apt install cifs-utils
+
+# 2. Create the credentials file (root-only, never world-readable)
+sudo tee /etc/samba/studio-music-creds > /dev/null <<'EOF'
+username=james
+password=<vault_james_password>
+EOF
+sudo chmod 600 /etc/samba/studio-music-creds
+
+# 3. Create the mount point
+sudo mkdir /music-library
+
+# 4. Add to /etc/fstab
+echo '//192.168.0.20/music-library  /music-library  cifs  credentials=/etc/samba/studio-music-creds,uid=1000,gid=1000,file_mode=0664,dir_mode=0775,vers=3.0,_netdev,x-systemd.automount  0  0' | sudo tee -a /etc/fstab
+
+# 5. Mount now without rebooting
+sudo systemctl daemon-reload
+sudo mount /music-library
+```
+
+> **Password:** retrieve from `ansible/vars/vault.yml` on apex:
+> `ansible-vault view ~/homelab/ansible/vars/vault.yml --vault-password-file=~/homelab/.vault_pass`
+
+After mounting, `/music-library` behaves like a local directory. New files and edited tags written here are picked up by Navidrome on its next scheduled scan (default: every hour).
+
+### Forcing a Navidrome Rescan
+
+```bash
+# Trigger a full library rescan immediately
+curl -u admin:<password> -X POST https://navidrome.littlewolfacres.com/rest/startScan?apiKey=<key>
+
+# Or via the web UI
+# Navidrome → ⚙ Settings → Library → Start Full Scan
+```
+
+### Health Check
+
+```bash
+# Check pod status
+sudo k3s kubectl get pods -n navidrome
+
+# Tail logs
+sudo k3s kubectl logs -n navidrome deployment/navidrome --tail=50 -f
+
+# Verify music hostPath is mounted inside the pod
+sudo k3s kubectl exec -n navidrome deployment/navidrome -- ls /music | head -20
+```
+
+### Restarting Navidrome
+
+```bash
+sudo k3s kubectl rollout restart deployment/navidrome -n navidrome
+sudo k3s kubectl rollout status deployment/navidrome -n navidrome
+```
+
+---
+
 ## Service Health Checks
 
 ### Watchtower (run on watchtower)
