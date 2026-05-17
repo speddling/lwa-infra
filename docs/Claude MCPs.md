@@ -133,6 +133,7 @@ The human stays in the loop at exactly one point: GitHub PR review and merge. Ev
 | `git_status` | Show current branch, staged/unstaged changes, and untracked files |
 | `git_branch` | Create and checkout a new branch (`git checkout -b <name>`) |
 | `git_commit` | Stage a specified list of paths and commit with a message |
+| `git_rm` | Remove tracked files from disk and stage the deletion |
 | `git_push` | Push the current branch to origin and set upstream |
 | `git_pr` | Open a GitHub PR via `gh pr create` with title and body |
 
@@ -326,6 +327,7 @@ sudo systemctl restart argus
 | Query Prometheus metrics | Synapse → `prom_query` / `prom_active_alerts` |
 | Read files on Monolith | Synapse → `fs_read_file` / `fs_list_dir` |
 | Branch, commit, push, open PR | Scribe → `git_*` tools |
+| Remove tracked files from the repo | Scribe → `git_rm` |
 | Read live Alertmanager or Prometheus config | Argus → `alertmanager_status` / `prometheus_rules` |
 | Check systemd service or timer state | Argus → `systemd_status` |
 | Read journald logs for a Watchtower service | Argus → `journald_tail` |
