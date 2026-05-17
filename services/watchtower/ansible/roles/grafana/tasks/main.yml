@@ -162,3 +162,57 @@
   systemd:
     name: grafana-server
     state: restarted
+
+# ── Purge stale dashboards via Grafana API ────────────────────────────────
+# File-based cleanup can't remove dashboards that live only in Grafana's
+# SQLite database (manually imported or orphaned after a UID change).
+# Use the API from localhost so we can reach it without network restrictions.
+
+- name: Wait for Grafana to be ready after restart
+  ansible.builtin.uri:
+    url: "http://localhost:{{ port_grafana }}/api/health"
+    status_code: 200
+  register: grafana_health
+  retries: 12
+  delay: 5
+  until: grafana_health.status == 200
+
+- name: Search for stale T-Mobile dashboards (not managed by us)
+  ansible.builtin.uri:
+    url: "http://localhost:{{ port_grafana }}/api/search?query=T-Mobile&type=dash-db"
+    user: admin
+    password: "{{ vault_grafana_password }}"
+    force_basic_auth: true
+    return_content: true
+  register: tmobile_search
+
+- name: Delete stale T-Mobile dashboards
+  ansible.builtin.uri:
+    url: "http://localhost:{{ port_grafana }}/api/dashboards/uid/{{ item.uid }}"
+    method: DELETE
+    user: admin
+    password: "{{ vault_grafana_password }}"
+    force_basic_auth: true
+    status_code: [200, 404]
+  loop: "{{ tmobile_search.json }}"
+  when: item.uid is defined and item.uid != 'lwa-tmobile-gateway'
+
+- name: Search for stale SNMP dashboards (not managed by us)
+  ansible.builtin.uri:
+    url: "http://localhost:{{ port_grafana }}/api/search?query=SNMP&type=dash-db"
+    user: admin
+    password: "{{ vault_grafana_password }}"
+    force_basic_auth: true
+    return_content: true
+  register: snmp_search
+
+- name: Delete stale SNMP dashboards
+  ansible.builtin.uri:
+    url: "http://localhost:{{ port_grafana }}/api/dashboards/uid/{{ item.uid }}"
+    method: DELETE
+    user: admin
+    password: "{{ vault_grafana_password }}"
+    force_basic_auth: true
+    status_code: [200, 404]
+  loop: "{{ snmp_search.json }}"
+  when: item.uid is defined and item.uid != 'lwa-snmp-interfaces'
