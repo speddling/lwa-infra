@@ -10,6 +10,7 @@ Tools:
   git_status   Show current branch, staged/unstaged changes, and untracked files
   git_branch   Create and checkout a new branch (git checkout -b <name>)
   git_commit   Stage an explicit list of paths and commit with a message
+  git_rm       Remove files from the working tree and stage the deletion
   git_push     Push the current branch to origin, setting upstream
   git_pr       Open a GitHub PR via gh pr create
   git_sync     Checkout main (or master) and pull — housekeeping after a merge
@@ -238,6 +239,47 @@ def git_commit(paths: list[str], message: str, repo: Optional[str] = None) -> st
 
     out = _run(["git", "commit", "-m", message], repo_path)
     return f"Committed on branch '{branch}'.\n{out}"
+
+
+@mcp.tool()
+def git_rm(paths: list[str], repo: Optional[str] = None) -> str:
+    """Remove files from the working tree and stage the deletion.
+
+    Equivalent to `git rm` — deletes the file(s) from disk and stages the
+    removal in one step. Subject to the same path validation as git_commit:
+    every path must resolve inside the repo root. Refuses to operate on
+    main or master.
+
+    Use this when you need to delete tracked files as part of a commit, e.g.
+    removing docs that have been consolidated elsewhere.
+
+    Args:
+        paths: List of file paths to remove. Relative paths are resolved
+               relative to the repo root; absolute paths must still resolve
+               inside the repo root.
+        repo:  Repo name or full path. Optional when only one root is configured.
+    """
+    if not paths:
+        raise ValueError("paths must not be empty.")
+
+    repo_path = _resolve_repo(repo)
+    branch = _current_branch(repo_path)
+    _assert_not_protected(branch)
+
+    # Resolve and validate every path before touching anything.
+    resolved: list[pathlib.Path] = []
+    for p in paths:
+        raw = pathlib.Path(p)
+        candidate = (repo_path / raw).resolve() if not raw.is_absolute() else raw.resolve()
+        if not str(candidate).startswith(str(repo_path) + os.sep) and candidate != repo_path:
+            raise ValueError(
+                f"Path '{p}' resolves outside the repo root '{repo_path}'. "
+                "Scribe will not remove it."
+            )
+        resolved.append(candidate)
+
+    out = _run(["git", "rm", "--"] + [str(rp) for rp in resolved], repo_path)
+    return f"Removed and staged deletions on branch '{branch}'.\n{out}"
 
 
 @mcp.tool()
