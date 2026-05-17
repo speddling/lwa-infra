@@ -158,30 +158,27 @@
     enabled: yes
     state: started
 
-- name: Ensure Grafana is restarted to pick up provisioning changes
-  systemd:
-    name: grafana-server
-    state: restarted
+# Flush handlers here so Grafana restarts with all provisioning changes
+# applied before we stop it for SQLite maintenance below.
+- name: Flush handlers to apply any pending Grafana restart
+  ansible.builtin.meta: flush_handlers
 
-# ── Purge unmanaged dashboards via Grafana API ───────────────────────────
-# File-based cleanup removes JSON files, but dashboards in Grafana's SQLite
-# DB (manually imported, UI-created, or orphaned after a UID change) survive
-# file removal. Grafana's DELETE API returns 400 "provisioned dashboard
-# cannot be deleted" for any dashboard still flagged as provisioned in the
-# DB — even with disableDeletion: false (that flag only affects the UI).
+# ── SQLite maintenance: strip broken provisioning markers ─────────────────
+# Dashboards imported via the UI into the Homelab folder while the file
+# provisioner is active get flagged as provisioned in Grafana's SQLite DB
+# even though no file owns them. This breaks the GET API with HTTP 500
+# ("Error while checking if dashboard is provisioned"), which blocks every
+# subsequent API approach (re-save, delete).
 #
-# Fix: GET full JSON → POST back via save endpoint with overwrite:true
-# (strips the provisioning record from dashboard_provisioning table) →
-# DELETE now succeeds since the provisioning marker is gone.
+# Fix: stop Grafana, delete dashboard_provisioning rows for any UID outside
+# the managed set, then restart. Managed dashboards are re-provisioned from
+# their files on startup. Unmanaged dashboards become plain API-owned
+# dashboards (no provisioning record) and the DELETE endpoint works normally.
 
-- name: Wait for Grafana to be ready after restart
-  ansible.builtin.uri:
-    url: "http://localhost:{{ port_grafana }}/api/health"
-    status_code: 200
-  register: grafana_health
-  retries: 12
-  delay: 5
-  until: grafana_health.status == 200
+- name: Ensure sqlite3 CLI is installed
+  ansible.builtin.apt:
+    name: sqlite3
+    state: present
 
 - name: Read node-exporter-full UID from disk
   ansible.builtin.slurp:
@@ -191,6 +188,47 @@
 - name: Set node-exporter-full UID fact
   ansible.builtin.set_fact:
     nef_uid: "{{ (nef_raw.content | b64decode | from_json).uid }}"
+
+- name: Stop Grafana for SQLite maintenance
+  systemd:
+    name: grafana-server
+    state: stopped
+
+- name: Remove provisioning markers from unmanaged dashboards in Grafana DB
+  ansible.builtin.command:
+    argv:
+      - sqlite3
+      - /var/lib/grafana/grafana.db
+      - >-
+        DELETE FROM dashboard_provisioning
+        WHERE dashboard_id IN (
+          SELECT id FROM dashboard
+          WHERE uid NOT IN (
+            'lwa-blackbox-probes',
+            'lwa-k3s-cluster',
+            'lwa-reolink-nvr',
+            'lwa-snmp-interfaces',
+            'lwa-tmobile-gateway',
+            '{{ nef_uid }}'
+          )
+        );
+  changed_when: true
+
+- name: Start Grafana after SQLite maintenance
+  systemd:
+    name: grafana-server
+    state: started
+
+# ── API purge: delete any remaining unmanaged dashboards ─────────────────
+
+- name: Wait for Grafana to be ready
+  ansible.builtin.uri:
+    url: "http://localhost:{{ port_grafana }}/api/health"
+    status_code: 200
+  register: grafana_health
+  retries: 12
+  delay: 5
+  until: grafana_health.status == 200
 
 - name: Get all dashboards from Grafana
   ansible.builtin.uri:
@@ -216,31 +254,6 @@
       - lwa-reolink-nvr
       - lwa-snmp-interfaces
       - lwa-tmobile-gateway
-
-- name: Fetch full JSON for each unmanaged dashboard
-  ansible.builtin.uri:
-    url: "http://localhost:{{ port_grafana }}/api/dashboards/uid/{{ item }}"
-    user: admin
-    password: "{{ vault_grafana_password }}"
-    force_basic_auth: true
-    return_content: true
-  loop: "{{ grafana_orphan_uids }}"
-  register: grafana_orphan_details
-
-- name: Re-save each unmanaged dashboard to strip any provisioning marker
-  ansible.builtin.uri:
-    url: "http://localhost:{{ port_grafana }}/api/dashboards/db"
-    method: POST
-    user: admin
-    password: "{{ vault_grafana_password }}"
-    force_basic_auth: true
-    body_format: json
-    body:
-      dashboard: "{{ item.json.dashboard }}"
-      folderUid: "{{ item.json.meta.folderUid | default('') }}"
-      overwrite: true
-    status_code: [200]
-  loop: "{{ grafana_orphan_details.results }}"
 
 - name: Delete each unmanaged dashboard
   ansible.builtin.uri:
