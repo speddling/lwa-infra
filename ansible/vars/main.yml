@@ -91,6 +91,8 @@ vault_share_name:    "vault"
 vault_share_path:    "/mnt/ssd-b/vault"
 studio_share_name:   "studio-archive"
 studio_share_path:   "/mnt/lab-backups/studio-archive"
+music_share_name:    "music-library"
+music_share_path:    "/mnt/hdd-c/music-library"
 # Passwords: vault_samba_password, vault_james_password (see vault.yml)
 
 # -----------------------------------------------------------------------------

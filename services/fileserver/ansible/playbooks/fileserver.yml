@@ -74,6 +74,14 @@
       ansible.builtin.shell: smbpasswd -e {{ james_user }}
       changed_when: false
 
+    - name: Create music library share directory (top-level only — no recursive chown)
+      ansible.builtin.file:
+        path: "{{ music_share_path }}"
+        state: directory
+        mode: "0775"
+        owner: "{{ james_user }}"
+        group: "{{ james_user }}"
+
     - name: Write smb.conf
       ansible.builtin.template:
         src: ../templates/smb.conf.j2

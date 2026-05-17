@@ -30,3 +30,13 @@
    create mask = 0660
    directory mask = 0770
    force user = {{ james_user }}
+
+[{{ music_share_name }}]
+   comment = Music Library — Navidrome source / metadata editing
+   path = {{ music_share_path }}
+   browseable = yes
+   read only = no
+   valid users = {{ james_user }}
+   create mask = 0664
+   directory mask = 0775
+   force user = {{ james_user }}
