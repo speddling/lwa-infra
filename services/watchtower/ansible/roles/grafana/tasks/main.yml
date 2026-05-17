@@ -164,10 +164,15 @@
     state: restarted
 
 # ── Purge unmanaged dashboards via Grafana API ───────────────────────────
-# File-based cleanup removes JSON files, but dashboards already in Grafana's
-# SQLite database (manually imported, UI-created, or orphaned after a UID
-# change) survive file removal and can't be deleted from the UI once they
-# lose their provisioning link. Use the API to enforce the whitelist.
+# File-based cleanup removes JSON files, but dashboards in Grafana's SQLite
+# DB (manually imported, UI-created, or orphaned after a UID change) survive
+# file removal. Grafana's DELETE API returns 400 "provisioned dashboard
+# cannot be deleted" for any dashboard still flagged as provisioned in the
+# DB — even with disableDeletion: false (that flag only affects the UI).
+#
+# Fix: GET full JSON → POST back via save endpoint with overwrite:true
+# (strips the provisioning record from dashboard_provisioning table) →
+# DELETE now succeeds since the provisioning marker is gone.
 
 - name: Wait for Grafana to be ready after restart
   ansible.builtin.uri:
@@ -196,18 +201,14 @@
     return_content: true
   register: all_grafana_dashboards
 
-- name: Delete any dashboard not in the managed UID whitelist
-  ansible.builtin.uri:
-    url: "http://localhost:{{ port_grafana }}/api/dashboards/uid/{{ item.uid }}"
-    method: DELETE
-    user: admin
-    password: "{{ vault_grafana_password }}"
-    force_basic_auth: true
-    status_code: [200, 404]
-  loop: "{{ all_grafana_dashboards.json }}"
-  when:
-    - item.uid is defined
-    - item.uid not in (managed_dashboard_uids + [nef_uid])
+- name: Build list of unmanaged dashboard UIDs to purge
+  ansible.builtin.set_fact:
+    grafana_orphan_uids: >-
+      {{ all_grafana_dashboards.json
+         | selectattr('uid', 'defined')
+         | rejectattr('uid', 'in', managed_dashboard_uids + [nef_uid])
+         | map(attribute='uid')
+         | list }}
   vars:
     managed_dashboard_uids:
       - lwa-blackbox-probes
@@ -215,3 +216,38 @@
       - lwa-reolink-nvr
       - lwa-snmp-interfaces
       - lwa-tmobile-gateway
+
+- name: Fetch full JSON for each unmanaged dashboard
+  ansible.builtin.uri:
+    url: "http://localhost:{{ port_grafana }}/api/dashboards/uid/{{ item }}"
+    user: admin
+    password: "{{ vault_grafana_password }}"
+    force_basic_auth: true
+    return_content: true
+  loop: "{{ grafana_orphan_uids }}"
+  register: grafana_orphan_details
+
+- name: Re-save each unmanaged dashboard to strip any provisioning marker
+  ansible.builtin.uri:
+    url: "http://localhost:{{ port_grafana }}/api/dashboards/db"
+    method: POST
+    user: admin
+    password: "{{ vault_grafana_password }}"
+    force_basic_auth: true
+    body_format: json
+    body:
+      dashboard: "{{ item.json.dashboard }}"
+      folderUid: "{{ item.json.meta.folderUid | default('') }}"
+      overwrite: true
+    status_code: [200]
+  loop: "{{ grafana_orphan_details.results }}"
+
+- name: Delete each unmanaged dashboard
+  ansible.builtin.uri:
+    url: "http://localhost:{{ port_grafana }}/api/dashboards/uid/{{ item }}"
+    method: DELETE
+    user: admin
+    password: "{{ vault_grafana_password }}"
+    force_basic_auth: true
+    status_code: [200, 404]
+  loop: "{{ grafana_orphan_uids }}"
