@@ -1,5 +1,5 @@
 # Little Wolf Acres — Homelab Current State
-> Last updated: 2026-05-15 · Authored on apex · All IaC in `speddling/homelab` repo
+> Last updated: 2026-05-17 · Authored on apex · All IaC in `speddling/homelab` repo
 
 ---
 
@@ -208,7 +208,7 @@ Primary k3s worker node and household services platform. Hosts all Kubernetes wo
 
 | Name | Status | Description |
 |---|---|---|
-| Synapse | ✅ Active | MCP/AI tooling namespace. Claude's interface to the homelab. See `docs/synapse.md` |
+| Synapse | ✅ Active | MCP/AI tooling namespace. Claude's interface to the homelab. See `docs/Claude MCPs.md` |
 | Obelisk | Reserved | Client workspace on `/mnt/ssd-b` — isolated environment, future build |
 | Rommie | Reserved | Local LLM workspace — pending GPU hardware. *"Ship made flesh"* |
 
@@ -217,11 +217,19 @@ Primary k3s worker node and household services platform. Hosts all Kubernetes wo
 | Service | Role | Status |
 |---|---|---|
 | k3s | Kubernetes (single-node cluster) | ✅ Running |
-| Navidrome | Music streaming server | ✅ Running |
-| Samba | File share — passwords vaulted via ansible-vault | ✅ Running |
+| Navidrome | Music streaming — `navidrome.littlewolfacres.com` | ✅ Running |
+| Samba | File shares (vault, studio-archive, music-library) — passwords vaulted | ✅ Running |
 | node_exporter | Host metrics → Prometheus on Watchtower | ✅ Running |
 | Synapse | MCP server — AI tooling namespace | ✅ Running |
 | hdd-d mirror | Nightly rsync from hdd-c → hdd-d via systemd timer at 02:00 | ✅ Running |
+
+### Samba Shares
+
+| Share | Path | User | Access |
+|---|---|---|---|
+| `vault` | `/mnt/ssd-b/vault` | `vault` | Family backup share |
+| `studio-archive` | `/mnt/lab-backups/studio-archive` | `james` | DAW project storage |
+| `music-library` | `/mnt/hdd-c/music-library` | `james` | Navidrome source — metadata editing from Studio |
 
 ### SSH Access
 
@@ -280,9 +288,22 @@ Primary k3s worker node and household services platform. Hosts all Kubernetes wo
 | Spec     | Detail                                                       |
 | -------- | ------------------------------------------------------------ |
 | Machine  | Dell Precision                                               |
+| OS       | Ubuntu Studio (KDE)                                          |
 | Hostname | `studio`                                                     |
 | IP       | 192.168.0.109 (DHCP MAC-bound)                               |
 | Role     | Personal DAW — Reaper with M-Audio Air 192\|14. Secondary SSH access to monolith. |
+
+### Mounts
+
+| Mount | Source | Type | Notes |
+|---|---|---|---|
+| `/music-library` | `//monolith/music-library` | CIFS (Samba) | Manual setup — not managed by Ansible. See runbook. |
+
+### Notes
+
+- Studio is **not IaC-managed** — no Ansible runner, no GitHub Actions pipeline
+- SSH access to Monolith only; Monolith cannot reach Studio
+- `/music-library` automounts on first access via `x-systemd.automount` — persists across reboots via `/etc/fstab`
 
 ---
 
@@ -291,7 +312,7 @@ Primary k3s worker node and household services platform. Hosts all Kubernetes wo
 All changes go through a branch → PR → merge to main flow.
 Direct pushes to main are disabled via branch protection.
 
-Claude handles the full workflow via Scribe (see `docs/scribe.md`). Human action required only at PR review and merge.
+Claude handles the full workflow via Scribe (see `docs/Claude MCPs.md`). Human action required only at PR review and merge.
 
 ```bash
 # Start new work
