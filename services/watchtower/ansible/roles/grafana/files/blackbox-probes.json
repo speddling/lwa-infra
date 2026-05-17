@@ -1,0 +1,110 @@
+{
+  "annotations": { "list": [] },
+  "description": "HTTP and ICMP probe results from Blackbox Exporter — uptime, latency, HTTP status.",
+  "editable": true,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "id": 100,
+      "title": "HTTP Probes",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [{ "options": { "0": { "color": "red", "text": "DOWN" }, "1": { "color": "green", "text": "UP" } }, "type": "value" }],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "green", "value": 1 }] },
+          "color": { "mode": "thresholds" }, "noValue": "No Data"
+        }
+      },
+      "gridPos": { "h": 4, "w": 12, "x": 0, "y": 1 },
+      "id": 1,
+      "options": { "colorMode": "background", "graphMode": "none", "justifyMode": "auto", "orientation": "horizontal", "reduceOptions": { "calcs": ["lastNotNull"] }, "textMode": "value_and_name" },
+      "targets": [{ "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" }, "expr": "probe_success{job=\"blackbox-http\"}", "legendFormat": "{{ instance }}", "refId": "A" }],
+      "title": "HTTP — Up/Down",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": { "defaults": { "unit": "none", "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "green", "value": 200 }] }, "color": { "mode": "thresholds" } } },
+      "gridPos": { "h": 4, "w": 12, "x": 12, "y": 1 },
+      "id": 2,
+      "options": { "colorMode": "none", "graphMode": "none", "justifyMode": "auto", "orientation": "horizontal", "reduceOptions": { "calcs": ["lastNotNull"] }, "textMode": "value_and_name" },
+      "targets": [{ "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" }, "expr": "probe_http_status_code{job=\"blackbox-http\"}", "legendFormat": "{{ instance }}", "refId": "A" }],
+      "title": "HTTP — Status Code",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": { "defaults": { "unit": "s", "color": { "mode": "palette-classic" }, "custom": { "lineWidth": 1, "fillOpacity": 10 } } },
+      "gridPos": { "h": 7, "w": 24, "x": 0, "y": 5 },
+      "id": 3,
+      "targets": [{ "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" }, "expr": "probe_duration_seconds{job=\"blackbox-http\"}", "legendFormat": "{{ instance }}", "refId": "A" }],
+      "title": "HTTP — Probe Duration",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 12 },
+      "id": 101,
+      "title": "ICMP Probes",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [{ "options": { "0": { "color": "red", "text": "DOWN" }, "1": { "color": "green", "text": "UP" } }, "type": "value" }],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "green", "value": 1 }] },
+          "color": { "mode": "thresholds" }, "noValue": "No Data"
+        }
+      },
+      "gridPos": { "h": 4, "w": 12, "x": 0, "y": 13 },
+      "id": 4,
+      "options": { "colorMode": "background", "graphMode": "none", "justifyMode": "auto", "orientation": "horizontal", "reduceOptions": { "calcs": ["lastNotNull"] }, "textMode": "value_and_name" },
+      "targets": [{ "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" }, "expr": "probe_success{job=\"blackbox-icmp\"}", "legendFormat": "{{ instance }}", "refId": "A" }],
+      "title": "ICMP — Up/Down",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": { "defaults": { "unit": "s", "color": { "mode": "palette-classic" }, "custom": { "lineWidth": 1, "fillOpacity": 10 } } },
+      "gridPos": { "h": 7, "w": 24, "x": 0, "y": 17 },
+      "id": 5,
+      "targets": [{ "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" }, "expr": "probe_duration_seconds{job=\"blackbox-icmp\"}", "legendFormat": "{{ instance }}", "refId": "A" }],
+      "title": "ICMP — Round-trip Latency",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 24 },
+      "id": 102,
+      "title": "History",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "custom": { "lineWidth": 1, "fillOpacity": 10 }, "min": 0, "max": 1 } },
+      "gridPos": { "h": 7, "w": 24, "x": 0, "y": 25 },
+      "id": 6,
+      "targets": [{ "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" }, "expr": "probe_success", "legendFormat": "{{ job }} — {{ instance }}", "refId": "A" }],
+      "title": "All Probes — Success History",
+      "type": "timeseries"
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 38,
+  "tags": ["blackbox", "probes", "homelab"],
+  "templating": { "list": [] },
+  "time": { "from": "now-6h", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Blackbox Probes",
+  "uid": "lwa-blackbox-probes",
+  "version": 1
+}

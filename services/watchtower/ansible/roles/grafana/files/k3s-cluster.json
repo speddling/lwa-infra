@@ -1,0 +1,142 @@
+{
+  "annotations": { "list": [] },
+  "description": "k3s cluster state from kube-state-metrics — pod health, deployment status, PVCs.",
+  "editable": true,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "id": 100,
+      "title": "Cluster Overview",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] }, "noValue": "0" } },
+      "gridPos": { "h": 4, "w": 4, "x": 0, "y": 1 },
+      "id": 1,
+      "options": { "colorMode": "none", "graphMode": "none", "justifyMode": "center", "reduceOptions": { "calcs": ["lastNotNull"] }, "textMode": "auto" },
+      "targets": [{ "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" }, "expr": "count(kube_pod_info{job=\"kube-state-metrics\"})", "legendFormat": "Pods", "refId": "A" }],
+      "title": "Total Pods",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 1 }] }, "noValue": "0" } },
+      "gridPos": { "h": 4, "w": 4, "x": 4, "y": 1 },
+      "id": 2,
+      "options": { "colorMode": "background", "graphMode": "none", "justifyMode": "center", "reduceOptions": { "calcs": ["lastNotNull"] }, "textMode": "auto" },
+      "targets": [{ "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" }, "expr": "count(kube_pod_status_phase{job=\"kube-state-metrics\", phase!=\"Running\", phase!=\"Succeeded\"}) or vector(0)", "legendFormat": "Not Running", "refId": "A" }],
+      "title": "Pods Not Running",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] }, "noValue": "0" } },
+      "gridPos": { "h": 4, "w": 4, "x": 8, "y": 1 },
+      "id": 3,
+      "options": { "colorMode": "none", "graphMode": "none", "justifyMode": "center", "reduceOptions": { "calcs": ["lastNotNull"] }, "textMode": "auto" },
+      "targets": [{ "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" }, "expr": "count(kube_deployment_status_replicas_available{job=\"kube-state-metrics\"})", "legendFormat": "Deployments", "refId": "A" }],
+      "title": "Deployments",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 1 }] }, "noValue": "0" } },
+      "gridPos": { "h": 4, "w": 4, "x": 12, "y": 1 },
+      "id": 4,
+      "options": { "colorMode": "background", "graphMode": "none", "justifyMode": "center", "reduceOptions": { "calcs": ["lastNotNull"] }, "textMode": "auto" },
+      "targets": [{ "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" }, "expr": "count(kube_persistentvolumeclaim_status_phase{job=\"kube-state-metrics\", phase!=\"Bound\"}) or vector(0)", "legendFormat": "Unbound PVCs", "refId": "A" }],
+      "title": "Unbound PVCs",
+      "type": "stat"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 5 },
+      "id": 101,
+      "title": "Pod Status",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] } } },
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 6 },
+      "id": 5,
+      "options": { "displayMode": "table", "orientation": "horizontal", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "/.*/", "values": true } },
+      "targets": [{ "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" }, "expr": "kube_pod_status_phase{job=\"kube-state-metrics\"} == 1", "legendFormat": "{{ namespace }}/{{ pod }}", "refId": "A", "instant": true, "format": "table" }],
+      "title": "Pod Phases",
+      "type": "table"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 16 },
+      "id": 102,
+      "title": "Deployments",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" }, "custom": { "lineWidth": 1, "fillOpacity": 10 }, "min": 0 } },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 17 },
+      "id": 6,
+      "targets": [
+        { "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" }, "expr": "kube_deployment_status_replicas_available{job=\"kube-state-metrics\"}", "legendFormat": "{{ namespace }}/{{ deployment }} available", "refId": "A" },
+        { "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" }, "expr": "kube_deployment_spec_replicas{job=\"kube-state-metrics\"}", "legendFormat": "{{ namespace }}/{{ deployment }} desired", "refId": "B" }
+      ],
+      "title": "Deployment Replicas — Available vs Desired",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [{ "options": { "0": { "color": "red", "text": "Degraded" }, "1": { "color": "green", "text": "Healthy" } }, "type": "value" }],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "green", "value": 1 }] },
+          "color": { "mode": "thresholds" }
+        }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 17 },
+      "id": 7,
+      "options": { "colorMode": "background", "graphMode": "none", "justifyMode": "auto", "orientation": "horizontal", "reduceOptions": { "calcs": ["lastNotNull"] }, "textMode": "value_and_name" },
+      "targets": [{ "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" }, "expr": "kube_deployment_status_replicas_available{job=\"kube-state-metrics\"} == kube_deployment_spec_replicas{job=\"kube-state-metrics\"}", "legendFormat": "{{ namespace }}/{{ deployment }}", "refId": "A" }],
+      "title": "Deployment Health",
+      "type": "stat"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 25 },
+      "id": 103,
+      "title": "Storage",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [{ "options": { "Bound": { "color": "green" }, "Pending": { "color": "yellow" }, "Lost": { "color": "red" } }, "type": "value" }],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] },
+          "color": { "mode": "thresholds" }
+        }
+      },
+      "gridPos": { "h": 5, "w": 24, "x": 0, "y": 26 },
+      "id": 8,
+      "options": { "colorMode": "background", "graphMode": "none", "justifyMode": "auto", "orientation": "horizontal", "reduceOptions": { "calcs": ["lastNotNull"] }, "textMode": "value_and_name" },
+      "targets": [{ "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" }, "expr": "kube_persistentvolumeclaim_status_phase{job=\"kube-state-metrics\"} == 1", "legendFormat": "{{ namespace }}/{{ persistentvolumeclaim }}", "refId": "A" }],
+      "title": "PVC Status",
+      "type": "stat"
+    }
+  ],
+  "refresh": "1m",
+  "schemaVersion": 38,
+  "tags": ["k3s", "kubernetes", "homelab"],
+  "templating": { "list": [] },
+  "time": { "from": "now-1h", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "k3s Cluster",
+  "uid": "lwa-k3s-cluster",
+  "version": 1
+}
