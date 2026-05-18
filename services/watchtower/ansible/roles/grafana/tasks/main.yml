@@ -158,28 +158,18 @@
     enabled: yes
     state: started
 
-# Flush pending handlers so Grafana restarts with all provisioning changes
-# applied before we stop it for SQLite maintenance.
+# Flush pending handlers so Grafana has the latest provisioning before
+# we stop it for SQLite maintenance.
 - name: Flush handlers to apply any pending Grafana restart
   ansible.builtin.meta: flush_handlers
 
-# ── SQLite maintenance: delete unmanaged dashboards from the DB ───────────
-# Removing only dashboard_provisioning rows in the previous attempt was not
-# enough — Grafana re-inserts them on startup, which means the orphan JSON
-# files are still being found by the provisioner somewhere on disk.
-#
-# Deleting the dashboard rows themselves is definitive: the provisioner has
-# nothing to re-attach to. Managed dashboards are re-created from their
-# files on the next startup; orphans don't come back.
-#
-# Order matters: clear dashboard_provisioning first (FK side), then delete
-# the dashboard rows. SQLite FK enforcement is off by default so this won't
-# cascade automatically — we handle both tables explicitly.
-
-- name: Ensure sqlite3 CLI is installed
-  ansible.builtin.apt:
-    name: sqlite3
-    state: present
+# ── SQLite maintenance ────────────────────────────────────────────────────
+# Previous attempts with sqlite3 CLI deleted 0 rows — either the schema
+# differs from what we expected, or Grafana is re-inserting from files.
+# Using Python to get full visibility: lists every provisioning file and
+# its UID, deletes any file with an orphan UID, prints the full dashboard
+# table, then deletes unmanaged rows. Output is visible in the deploy log
+# so we can see exactly what's happening.
 
 - name: Read node-exporter-full UID from disk
   ansible.builtin.slurp:
@@ -195,32 +185,84 @@
     name: grafana-server
     state: stopped
 
-- name: Clear dashboard_provisioning rows for unmanaged dashboards
-  ansible.builtin.shell: >-
-    sqlite3 /var/lib/grafana/grafana.db
-    "DELETE FROM dashboard_provisioning WHERE dashboard_id IN
-    (SELECT id FROM dashboard WHERE is_folder=0 AND uid NOT IN
-    ('lwa-blackbox-probes','lwa-k3s-cluster','lwa-reolink-nvr',
-    'lwa-snmp-interfaces','lwa-tmobile-gateway','{{ nef_uid }}'));"
+- name: Purge unmanaged dashboards — inspect files and DB, delete orphans
+  ansible.builtin.shell:
+    executable: /bin/bash
+    cmd: |
+      python3 << 'PYEOF'
+      import json, os, glob, sqlite3, sys
+
+      MANAGED_UIDS = {
+          'lwa-blackbox-probes', 'lwa-k3s-cluster', 'lwa-reolink-nvr',
+          'lwa-snmp-interfaces', 'lwa-tmobile-gateway',
+          '{{ nef_uid }}'
+      }
+
+      print("=== Provisioning directory files ===")
+      for f in sorted(glob.glob('/var/lib/grafana/dashboards/*.json')):
+          try:
+              data = json.load(open(f))
+              uid = data.get('uid', 'NO_UID')
+              if uid in MANAGED_UIDS:
+                  print(f"  MANAGED : {os.path.basename(f)}  uid={uid}")
+              else:
+                  print(f"  ORPHAN  : {os.path.basename(f)}  uid={uid}  -> DELETING FILE")
+                  os.remove(f)
+          except Exception as e:
+              print(f"  ERROR   : {f}: {e}")
+
+      print("")
+      print("=== Dashboard table (before cleanup) ===")
+      conn = sqlite3.connect('/var/lib/grafana/grafana.db')
+      c = conn.cursor()
+
+      try:
+          c.execute("SELECT id, uid, title, is_folder FROM dashboard ORDER BY is_folder, title")
+      except sqlite3.OperationalError as e:
+          print(f"  ERROR querying dashboard table: {e}")
+          print("  Trying without is_folder column...")
+          c.execute("SELECT id, uid, title FROM dashboard ORDER BY title")
+          rows = [(id_, uid, title, None) for id_, uid, title in c.fetchall()]
+      else:
+          rows = c.fetchall()
+
+      to_delete = []
+      for id_, uid, title, is_folder in rows:
+          ftype = 'FOLDER' if is_folder else 'DASH '
+          managed = 'managed' if uid in MANAGED_UIDS else 'ORPHAN'
+          print(f"  {ftype} [{managed}] uid={uid!r:45s} title={title!r}")
+          if managed == 'ORPHAN' and not is_folder:
+              to_delete.append((id_, uid, title))
+
+      print("")
+      print("=== Deleting unmanaged dashboards from DB ===")
+      if not to_delete:
+          print("  Nothing to delete")
+      for id_, uid, title in to_delete:
+          print(f"  Deleting: id={id_}  uid={uid}  title={title}")
+          c.execute("DELETE FROM dashboard_provisioning WHERE dashboard_id=?", (id_,))
+          print(f"    dashboard_provisioning rows removed: {conn.total_changes}")
+          prev = conn.total_changes
+          c.execute("DELETE FROM dashboard WHERE id=?", (id_,))
+          print(f"    dashboard rows removed: {conn.total_changes - prev}")
+
+      conn.commit()
+      print(f"\nTotal deleted: {len(to_delete)} dashboard(s)")
+      conn.close()
+      PYEOF
+  register: sqlite_purge
   changed_when: true
 
-- name: Delete unmanaged dashboard rows from Grafana DB
-  ansible.builtin.shell: >-
-    sqlite3 /var/lib/grafana/grafana.db
-    "DELETE FROM dashboard WHERE is_folder=0 AND uid NOT IN
-    ('lwa-blackbox-probes','lwa-k3s-cluster','lwa-reolink-nvr',
-    'lwa-snmp-interfaces','lwa-tmobile-gateway','{{ nef_uid }}');"
-  changed_when: true
+- name: Show SQLite purge output
+  ansible.builtin.debug:
+    var: sqlite_purge.stdout_lines
 
 - name: Start Grafana after SQLite maintenance
   systemd:
     name: grafana-server
     state: started
 
-# ── API purge: safety net for any non-provisioned orphans ─────────────────
-# Dashboards deleted from the SQLite DB above won't appear here. This step
-# catches any remaining unmanaged dashboards that survived without a
-# provisioning marker (plain UI imports that don't hit the 400/500 error).
+# ── API purge: safety net for non-provisioned orphans ────────────────────
 
 - name: Wait for Grafana to be ready
   ansible.builtin.uri:
@@ -256,7 +298,7 @@
       - lwa-snmp-interfaces
       - lwa-tmobile-gateway
 
-- name: Delete each unmanaged dashboard
+- name: Delete each unmanaged dashboard (API)
   ansible.builtin.uri:
     url: "http://localhost:{{ port_grafana }}/api/dashboards/uid/{{ item }}"
     method: DELETE
