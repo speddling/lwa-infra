@@ -204,7 +204,7 @@
     name: grafana-server
     state: stopped
 
-- name: Inspect all SQLite files and purge unmanaged dashboard records
+- name: Purge unmanaged dashboards from unified storage
   ansible.builtin.shell:
     executable: /bin/bash
     cmd: |
@@ -217,64 +217,36 @@
           '{{ nef_uid }}'
       }
 
-      # 1. List all SQLite files
-      print("=== SQLite files in /var/lib/grafana/ ===")
-      db_files = sorted(glob.glob('/var/lib/grafana/*.db'))
-      for f in db_files:
-          print(f"  {f}  ({os.path.getsize(f):,} bytes)")
+      conn = sqlite3.connect('/var/lib/grafana/grafana.db')
+      c = conn.cursor()
 
-      # 2. Inspect every DB file
-      for db_path in db_files:
-          print(f"\n=== {db_path} ===")
-          conn = sqlite3.connect(db_path)
-          c = conn.cursor()
-          c.execute("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
-          tables = [r[0] for r in c.fetchall()]
-          print(f"  tables: {tables}")
+      # Show all dashboard rows currently in unified storage
+      print("=== resource table: dashboard.grafana.app/dashboards ===")
+      c.execute("""
+          SELECT name FROM resource
+          WHERE \"group\" = 'dashboard.grafana.app'
+          AND resource = 'dashboards'
+          ORDER BY name
+      """)
+      rows = c.fetchall()
+      for (name,) in rows:
+          tag = 'managed' if name in MANAGED_UIDS else 'ORPHAN'
+          print(f"  [{tag}] {name}")
 
-          for table in tables:
-              c.execute(f"SELECT COUNT(*) FROM {table}")
-              count = c.fetchone()[0]
-              if count == 0:
-                  continue
-              c.execute(f"PRAGMA table_info({table})")
-              cols = [r[1] for r in c.fetchall()]
-              print(f"  {table}: {count} rows  columns={cols}")
-              if any(kw in table.lower() for kw in ('dashboard', 'resource', 'entity')):
-                  c.execute(f"SELECT * FROM {table} LIMIT 30")
-                  for row in c.fetchall():
-                      print(f"    {row[:6]}")
+      # Delete ALL dashboard rows — managed ones re-provisioned from files,
+      # orphans won't come back because their files are gone.
+      # Scoped strictly to group+resource so folders/advisor/etc are untouched.
+      c.execute("""
+          DELETE FROM resource
+          WHERE \"group\" = 'dashboard.grafana.app'
+          AND resource = 'dashboards'
+      """)
+      print(f"\nDeleted {conn.total_changes} rows from resource table")
+      print("Managed dashboards will be re-provisioned from files on Grafana startup.")
+      print("Orphans won't come back — no files exist for them.")
 
-          # delete from legacy dashboard table
-          if 'dashboard' in tables:
-              c.execute("SELECT id, uid, title FROM dashboard ORDER BY title")
-              for id_, uid, title in c.fetchall():
-                  if uid not in MANAGED_UIDS:
-                      print(f"  DELETING from dashboard: uid={uid!r} title={title!r}")
-                      c.execute("DELETE FROM dashboard_provisioning WHERE dashboard_id=?", (id_,))
-                      c.execute("DELETE FROM dashboard WHERE id=?", (id_,))
-
-          # delete from unified storage resource table (Grafana 11+)
-          if 'resource' in tables:
-              c.execute("PRAGMA table_info(resource)")
-              cols = [r[1] for r in c.fetchall()]
-              name_col = next((col for col in cols if col in ('name', 'uid', 'key')), None)
-              if name_col:
-                  c.execute(f"SELECT {name_col} FROM resource")
-                  for (val,) in c.fetchall():
-                      if val not in MANAGED_UIDS:
-                          print(f"  DELETING from resource: {name_col}={val!r}")
-                          c.execute(f"DELETE FROM resource WHERE {name_col}=?", (val,))
-
-          conn.commit()
-          conn.close()
-
-      # 3. Dump all provisioner YAML files (no yaml module needed)
-      print("\n=== /etc/grafana/provisioning/dashboards/ ===")
-      for f in sorted(glob.glob('/etc/grafana/provisioning/dashboards/*')):
-          print(f"  {f}")
-          if f.endswith(('.yml', '.yaml')):
-              print(open(f).read())
+      conn.commit()
+      conn.close()
       PYEOF
   register: db_inspect
   changed_when: true
