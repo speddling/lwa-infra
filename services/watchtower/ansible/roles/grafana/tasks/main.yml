@@ -209,100 +209,72 @@
     executable: /bin/bash
     cmd: |
       python3 << 'PYEOF'
-      import json, os, glob, sqlite3, sys
+      import json, os, glob, sqlite3
 
       MANAGED_UIDS = {
           'lwa-blackbox-probes', 'lwa-k3s-cluster', 'lwa-reolink-nvr',
           'lwa-snmp-interfaces', 'lwa-tmobile-gateway',
           '{{ nef_uid }}'
       }
-      ORPHAN_UIDS = {'c179cb7c-3f18-443b-94ea-575d15d2cee8', 'xtkCtBkiz'}
 
-      # ── 1. List all SQLite files ──────────────────────────────────────
+      # 1. List all SQLite files
       print("=== SQLite files in /var/lib/grafana/ ===")
-      db_files = glob.glob('/var/lib/grafana/*.db')
-      for f in sorted(db_files):
-          size = os.path.getsize(f)
-          print(f"  {f}  ({size:,} bytes)")
+      db_files = sorted(glob.glob('/var/lib/grafana/*.db'))
+      for f in db_files:
+          print(f"  {f}  ({os.path.getsize(f):,} bytes)")
 
-      # ── 2. Inspect every DB file ──────────────────────────────────────
-      for db_path in sorted(db_files):
-          print(f"\n=== Tables in {db_path} ===")
+      # 2. Inspect every DB file
+      for db_path in db_files:
+          print(f"\n=== {db_path} ===")
           conn = sqlite3.connect(db_path)
           c = conn.cursor()
           c.execute("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
-          tables = [row[0] for row in c.fetchall()]
-          print(f"  {tables}")
+          tables = [r[0] for r in c.fetchall()]
+          print(f"  tables: {tables}")
 
-          # legacy storage
+          for table in tables:
+              c.execute(f"SELECT COUNT(*) FROM {table}")
+              count = c.fetchone()[0]
+              if count == 0:
+                  continue
+              c.execute(f"PRAGMA table_info({table})")
+              cols = [r[1] for r in c.fetchall()]
+              print(f"  {table}: {count} rows  columns={cols}")
+              if any(kw in table.lower() for kw in ('dashboard', 'resource', 'entity')):
+                  c.execute(f"SELECT * FROM {table} LIMIT 30")
+                  for row in c.fetchall():
+                      print(f"    {row[:6]}")
+
+          # delete from legacy dashboard table
           if 'dashboard' in tables:
-              c.execute("SELECT COUNT(*) FROM dashboard")
-              count = c.fetchone()[0]
-              print(f"  dashboard table: {count} rows")
-              if count > 0:
-                  c.execute("SELECT id, uid, title FROM dashboard ORDER BY title")
-                  for id_, uid, title in c.fetchall():
-                      tag = 'MANAGED' if uid in MANAGED_UIDS else 'ORPHAN'
-                      print(f"    [{tag}] uid={uid!r}  title={title!r}")
-                      if tag == 'ORPHAN':
-                          c.execute("DELETE FROM dashboard_provisioning WHERE dashboard_id=?", (id_,))
-                          c.execute("DELETE FROM dashboard WHERE id=?", (id_,))
-                          print(f"      -> DELETED")
-                  conn.commit()
+              c.execute("SELECT id, uid, title FROM dashboard ORDER BY title")
+              for id_, uid, title in c.fetchall():
+                  if uid not in MANAGED_UIDS:
+                      print(f"  DELETING from dashboard: uid={uid!r} title={title!r}")
+                      c.execute("DELETE FROM dashboard_provisioning WHERE dashboard_id=?", (id_,))
+                      c.execute("DELETE FROM dashboard WHERE id=?", (id_,))
 
-          # unified storage (Grafana 11+)
+          # delete from unified storage resource table (Grafana 11+)
           if 'resource' in tables:
-              c.execute("SELECT COUNT(*) FROM resource")
-              count = c.fetchone()[0]
-              print(f"  resource table: {count} rows")
-              c.execute("SELECT name, resource_group, resource, namespace FROM resource LIMIT 30")
-              for row in c.fetchall():
-                  name, rgroup, res, ns = row
-                  tag = 'MANAGED' if name in MANAGED_UIDS else ('ORPHAN' if name in ORPHAN_UIDS else 'other')
-                  print(f"    [{tag}] name={name!r}  group={rgroup!r}  resource={res!r}")
-                  if tag == 'ORPHAN':
-                      c.execute("DELETE FROM resource WHERE name=? AND resource_group=? AND resource=? AND namespace=?",
-                                (name, rgroup, res, ns))
-                      print(f"      -> DELETED")
-              conn.commit()
+              c.execute("PRAGMA table_info(resource)")
+              cols = [r[1] for r in c.fetchall()]
+              name_col = next((col for col in cols if col in ('name', 'uid', 'key')), None)
+              if name_col:
+                  c.execute(f"SELECT {name_col} FROM resource")
+                  for (val,) in c.fetchall():
+                      if val not in MANAGED_UIDS:
+                          print(f"  DELETING from resource: {name_col}={val!r}")
+                          c.execute(f"DELETE FROM resource WHERE {name_col}=?", (val,))
 
-          # entity table (another possible unified storage table)
-          if 'entity' in tables:
-              c.execute("SELECT COUNT(*) FROM entity")
-              count = c.fetchone()[0]
-              print(f"  entity table: {count} rows")
-
+          conn.commit()
           conn.close()
 
-      # ── 3. List provisioner YAMLs ─────────────────────────────────────
-      print("\n=== Dashboard provisioner configs ===")
+      # 3. Dump all provisioner YAML files (no yaml module needed)
+      print("\n=== /etc/grafana/provisioning/dashboards/ ===")
       for f in sorted(glob.glob('/etc/grafana/provisioning/dashboards/*')):
           print(f"  {f}")
-
-      # ── 4. Check for orphan UIDs in any provisioning dir ─────────────
-      print("\n=== All provisioned JSON files (all dirs) ===")
-      for yaml_file in glob.glob('/etc/grafana/provisioning/dashboards/*.yml') + \
-                        glob.glob('/etc/grafana/provisioning/dashboards/*.yaml'):
-          try:
-              import yaml
-              cfg = yaml.safe_load(open(yaml_file))
-              for provider in (cfg or {}).get('providers', []):
-                  path = provider.get('options', {}).get('path', '')
-                  if path:
-                      print(f"  Provider '{provider.get('name')}' path: {path}")
-                      for jf in glob.glob(f"{path}/*.json"):
-                          try:
-                              data = json.load(open(jf))
-                              uid = data.get('uid', 'NO_UID')
-                              tag = 'MANAGED' if uid in MANAGED_UIDS else 'ORPHAN'
-                              print(f"    [{tag}] {os.path.basename(jf)}  uid={uid}")
-                              if tag == 'ORPHAN':
-                                  os.remove(jf)
-                                  print(f"      -> FILE DELETED")
-                          except Exception as e:
-                              print(f"    ERROR: {jf}: {e}")
-          except Exception as e:
-              print(f"  ERROR reading {yaml_file}: {e}")
+          if f.endswith(('.yml', '.yaml')):
+              print(open(f).read())
       PYEOF
   register: db_inspect
   changed_when: true
