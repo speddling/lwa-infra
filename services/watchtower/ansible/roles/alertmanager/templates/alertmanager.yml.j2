@@ -25,8 +25,16 @@ receivers:
           {{ "{{" }} end {{ "}}" }}
 
 inhibit_rules:
+  # Suppress warnings when a critical fires for the same rule
   - source_matchers:
       - severity = critical
     target_matchers:
       - severity = warning
     equal: ['alertname']
+  # Suppress all Watchtower threshold alerts when Prometheus itself is down —
+  # metric-based alerts are unreliable and would otherwise fire as a cascade
+  - source_matchers:
+      - alertname = WatchtowerPrometheusDown
+    target_matchers:
+      - host = watchtower
+    equal: ['host']

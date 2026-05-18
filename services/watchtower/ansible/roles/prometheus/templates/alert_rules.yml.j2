@@ -25,12 +25,30 @@ groups:
 
       - alert: WatchtowerLowDisk
         expr: (1 - (node_filesystem_avail_bytes{instance="watchtower",mountpoint="/"} / node_filesystem_size_bytes{instance="watchtower",mountpoint="/"})) * 100 > 80
+        for: 10m
+        labels:
+          severity: warning
+          host: watchtower
+        annotations:
+          description: "Watchtower disk usage is above 80% (current: {{ "{{" }} $value | printf \"%.1f\" {{ "}}" }}%) — investigate before it climbs further"
+
+      - alert: WatchtowerCriticalDisk
+        expr: (1 - (node_filesystem_avail_bytes{instance="watchtower",mountpoint="/"} / node_filesystem_size_bytes{instance="watchtower",mountpoint="/"})) * 100 > 90
         for: 5m
         labels:
           severity: critical
           host: watchtower
         annotations:
-          description: "Watchtower disk usage is above 80% (current: {{ "{{" }} $value | printf \"%.1f\" {{ "}}" }}%)"
+          description: "Watchtower disk usage is above 90% (current: {{ "{{" }} $value | printf \"%.1f\" {{ "}}" }}%) — immediate action required"
+
+      - alert: WatchtowerPrometheusDown
+        expr: up{job="prometheus"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          host: watchtower
+        annotations:
+          description: "Prometheus on Watchtower is unreachable — all metric-based alerts are unreliable until it recovers"
 
       - alert: WatchtowerPrometheusTSDB
         expr: prometheus_tsdb_storage_blocks_bytes{job="prometheus",instance="watchtower"} > 8e9

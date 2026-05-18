@@ -18,7 +18,15 @@ allow_org_create = false
 enabled = false
 
 [unified_alerting]
-enabled = true
+# Disabled — alerting is owned by Prometheus + Alertmanager.
+# Grafana is display-only. Enabling this causes DatasourceNoData
+# state alerts to fire via the Grafana contact point, duplicating
+# and racing with the Alertmanager → Slack pipeline.
+enabled = false
+
+[alerting]
+# Legacy alerting also disabled for the same reason.
+enabled = false
 
 [log]
 mode = console
