@@ -151,22 +151,13 @@
     mode: '0644'
   notify: restart grafana
 
-- name: Deploy Grafana alerting provisioning
-  template:
-    src: alerting.yml.j2
-    dest: /etc/grafana/provisioning/alerting/sentinel.yml
-    owner: root
-    group: grafana
-    mode: '0640'
-  notify: restart grafana
-
-- name: Deploy Grafana alert rules
-  template:
-    src: alert_rules.yml.j2
-    dest: /etc/grafana/provisioning/alerting/alert_rules.yml
-    owner: root
-    group: grafana
-    mode: '0640'
+# Alerting provisioning is intentionally absent — unified alerting is disabled
+# in grafana.ini. Remove any stale alerting provisioning files left from
+# earlier configurations so Grafana doesn't attempt to load them.
+- name: Remove stale Grafana alerting provisioning files
+  ansible.builtin.file:
+    path: /etc/grafana/provisioning/alerting
+    state: absent
   notify: restart grafana
 
 - name: Enable and start Grafana
