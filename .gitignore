@@ -1,6 +1,9 @@
 .vault_pass
 homelab-dump.txt
 
+# Obsidian workspace config — local only, not part of the repo
+.obsidian/
+
 # Never commit a plaintext vault — only the ansible-vault encrypted version
 # ansible/vars/vault.yml must be encrypted before committing
 ansible/vars/vault.yml.plaintext
