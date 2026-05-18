@@ -1,6 +1,6 @@
 # Monitoring Runbook — Little Wolf Acres
 > Reference for the full observability stack: Prometheus, Grafana, Alertmanager, exporters, and the daily Slack summary.
-> Last updated: 2026-05-16
+> Last updated: 2026-05-18
 
 ---
 
@@ -75,15 +75,18 @@ or directly at `http://192.168.0.21:3001`.
 Dashboards are **provisioned from disk** — JSON files placed by Ansible into
 `/var/lib/grafana/dashboards/`. They survive Grafana restarts and re-deploys.
 Do not rely on dashboards imported manually through the UI; add them to the Grafana
-Ansible role instead (`roles/grafana/tasks/main.yml` + `roles/grafana/files/`).
+Ansible role instead (`roles/grafana/tasks/main.yml` + `roles/grafana/files/`). The
+monitoring playbook automatically purges any dashboard not in the managed UID set on
+every deploy — community dashboards imported via the UI will be removed.
 
 | Dashboard | File | Source | Purpose |
 |-----------|------|--------|---------|
-| Node Exporter Full | `node-exporter-full.json` | Grafana ID 1860 | Full host metrics for Watchtower and Monolith |
-| k3s Cluster | `k3s-cluster.json` | Grafana ID 15661 | Kubernetes cluster overview (needs kube-state-metrics) |
-| Blackbox Exporter | `blackbox-exporter.json` | Grafana ID 7587 | HTTP/ICMP probe status and duration |
-| SNMP Interfaces | `snmp-interfaces.json` | Custom | Network interface traffic, errors, status |
-| Reolink NVR | `reolink-nvr.json` | Custom | NVR/camera status and HDD usage |
+| Node Exporter Full | `node-exporter-full.json` | Community ID 1860 | Full host metrics for Watchtower and Monolith |
+| Blackbox Probes | `blackbox-exporter.json` | Custom (`lwa-blackbox-probes`) | HTTP/ICMP probe status and duration |
+| k3s Cluster | `k3s-cluster.json` | Custom (`lwa-k3s-cluster`) | Kubernetes cluster overview (needs kube-state-metrics) |
+| SNMP Interfaces | `snmp-interfaces.json` | Custom (`lwa-snmp-interfaces`) | Network interface traffic, errors, status |
+| T-Mobile 5G Gateway | `tmobile-gateway.json` | Custom (`lwa-tmobile-gateway`) | Gateway signal, band, uptime |
+| Reolink NVR | `reolink-nvr.json` | Custom (`lwa-reolink-nvr`) | NVR/camera status and HDD usage |
 
 ### Using Node Exporter Full
 
@@ -364,7 +367,7 @@ curl -s 'http://192.168.0.21:9090/api/v1/query?query=up' | python3 -m json.tool
 # Check active alerts
 curl -s http://192.168.0.21:9090/api/v1/alerts | python3 -m json.tool
 
-# Check storage size
+# Check storage size (retention limit: 10GB)
 du -sh /var/lib/prometheus
 
 # Reload config without restart (preferred — avoids data gap)

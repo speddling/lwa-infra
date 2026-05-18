@@ -1,5 +1,5 @@
 # Little Wolf Acres — Homelab Current State
-> Last updated: 2026-05-17 · Authored on apex · All IaC in `speddling/homelab` repo
+> Last updated: 2026-05-18 · Authored on apex · All IaC in `speddling/homelab` repo
 
 ---
 
@@ -88,6 +88,8 @@ Always-on DNS resolver and full-stack monitoring node. Never runs workloads. See
 | Netdata | Real-time host observability | 19999 | ✅ Running |
 | Grafana | Dashboards (display only) | 3001 | ✅ Running |
 
+> **AdGuard Home auto-update is disabled** (`disable_updates: true` in `AdGuardHome.yaml`). Version upgrades go through the Ansible role — prevents unscheduled restarts that cause ~10s DNS outages across the LAN.
+
 ### Web UIs
 
 | Service | URL |
@@ -115,13 +117,16 @@ Always-on DNS resolver and full-stack monitoring node. Never runs workloads. See
 
 ### Grafana Dashboards
 
-| Dashboard | Grafana ID |
-|---|---|
-| Node Exporter Full | 1860 |
-| AdGuard Home | 20799 |
-| Blackbox Exporter | 7587 |
-| SNMP Interface Stats | 11169 |
-| k3s Cluster | 15661 |
+| Dashboard | UID | Source |
+|---|---|---|
+| Node Exporter Full | `rYdddlPWk` | Community ID 1860 — downloaded by Ansible |
+| Blackbox Probes | `lwa-blackbox-probes` | Custom — `roles/grafana/files/blackbox-probes.json` |
+| k3s Cluster | `lwa-k3s-cluster` | Custom — `roles/grafana/files/k3s-cluster.json` |
+| SNMP Interfaces | `lwa-snmp-interfaces` | Custom — `roles/grafana/files/snmp-interfaces.json` |
+| T-Mobile 5G Gateway | `lwa-tmobile-gateway` | Custom — `roles/grafana/files/tmobile-gateway.json` |
+| Reolink NVR | `lwa-reolink-nvr` | Custom — `roles/grafana/files/reolink-nvr.json` |
+
+All dashboards are provisioned from disk by Ansible. Do not import community dashboards via the Grafana UI — add them to the Ansible role instead. The monitoring playbook automatically purges any dashboard not in the managed UID set.
 
 ### Alerting
 
@@ -142,6 +147,7 @@ Alerting is owned by **Prometheus + Alertmanager**. Grafana is display-only.
 | WatchtowerHighCPU | > 85% sustained 5m | watchtower |
 | WatchtowerHighMemory | > 85% sustained 5m | watchtower |
 | WatchtowerLowDisk | > 80% used | watchtower |
+| WatchtowerPrometheusTSDB | TSDB blocks > 8GB (80% of 10GB retention limit) | watchtower |
 | WatchtowerNodeExporterDown | Scrape fails > 1m | watchtower |
 | DailySummary | Always firing — canary for pipeline health | all |
 
