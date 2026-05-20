@@ -269,7 +269,7 @@ Primary k3s worker node and household services platform. Hosts all Kubernetes wo
 | 9100 | TCP | node_exporter | watchtower |
 | 30800 | TCP | Synapse MCP server | apex only |
 | 30880 | TCP | ArgoCD NodePort fallback | LAN |
-| 30882 | TCP | ArgoCD app-controller metrics | watchtower |
+| 30885 | TCP | ArgoCD app-controller metrics | watchtower |
 | 30883 | TCP | ArgoCD server metrics | watchtower |
 | 30900 | TCP | kube-state-metrics | watchtower |
 
@@ -292,7 +292,7 @@ all k8s workloads. Replaces the per-app `kubectl apply` GitHub Actions workflows
 | Port | Service | Purpose |
 |---|---|---|
 | 30880 | argocd-server | UI/API fallback (primary: Traefik ingress) |
-| 30882 | argocd-application-controller | Prometheus metrics scrape |
+| 30885 | argocd-application-controller | Prometheus metrics scrape |
 | 30883 | argocd-server metrics | Prometheus metrics scrape |
 
 ### Applications Under Management
@@ -309,7 +309,7 @@ all k8s workloads. Replaces the per-app `kubectl apply` GitHub Actions workflows
 
 | Job | Target |
 |---|---|
-| argocd-app-controller | monolith.littlewolfacres.com:30882 |
+| argocd-app-controller | monolith.littlewolfacres.com:30885 |
 | argocd-server | monolith.littlewolfacres.com:30883 |
 
 ### Alert Rules

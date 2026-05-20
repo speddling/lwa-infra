@@ -90,6 +90,14 @@
     proto: tcp
     src: "{{ ip_watchtower }}"
 
+- name: Remove stale ArgoCD app-controller metrics rule (port 30882 — replaced by 30885)
+  community.general.ufw:
+    rule: allow
+    port: "30882"
+    proto: tcp
+    src: "{{ ip_watchtower }}"
+    delete: true
+
 - name: Allow ArgoCD app-controller metrics from watchtower
   community.general.ufw:
     rule: allow

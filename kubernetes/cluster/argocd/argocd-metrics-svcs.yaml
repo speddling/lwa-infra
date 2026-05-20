@@ -34,7 +34,7 @@ spec:
     - name: metrics
       port: 8082
       targetPort: 8082
-      nodePort: 30882
+      nodePort: 30885
 
 ---
 apiVersion: v1
