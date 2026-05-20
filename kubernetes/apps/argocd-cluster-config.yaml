@@ -1,0 +1,51 @@
+# argocd-cluster-config — ArgoCD Application for ArgoCD's own cluster config
+#
+# Watches kubernetes/cluster/argocd/ and applies any changes to the argocd
+# namespace. This covers:
+#   - argocd-cmd-params-cm (insecure mode flag)
+#   - argocd-server-svc (NodePort fallback + standard service)
+#   - argocd-metrics-svcs (Prometheus scrape NodePorts)
+#   - argocd-ingress (Traefik HTTPS ingress)
+#   - argocd-repo-secret (placeholder — real value injected by bootstrap)
+#
+# Without this Application, changes to kubernetes/cluster/argocd/ are NOT
+# applied by ArgoCD — they only take effect if the bootstrap workflow is
+# re-run or kubectl apply is used manually. This caused the argocd-metrics-svcs
+# NodePort change (30882 → 30885) to not be applied after PR merge.
+#
+# Note: ArgoCD does not manage itself (no self-management bootstrap), so this
+# Application is safe — it only manages config resources, not the ArgoCD
+# install manifest itself.
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: argocd-cluster-config
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/speddling/homelab
+    targetRevision: master
+    path: kubernetes/cluster/argocd
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  ignoreDifferences:
+    # Repo secret data is injected by bootstrap workflow — ArgoCD must not
+    # overwrite it with the placeholder value from the manifest.
+    - group: ""
+      kind: Secret
+      name: homelab-repo
+      namespace: argocd
+      jsonPointers:
+        - /data
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false   # argocd namespace already exists
+      - ServerSideApply=true
