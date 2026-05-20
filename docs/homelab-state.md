@@ -1,5 +1,5 @@
 # Little Wolf Acres — Homelab Current State
-> Last updated: 2026-05-19 · Authored on apex · All IaC in `speddling/homelab` repo
+> Last updated: 2026-05-20 · Authored on apex · All IaC in `speddling/homelab` repo
 
 ---
 
@@ -502,8 +502,9 @@ gh workflow run deploy-watchtower.yml
 
 | Item | Priority | Notes |
 | ---- | -------- | ----- |
-| ArgoCD + cert-manager — bootstrap | **Ready** | Branch `feat/argocd-certmanager-bootstrap` — PR open, awaiting merge + workflow run |
-| Navidrome ingress — upgrade to HTTPS | Low | Update entrypoint from `web` to `websecure` + add cert-manager annotation. Follow-up after ArgoCD confirms healthy. |
+| ArgoCD + cert-manager | ✅ Done | GitOps live, HTTPS working |
+| Navidrome ingress — upgrade to HTTPS | Low | Update entrypoint from `web` to `websecure` + add cert-manager annotation |
+| Fileserver idempotency | Low | Fix `smbpasswd -a` in fileserver playbook — fails on re-run when user exists |
 | Loki — log aggregation | Low | Add to Watchtower stack |
 | Obelisk — client workspace on `/mnt/ssd-b` | Low | Isolated client environment, reserved name |
 | Synapse — health endpoint | Low | Add /health route to FastMCP app for proper k8s probes |
@@ -512,3 +513,4 @@ gh workflow run deploy-watchtower.yml
 
 ## Post-Watchtower Cleanup
 - Remove UFW install task from fileserver Ansible playbook — UFW is now managed by `deploy-monolith.yml` via the `ufw` role
+- Fix `smbpasswd -a` idempotency in fileserver playbook (use `pdbedit -L` to check before adding)

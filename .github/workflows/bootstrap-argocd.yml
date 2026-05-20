@@ -13,15 +13,20 @@ name: Bootstrap ArgoCD
 #   1. Install cert-manager v1.20.2 (CRDs + controller)
 #   2. Create Cloudflare API token secret for DNS-01 challenges
 #   3. Apply ClusterIssuers (staging + prod)
-#   4. Install ArgoCD v3.3.0
-#   5. Apply ArgoCD config (insecure mode, NodePort services, ingress)
-#   6. Create repo credentials secret for homelab repo access
-#   7. Apply App of Apps — ArgoCD takes over all subsequent management
+#   4. Create argocd namespace
+#   5. Install ArgoCD v3.3.0
+#   6. Apply ArgoCD cmd params AFTER install (insecure mode + rollout restart)
+#      NOTE: must be applied after install.yaml — the upstream manifest resets
+#      argocd-cmd-params-cm to an empty ConfigMap, overwriting any pre-applied
+#      data. Applying after and restarting argocd-server ensures the flag takes.
+#   7. Apply ArgoCD services and ingress
+#   8. Create repo credentials secret for homelab repo access
+#   9. Apply App of Apps — ArgoCD takes over all subsequent management
 #
 # After this workflow completes:
 #   - ArgoCD UI: https://argocd.littlewolfacres.com (cert may take 2-3 min)
 #   - Fallback:  http://monolith.littlewolfacres.com:30880
-#   - Initial admin password: retrieve with command in workflow summary
+#   - Initial admin password: retrieve from workflow summary
 
 on:
   workflow_dispatch:
@@ -40,7 +45,8 @@ jobs:
         run: |
           # --server-side avoids the 262144-byte annotation limit on large CRDs
           # --force-conflicts takes ownership from any previous client-side apply manager
-          kubectl apply --server-side --force-conflicts -f https://github.com/cert-manager/cert-manager/releases/download/v1.20.2/cert-manager.yaml
+          kubectl apply --server-side --force-conflicts \
+            -f https://github.com/cert-manager/cert-manager/releases/download/v1.20.2/cert-manager.yaml
           echo "Waiting for cert-manager webhooks to be ready..."
           kubectl rollout status deployment/cert-manager -n cert-manager --timeout=120s
           kubectl rollout status deployment/cert-manager-webhook -n cert-manager --timeout=120s
@@ -50,13 +56,15 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: |
-          # --save-config ensures the last-applied annotation is set so
-          # future kubectl apply calls don't warn about missing annotations.
-          # The secret is excluded from ArgoCD sync via ignoreDifferences
-          # in kubernetes/apps/cert-manager.yaml.
+          # Single quotes in the kubectl literal prevent shell interpretation of
+          # special characters in the token value.
+          # --save-config sets the last-applied annotation so future applies
+          # don't warn about missing annotations.
+          # The secret is excluded from ArgoCD sync via ignoreDifferences in
+          # kubernetes/apps/cert-manager.yaml so ArgoCD never overwrites it.
           kubectl create secret generic cloudflare-api-token \
             --namespace cert-manager \
-            --from-literal=api-token="${CLOUDFLARE_API_TOKEN}" \
+            --from-literal=api-token='${{ secrets.CLOUDFLARE_API_TOKEN }}' \
             --save-config \
             --dry-run=client -o yaml | kubectl apply -f -
 
@@ -70,16 +78,25 @@ jobs:
       - name: Create argocd namespace
         run: kubectl apply -f kubernetes/cluster/argocd/namespace.yaml
 
-      - name: Apply ArgoCD cmd params (insecure mode) before install
-        run: kubectl apply -f kubernetes/cluster/argocd/argocd-cmd-params-cm.yaml
-
       - name: Install ArgoCD v3.3.0
         run: |
           # --server-side avoids the 262144-byte annotation limit on large CRDs
           # --force-conflicts takes ownership from any previous client-side apply manager
-          kubectl apply -n argocd --server-side --force-conflicts -f https://raw.githubusercontent.com/argoproj/argo-cd/v3.3.0/manifests/install.yaml
+          kubectl apply -n argocd --server-side --force-conflicts \
+            -f https://raw.githubusercontent.com/argoproj/argo-cd/v3.3.0/manifests/install.yaml
           echo "Waiting for ArgoCD server to be ready..."
           kubectl rollout status deployment/argocd-server -n argocd --timeout=180s
+
+      - name: Apply ArgoCD cmd params and restart server
+        run: |
+          # IMPORTANT: applied AFTER install.yaml, not before.
+          # The upstream install.yaml resets argocd-cmd-params-cm to an empty
+          # ConfigMap. Applying our config before install means it gets wiped.
+          # Applying after and restarting the server ensures insecure mode is
+          # active before Traefik starts routing traffic to it.
+          kubectl apply -f kubernetes/cluster/argocd/argocd-cmd-params-cm.yaml
+          kubectl rollout restart deployment/argocd-server -n argocd
+          kubectl rollout status deployment/argocd-server -n argocd --timeout=120s
 
       - name: Apply ArgoCD services and ingress
         run: |
@@ -98,7 +115,9 @@ jobs:
             --from-literal=username=speddling \
             --from-literal=password="${ARGOCD_GITHUB_TOKEN}" \
             --dry-run=client -o yaml \
-          | kubectl label --local -f - argocd.argoproj.io/secret-type=repository --dry-run=client -o yaml \
+          | kubectl label --local -f - \
+            argocd.argoproj.io/secret-type=repository \
+            --dry-run=client -o yaml \
           | kubectl apply -f -
 
       # ── App of Apps ───────────────────────────────────────────────────────
@@ -114,7 +133,7 @@ jobs:
           echo "  ArgoCD Bootstrap Complete"
           echo "================================================================"
           echo ""
-          echo "  UI (HTTPS):  https://argocd.littlewolfacres.com"
+          echo "  UI (HTTPS):    https://argocd.littlewolfacres.com"
           echo "  UI (fallback): http://monolith.littlewolfacres.com:30880"
           echo ""
           echo "  Initial admin password:"

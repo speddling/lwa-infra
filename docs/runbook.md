@@ -1,6 +1,107 @@
 # Little Wolf Acres — Homelab Runbook
 > Operational reference for day-to-day tasks, troubleshooting, and maintenance.
-> Last updated: 2026-05-14
+> Last updated: 2026-05-20
+
+---
+
+## ArgoCD
+
+### Access
+
+| Method | URL | When to use |
+|---|---|---|
+| Primary | https://argocd.littlewolfacres.com | Normal operations |
+| Fallback | http://monolith.littlewolfacres.com:30880 | DNS unstable or cert issue |
+
+### Health Checks
+
+```bash
+# All ArgoCD pods
+kubectl get pods -n argocd
+
+# All managed applications
+kubectl get applications -n argocd
+
+# Certificate status
+kubectl get certificate -n argocd
+
+# Traefik routing (look for argocd-server ingress)
+kubectl get ingress -A
+```
+
+### Common Operations
+
+```bash
+# Force ArgoCD to re-sync an app immediately
+kubectl patch application navidrome -n argocd \
+  --type merge -p '{"operation":{"initiatedBy":{"username":"admin"},"sync":{"revision":"HEAD"}}}'
+
+# Check why an app is OutOfSync
+kubectl describe application navidrome -n argocd
+
+# Restart ArgoCD server (e.g. after ConfigMap change)
+kubectl rollout restart deployment/argocd-server -n argocd
+kubectl rollout status deployment/argocd-server -n argocd --timeout=120s
+```
+
+### Insecure Mode (Traefik TLS termination)
+
+ArgoCD runs with `server.insecure: "true"` in `argocd-cmd-params-cm`. This disables
+ArgoCD's internal TLS so Traefik can terminate TLS at the ingress and forward plain
+HTTP to argocd-server:8080. Without this flag, ArgoCD returns 307 redirects.
+
+To verify the flag is set:
+```bash
+kubectl get configmap argocd-cmd-params-cm -n argocd -o yaml | grep insecure
+```
+
+If missing, patch and restart:
+```bash
+kubectl patch configmap argocd-cmd-params-cm -n argocd \
+  --type merge -p '{"data":{"server.insecure":"true"}}'
+kubectl rollout restart deployment/argocd-server -n argocd
+```
+
+### Adding a New Service to GitOps
+
+1. Create `kubernetes/apps/<service>.yaml` — ArgoCD Application manifest
+2. Add `<hostname>.littlewolfacres.com` to AdGuard Home rewrite table in
+   `services/watchtower/ansible/roles/adguard/templates/AdGuardHome.yaml.j2`
+3. Add the same hostname as a public A record in Cloudflare DNS (DNS only, reserved IP)
+4. PR → merge → ArgoCD auto-syncs — done
+
+### cert-manager / TLS
+
+```bash
+# Check all certificates
+kubectl get certificates -A
+
+# Check why a cert isn't issuing
+kubectl describe certificate argocd-tls -n argocd
+kubectl describe certificaterequest -n argocd
+kubectl describe challenge -n argocd
+
+# Force cert retry (deletes stuck challenge, recreates automatically)
+kubectl delete challenge -n <namespace> --all
+# If still stuck, delete the CertificateRequest too:
+kubectl delete certificaterequest -n <namespace> --all
+
+# Check ClusterIssuers
+kubectl get clusterissuer
+```
+
+The Cloudflare API token for DNS-01 challenges lives in:
+`kubectl get secret cloudflare-api-token -n cert-manager`
+
+It is managed out-of-band (bootstrap workflow) and excluded from ArgoCD sync.
+Do not commit it to the repo. Rotate it in Cloudflare → update GitHub secret
+`CLOUDFLARE_API_TOKEN` → re-run bootstrap or patch directly:
+```bash
+kubectl create secret generic cloudflare-api-token \
+  --namespace cert-manager \
+  --from-literal=api-token='<NEW_TOKEN>' \
+  --dry-run=client -o yaml | kubectl apply -f -
+```
 
 ---
 
@@ -8,7 +109,9 @@
 
 ### Music Library — Mounting on Studio
 
-Navidrome reads from `/mnt/hdd-c/music-library` on Monolith via a k3s hostPath volume. To add new music or edit metadata from Studio, mount the `music-library` Samba share. **This is a one-time manual setup on Studio** — there is no Ansible automation for it.
+Navidrome reads from `/mnt/hdd-c/music-library` on Monolith via a k3s hostPath volume.
+To add new music or edit metadata from Studio, mount the `music-library` Samba share.
+**One-time manual setup on Studio — no Ansible automation.**
 
 ```bash
 # 1. Install CIFS support
@@ -25,85 +128,61 @@ sudo chmod 600 /etc/samba/studio-music-creds
 sudo mkdir /music-library
 
 # 4. Add to /etc/fstab
-echo '//192.168.0.20/music-library  /music-library  cifs  credentials=/etc/samba/studio-music-creds,uid=1000,gid=1000,file_mode=0664,dir_mode=0775,vers=3.0,_netdev,x-systemd.automount  0  0' | sudo tee -a /etc/fstab
+echo '//192.168.0.20/music-library  /music-library  cifs  credentials=/etc/samba/studio-music-creds,uid=1000,gid=1000,file_mode=0664,dir_mode=0775,vers=3.0,_netdev,x-systemd.automount  0  0' \
+  | sudo tee -a /etc/fstab
 
 # 5. Mount now without rebooting
 sudo systemctl daemon-reload
 sudo mount /music-library
 ```
 
-> **Password:** retrieve from `ansible/vars/vault.yml` on apex:
+> **Password:** retrieve from vault on apex:
 > `ansible-vault view ~/homelab/ansible/vars/vault.yml --vault-password-file=~/homelab/.vault_pass`
-
-After mounting, `/music-library` behaves like a local directory. New files and edited tags written here are picked up by Navidrome on its next scheduled scan (default: every hour).
-
-### Forcing a Navidrome Rescan
-
-```bash
-# Trigger a full library rescan immediately
-curl -u admin:<password> -X POST https://navidrome.littlewolfacres.com/rest/startScan?apiKey=<key>
-
-# Or via the web UI
-# Navidrome → ⚙ Settings → Library → Start Full Scan
-```
 
 ### Health Check
 
 ```bash
-# Check pod status
-sudo k3s kubectl get pods -n navidrome
-
-# Tail logs
-sudo k3s kubectl logs -n navidrome deployment/navidrome --tail=50 -f
-
-# Verify music hostPath is mounted inside the pod
-sudo k3s kubectl exec -n navidrome deployment/navidrome -- ls /music | head -20
+kubectl get pods -n navidrome
+kubectl logs -n navidrome deployment/navidrome --tail=50 -f
+kubectl exec -n navidrome deployment/navidrome -- ls /music | head -20
 ```
 
 ### Restarting Navidrome
 
 ```bash
-sudo k3s kubectl rollout restart deployment/navidrome -n navidrome
-sudo k3s kubectl rollout status deployment/navidrome -n navidrome
+kubectl rollout restart deployment/navidrome -n navidrome
+kubectl rollout status deployment/navidrome -n navidrome
 ```
 
 ---
 
 ## Service Health Checks
 
-### Watchtower (run on watchtower)
+### Watchtower
 
 ```bash
-# All core services at once
-systemctl status prometheus alertmanager grafana-server netdata AdGuardHome unbound
-
-# Individual services
-systemctl status prometheus
-systemctl status alertmanager
-systemctl status grafana-server
-systemctl status AdGuardHome
-systemctl status unbound
-systemctl status node_exporter
-systemctl status blackbox_exporter
-systemctl status snmp_exporter
-systemctl status adguard_exporter
-systemctl status netdata
+systemctl status prometheus alertmanager grafana-server netdata AdGuardHome unbound \
+  node_exporter blackbox_exporter snmp_exporter adguard_exporter
 ```
 
-### Monolith (run on monolith)
+### Monolith — k3s workloads
 
 ```bash
-# k3s node and all pods
-sudo k3s kubectl get nodes
-sudo k3s kubectl get pods -A
+# All pods across all namespaces
+kubectl get pods -A
 
 # Specific namespace
-sudo k3s kubectl get pods -n navidrome
-sudo k3s kubectl get pods -n minecraft
+kubectl get pods -n navidrome
+kubectl get pods -n minecraft
+kubectl get pods -n argocd
+kubectl get pods -n cert-manager
 
 # Pod logs
-sudo k3s kubectl logs -n navidrome deployment/navidrome --tail=50
-sudo k3s kubectl logs -n minecraft deployment/minecraft --tail=50
+kubectl logs -n navidrome deployment/navidrome --tail=50
+kubectl logs -n argocd deployment/argocd-server --tail=50
+
+# Node status
+kubectl get nodes
 ```
 
 ---
@@ -129,55 +208,40 @@ journalctl -fu snmp_exporter
 ### Testing
 
 ```bash
-# Test Unbound directly (recursive resolver)
-dig @127.0.0.1 -p 5335 google.com
-
-# Test AdGuard Home (DNS frontend)
-dig @127.0.0.1 google.com
-
-# Test local rewrites
-dig monolith.littlewolfacres.com
-dig grafana.littlewolfacres.com
-
-# Test short hostname resolution (search domain)
-dig monolith
-dig grafana
-
 # Test from apex against watchtower
 dig @192.168.0.21 monolith.littlewolfacres.com
+dig @192.168.0.21 argocd.littlewolfacres.com
+
+# Test Unbound directly (run on watchtower)
+dig @127.0.0.1 -p 5335 google.com
+
+# Test AdGuard Home (run on watchtower)
+dig @127.0.0.1 google.com
+
+# Flush Unbound cache (run on watchtower)
+sudo unbound-control flush_zone littlewolfacres.com
 ```
 
-### Adding a Local Rewrite
+### Adding a Local DNS Rewrite
 
-1. Open AdGuard Home → `http://watchtower:3000`
-2. Filters → DNS rewrites → Add rewrite
-3. Domain: `hostname.littlewolfacres.com` → IP address
+**Do not add rewrites via the AdGuard Home UI** — they will be overwritten on the
+next deploy-watchtower run. All rewrites are managed in:
+`services/watchtower/ansible/roles/adguard/templates/AdGuardHome.yaml.j2`
+
+Process:
+1. Add entry to `AdGuardHome.yaml.j2` under `filtering.rewrites`
+2. Add matching A record in Cloudflare DNS (DNS only, reserved IP) for fallback
+3. PR → merge → run **Deploy Watchtower Config** workflow
 4. Update `homelab-state.md` DNS rewrites table
-5. Commit via `docs/*` branch
-
-### Omada DHCP Settings
-
-Search domain and other DHCP options are at:
-**Omada Cloud Portal → Settings → Wired Networks → LAN → Edit → DHCP Server**
-
-- Domain Name: `littlewolfacres.com` (pushes search domain to all DHCP clients)
-- DNS Server: `192.168.0.21` (Watchtower)
 
 ---
 
 ## SNMP Testing (run on watchtower)
 
 ```bash
-# Test ER605
 snmpwalk -v2c -c littlewolfacres 192.168.0.1 1.3.6.1.2.1.1.1.0
-
-# Test EAP245 Yarn Studio
 snmpwalk -v2c -c littlewolfacres 192.168.0.5 1.3.6.1.2.1.1.1.0
-
-# Test EAP245 Foyer
 snmpwalk -v2c -c littlewolfacres 192.168.0.2 1.3.6.1.2.1.1.1.0
-
-# Test SNMP exporter directly
 curl "http://localhost:9116/snmp?module=if_mib&auth=littlewolfacres_v2&target=192.168.0.1"
 ```
 
@@ -186,10 +250,8 @@ curl "http://localhost:9116/snmp?module=if_mib&auth=littlewolfacres_v2&target=19
 ## Prometheus
 
 ```bash
-# Validate config
+# Validate config and rules (run on watchtower)
 promtool check config /etc/prometheus/prometheus.yml
-
-# Validate alert rules
 promtool check rules /etc/prometheus/alert_rules.yml
 
 # Check active alerts
@@ -201,7 +263,7 @@ curl -s http://192.168.0.21:9090/api/v1/targets | python3 -m json.tool | grep -E
 # Check storage size
 du -sh /var/lib/prometheus
 
-# Restart after config change
+# Restart after config change (run on watchtower)
 sudo systemctl restart prometheus
 ```
 
@@ -210,13 +272,8 @@ sudo systemctl restart prometheus
 ## Alertmanager
 
 ```bash
-# Check health
 curl -s http://192.168.0.21:9093/-/healthy
-
-# Check active alerts
 curl -s http://192.168.0.21:9093/api/v2/alerts
-
-# Restart
 sudo systemctl restart alertmanager
 ```
 
@@ -224,27 +281,41 @@ sudo systemctl restart alertmanager
 
 ## Ansible (run from apex)
 
+### Watchtower
+
 ```bash
 cd ~/homelab/services/watchtower/ansible
 
-# Run individual playbooks
-ansible-playbook -i inventory.ini playbooks/dns.yml --vault-password-file=~/homelab/.vault_pass
-ansible-playbook -i inventory.ini playbooks/monitoring.yml --vault-password-file=~/homelab/.vault_pass
-ansible-playbook -i inventory.ini playbooks/exporters.yml --vault-password-file=~/homelab/.vault_pass
+ansible-playbook -i inventory.ini playbooks/dns.yml \
+  --vault-password-file=~/homelab/.vault_pass
+ansible-playbook -i inventory.ini playbooks/monitoring.yml \
+  --vault-password-file=~/homelab/.vault_pass
+ansible-playbook -i inventory.ini playbooks/exporters.yml \
+  --vault-password-file=~/homelab/.vault_pass
 
 # Dry run
-ansible-playbook -i inventory.ini playbooks/monitoring.yml --check --vault-password-file=~/homelab/.vault_pass
+ansible-playbook -i inventory.ini playbooks/monitoring.yml \
+  --check --vault-password-file=~/homelab/.vault_pass
 
 # Vault operations
-ansible-vault edit group_vars/all/vault.yml --vault-password-file=~/homelab/.vault_pass
-ansible-vault view group_vars/all/vault.yml --vault-password-file=~/homelab/.vault_pass
+ansible-vault edit group_vars/all/vault.yml \
+  --vault-password-file=~/homelab/.vault_pass
+ansible-vault view group_vars/all/vault.yml \
+  --vault-password-file=~/homelab/.vault_pass
 ```
 
-### Monolith Ansible
+### Monolith
 
 ```bash
 cd ~/homelab/services/monolith/ansible
-ansible-playbook -i inventory.ini playbooks/monitoring.yml
+
+# Firewall rules
+ansible-playbook -i inventory.ini playbooks/firewall.yml \
+  --vault-password-file=~/homelab/.vault_pass
+
+# Monitoring agents (node_exporter etc.)
+ansible-playbook -i inventory.ini playbooks/monitoring.yml \
+  --vault-password-file=~/homelab/.vault_pass
 ```
 
 ---
@@ -265,7 +336,7 @@ terraform apply
 
 ---
 
-## UFW
+## UFW (run on the relevant host)
 
 ```bash
 # Check rules
@@ -275,18 +346,17 @@ sudo ufw status numbered
 sudo ufw reload
 ```
 
+**Do not add UFW rules manually on Monolith** — all rules are managed by the `ufw`
+Ansible role in `services/monolith/ansible/roles/ufw/`. Add rules there and run the
+**Deploy Monolith Config** workflow.
+
 ---
 
 ## k3s Storage
 
 ```bash
-# Check PVCs
-sudo k3s kubectl get pvc -A
-
-# Check storage classes
-sudo k3s kubectl get storageclass
-
-# Check disk usage on mounts
+kubectl get pvc -A
+kubectl get storageclass
 df -h | grep mnt
 ```
 
@@ -296,17 +366,19 @@ df -h | grep mnt
 
 ```bash
 # List provisioned alert rules
-curl -s -u 'admin:PASSWORD' 'http://192.168.0.21:3001/api/v1/provisioning/alert-rules' | python3 -m json.tool
-
-# Import dashboard by ID — do via UI: Dashboards → Import → Enter ID
+curl -s -u 'admin:PASSWORD' \
+  'http://192.168.0.21:3001/api/v1/provisioning/alert-rules' | python3 -m json.tool
 ```
+
+**Do not import dashboards via the Grafana UI** — the monitoring playbook purges any
+dashboard not in the managed UID set. Add new dashboards to the Ansible grafana role.
 
 ---
 
 ## NUT — When UPS Arrives
 
 1. Connect CyberPower CP1500PFCLCD via USB to Watchtower
-2. Run monitoring playbook — NUT role will activate automatically
+2. Run monitoring playbook — NUT role activates automatically (`nut_enabled: true` in vars)
 3. Verify: `systemctl status nut-server nut-monitor`
 4. Check UPS status: `upsc cyberpower@localhost`
 
@@ -315,30 +387,38 @@ curl -s -u 'admin:PASSWORD' 'http://192.168.0.21:3001/api/v1/provisioning/alert-
 ## Git Workflow
 
 ```bash
-# Start new work
 cd ~/homelab
-git checkout -b feature/description
+git checkout -b feat/description-of-change
 
-# Commit and push
-git add .
+git add <explicit paths>
 git commit -m "feat: description"
-git push -u origin feature/description
+git push -u origin feat/description-of-change
 
-# Open PR
 gh pr create --title "feat: description" --body "What and why"
 
-# Merge via GitHub UI after validate passes
-# Deploy triggers automatically on merge to master
+# After merge — sync local repo
+git checkout master && git pull
 
 # Manual workflow trigger
 gh workflow run deploy-watchtower.yml
+gh workflow run deploy-monolith.yml
 ```
 
 ### Branch conventions
 
 | Prefix | Use |
 |---|---|
-| `feature/*` | New capabilities |
+| `feat/*` | New capabilities |
 | `fix/*` | Bug fixes |
 | `docs/*` | Documentation only — no deploy triggered |
 | `chore/*` | Maintenance, dependency updates |
+
+### Workflows
+
+| Workflow | Trigger | What it does |
+|---|---|---|
+| `deploy-watchtower.yml` | Push to master (watchtower paths) | DNS, monitoring, exporters |
+| `deploy-monolith.yml` | Push to master (monolith paths) | Firewall, monitoring agents |
+| `deploy-fileserver.yml` | Manual | Samba config |
+| `bootstrap-argocd.yml` | Manual (once) | cert-manager + ArgoCD install |
+| `provision-k3s.yml` | Manual | k3s cluster init |
