@@ -1,0 +1,44 @@
+# App of Apps — Root ArgoCD Application
+#
+# This is the single Application that ArgoCD syncs first.
+# It watches kubernetes/apps/ in the homelab repo and creates
+# one child Application per file it finds there.
+#
+# Workflow:
+#   1. Bootstrap applies this manifest (bootstrap-argocd.yml workflow)
+#   2. ArgoCD detects the new Application and syncs kubernetes/apps/
+#   3. Each .yaml in kubernetes/apps/ becomes a live ArgoCD Application
+#   4. Each child Application then syncs its own manifests from the repo
+#
+# Adding a new service:
+#   1. Create kubernetes/apps/my-service.yaml (ArgoCD Application manifest)
+#   2. PR → merge to master
+#   3. ArgoCD auto-syncs the App of Apps → creates the new child Application
+#   4. Child Application syncs the service manifests — done
+#
+# No manual kubectl apply needed after bootstrap.
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: apps
+  namespace: argocd
+  # Finalizer ensures ArgoCD cleans up child apps when this root app is deleted.
+  # Remove this finalizer before deleting if you want to preserve child resources.
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/speddling/homelab
+    targetRevision: master
+    path: kubernetes/apps
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true       # removes Applications for files deleted from kubernetes/apps/
+      selfHeal: true    # re-syncs if someone manually edits an Application in the cluster
+    syncOptions:
+      - CreateNamespace=true

@@ -1,0 +1,36 @@
+# ArgoCD Traefik Ingress
+#
+# Routes https://argocd.littlewolfacres.com → argocd-server:80 (HTTP, insecure mode)
+# TLS certificate issued and renewed automatically by cert-manager via
+# Cloudflare DNS-01 challenge (no inbound port required).
+#
+# Traefik terminates TLS, forwards plain HTTP to argocd-server.
+# argocd-server runs with --insecure flag (see argocd-cmd-params-cm.yaml).
+#
+# Fallback: http://monolith.littlewolfacres.com:30880 (NodePort, no TLS)
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: argocd-server
+  namespace: argocd
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.tls: "true"
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+spec:
+  tls:
+    - hosts:
+        - argocd.littlewolfacres.com
+      secretName: argocd-tls
+  rules:
+    - host: argocd.littlewolfacres.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: argocd-server
+                port:
+                  number: 80

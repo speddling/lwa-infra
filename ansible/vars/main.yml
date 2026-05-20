@@ -31,6 +31,7 @@ fqdn_watchtower:   "watchtower.littlewolfacres.com"
 fqdn_grafana:      "grafana.littlewolfacres.com"
 fqdn_navidrome:    "navidrome.littlewolfacres.com"
 fqdn_studio:       "studio.littlewolfacres.com"
+fqdn_argocd:       "argocd.littlewolfacres.com"
 
 # -----------------------------------------------------------------------------
 # Ports
@@ -53,6 +54,9 @@ port_reolink_exporter:   9720
 port_netdata:            19999
 port_synapse_mcp:        30800
 port_kube_state_metrics: 30900   # NodePort on Monolith; 30800 taken by synapse-mcp
+port_argocd_nodeport:    30880   # ArgoCD UI fallback (primary: Traefik ingress)
+port_argocd_metrics_controller: 30882  # argocd-application-controller metrics → Prometheus
+port_argocd_metrics_server:     30883  # argocd-server metrics → Prometheus
 port_scribe:             8765
 port_argus_mcp:          9800
 

@@ -132,3 +132,50 @@ groups:
           host: monolith
         annotations:
           description: "Monolith disk usage on /mnt/hdd-d (mirror) is above 80% (current: {{ "{{" }} $value | printf \"%.1f\" {{ "}}" }}%)"
+
+      # ── ArgoCD ──────────────────────────────────────────────────────────────
+
+      - alert: ArgoCDAppOutOfSync
+        expr: argocd_app_info{sync_status="OutOfSync"} == 1
+        for: 5m
+        labels:
+          severity: warning
+          host: monolith
+        annotations:
+          description: "ArgoCD app '{{ "{{" }} $labels.name {{ "}}" }}' has been OutOfSync for 5 minutes — a merge may be pending reconciliation or a drift has occurred"
+
+      - alert: ArgoCDAppDegraded
+        expr: argocd_app_info{health_status="Degraded"} == 1
+        for: 5m
+        labels:
+          severity: critical
+          host: monolith
+        annotations:
+          description: "ArgoCD app '{{ "{{" }} $labels.name {{ "}}" }}' health is Degraded — check pod status in the argocd namespace"
+
+      - alert: ArgoCDAppMissing
+        expr: argocd_app_info{health_status="Missing"} == 1
+        for: 2m
+        labels:
+          severity: critical
+          host: monolith
+        annotations:
+          description: "ArgoCD app '{{ "{{" }} $labels.name {{ "}}" }}' resources are Missing — expected resources not found in the cluster"
+
+      - alert: ArgoCDControllerDown
+        expr: up{job="argocd-app-controller"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          host: monolith
+        annotations:
+          description: "ArgoCD application-controller is unreachable — GitOps reconciliation has stopped. No app changes will be applied until it recovers."
+
+      - alert: ArgoCDServerDown
+        expr: up{job="argocd-server"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          host: monolith
+        annotations:
+          description: "ArgoCD server is unreachable — UI and API unavailable at argocd.littlewolfacres.com"

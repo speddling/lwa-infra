@@ -1,5 +1,5 @@
 # Little Wolf Acres — Homelab Current State
-> Last updated: 2026-05-18 · Authored on apex · All IaC in `speddling/homelab` repo
+> Last updated: 2026-05-19 · Authored on apex · All IaC in `speddling/homelab` repo
 
 ---
 
@@ -264,6 +264,95 @@ Primary k3s worker node and household services platform. Hosts all Kubernetes wo
 
 ---
 
+## ArgoCD
+
+GitOps controller for k3s. Watches `speddling/homelab` on `master` and reconciles
+all k8s workloads. Replaces the per-app `kubectl apply` GitHub Actions workflows.
+
+### Access
+
+| Method | URL | Notes |
+|---|---|---|
+| Primary (HTTPS) | https://argocd.littlewolfacres.com | Traefik ingress, Let's Encrypt cert |
+| Fallback (NodePort) | http://monolith.littlewolfacres.com:30880 | Use when DNS is unstable |
+
+### Services (NodePort)
+
+| Port | Service | Purpose |
+|---|---|---|
+| 30880 | argocd-server | UI/API fallback (primary: Traefik ingress) |
+| 30882 | argocd-application-controller | Prometheus metrics scrape |
+| 30883 | argocd-server metrics | Prometheus metrics scrape |
+
+### Applications Under Management
+
+| App | Source Path | Namespace |
+|---|---|---|
+| navidrome | `services/navidrome/kubernetes/` | navidrome |
+| minecraft | `services/minecraft/kubernetes/` | minecraft |
+| synapse | `services/synapse/kubernetes/` | synapse |
+| kube-state-metrics | `kubernetes/manifests/` | kube-system |
+| cert-manager | `kubernetes/cluster/cert-manager/` | cert-manager |
+
+### Prometheus Targets
+
+| Job | Target |
+|---|---|
+| argocd-app-controller | monolith.littlewolfacres.com:30882 |
+| argocd-server | monolith.littlewolfacres.com:30883 |
+
+### Alert Rules
+
+| Alert | Condition | Severity |
+|---|---|---|
+| ArgoCDAppOutOfSync | App OutOfSync > 5m | warning |
+| ArgoCDAppDegraded | App health Degraded > 5m | critical |
+| ArgoCDAppMissing | App health Missing > 2m | critical |
+| ArgoCDControllerDown | Controller scrape fails > 1m | critical |
+| ArgoCDServerDown | Server scrape fails > 1m | critical |
+
+### IaC
+
+| Layer | Location |
+|---|---|
+| Cluster config | `kubernetes/cluster/argocd/` |
+| Bootstrap | `kubernetes/bootstrap/apps-of-apps.yaml` |
+| App manifests | `kubernetes/apps/` |
+| Bootstrap workflow | `.github/workflows/bootstrap-argocd.yml` (manual, runs once) |
+
+---
+
+## cert-manager
+
+Automatic TLS certificate management for k3s. Issues and renews Let's Encrypt
+certificates via Cloudflare DNS-01 challenge (no inbound port required).
+
+### ClusterIssuers
+
+| Name | Endpoint | Use |
+|---|---|---|
+| `letsencrypt-prod` | acme-v02.api.letsencrypt.org | All production ingress resources |
+| `letsencrypt-staging` | acme-staging-v02.api.letsencrypt.org | Testing only — certs not browser-trusted |
+
+### How to add TLS to an ingress
+
+Add these two annotations to any Ingress manifest:
+```yaml
+traefik.ingress.kubernetes.io/router.entrypoints: websecure
+traefik.ingress.kubernetes.io/router.tls: "true"
+cert-manager.io/cluster-issuer: letsencrypt-prod
+```
+And add a `spec.tls` block referencing a `secretName`. cert-manager handles the rest.
+
+### IaC
+
+| Layer | Location |
+|---|---|
+| Cluster config | `kubernetes/cluster/cert-manager/` |
+| Managed by | ArgoCD (`cert-manager` Application) |
+
+---
+
 ## AI Nodes
 
 ### B-4 — apex (Active)
@@ -406,7 +495,8 @@ gh workflow run deploy-watchtower.yml
 
 | Item | Priority | Notes |
 | ---- | -------- | ----- |
-| ArgoCD — GitOps for k3s | Medium | Migrate from kubectl apply chains to GitOps. Next build. |
+| ArgoCD + cert-manager — bootstrap | **Ready** | Branch `feat/argocd-certmanager-bootstrap` — PR open, awaiting merge + workflow run |
+| Navidrome ingress — upgrade to HTTPS | Low | Update entrypoint from `web` to `websecure` + add cert-manager annotation. Follow-up after ArgoCD confirms healthy. |
 | Loki — log aggregation | Low | Add to Watchtower stack |
 | Obelisk — client workspace on `/mnt/ssd-b` | Low | Isolated client environment, reserved name |
 | Synapse — health endpoint | Low | Add /health route to FastMCP app for proper k8s probes |

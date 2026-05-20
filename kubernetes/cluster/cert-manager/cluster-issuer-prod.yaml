@@ -1,0 +1,26 @@
+# Let's Encrypt Production ClusterIssuer
+#
+# Issues trusted certificates for *.littlewolfacres.com via Cloudflare DNS-01.
+# Rate limited — 50 certs per registered domain per week.
+# Used by default on all ingress resources via annotation:
+#   cert-manager.io/cluster-issuer: letsencrypt-prod
+#
+# cert-manager auto-renews at 2/3 of the certificate lifetime (~60 days).
+# Renewal is fully automatic — no manual intervention required.
+
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    email: info@littlewolfacres.com
+    privateKeySecretRef:
+      name: letsencrypt-prod-account-key
+    solvers:
+      - dns01:
+          cloudflare:
+            apiTokenSecretRef:
+              name: cloudflare-api-token
+              key: api-token

@@ -1,0 +1,35 @@
+# argocd-server Service — NodePort fallback + standard ClusterIP
+#
+# Primary access: Traefik ingress at https://argocd.littlewolfacres.com
+# Fallback access: http://monolith.littlewolfacres.com:30880 (DNS-independent)
+#
+# Use the NodePort when:
+#   - DNS is unstable and argocd.littlewolfacres.com doesn't resolve
+#   - Traefik is down and you need to diagnose via direct access
+#   - cert-manager hasn't issued the cert yet during initial bootstrap
+#
+# Port 30880 is reserved for ArgoCD UI fallback.
+# See ansible/vars/main.yml: port_argocd_nodeport
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: argocd-server
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argocd-server
+    app.kubernetes.io/part-of: argocd
+    app.kubernetes.io/component: server
+spec:
+  type: NodePort
+  selector:
+    app.kubernetes.io/name: argocd-server
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080
+      nodePort: 30880
+    - name: https
+      port: 443
+      targetPort: 8080   # insecure mode — both ports hit 8080
+      nodePort: 30881

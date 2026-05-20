@@ -1,0 +1,20 @@
+# argocd-cmd-params-cm — runtime flags for ArgoCD components
+#
+# server.insecure: true
+#   Disables ArgoCD's built-in TLS. Traefik terminates TLS at the ingress
+#   using the cert-manager issued Let's Encrypt certificate, then forwards
+#   plain HTTP to argocd-server:8080. Required for standard Traefik ingress.
+#
+# Applied during bootstrap before ArgoCD server starts.
+# ArgoCD watches this ConfigMap and reloads on change.
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-cmd-params-cm
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argocd-cmd-params-cm
+    app.kubernetes.io/part-of: argocd
+data:
+  server.insecure: "true"

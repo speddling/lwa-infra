@@ -142,3 +142,22 @@ scrape_configs:
   - job_name: 'kube-state-metrics'
     static_configs:
       - targets: ['{{ fqdn_monolith }}:{{ port_kube_state_metrics }}']
+
+  # ── ArgoCD ──────────────────────────────────────────────────────────────
+  # application-controller: app health, sync status, reconciliation counts
+  # argocd-server:          API/UI availability and latency
+  # Both exposed via NodePort since Prometheus is external to k3s.
+
+  - job_name: 'argocd-app-controller'
+    static_configs:
+      - targets: ['{{ fqdn_monolith }}:{{ port_argocd_metrics_controller }}']
+    relabel_configs:
+      - target_label: instance
+        replacement: argocd
+
+  - job_name: 'argocd-server'
+    static_configs:
+      - targets: ['{{ fqdn_monolith }}:{{ port_argocd_metrics_server }}']
+    relabel_configs:
+      - target_label: instance
+        replacement: argocd

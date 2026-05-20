@@ -1,0 +1,125 @@
+name: Bootstrap ArgoCD
+
+# Manual trigger only — runs once to bootstrap ArgoCD and cert-manager.
+# After bootstrap, ArgoCD manages all subsequent deployments via GitOps.
+# This workflow becomes dormant after initial setup.
+#
+# Prerequisites (set in GitHub Actions secrets before running):
+#   CLOUDFLARE_API_TOKEN  — Cloudflare API token (Zone:DNS:Edit, Zone:Zone:Read)
+#                           scoped to littlewolfacres.com
+#   ARGOCD_GITHUB_TOKEN   — GitHub PAT with Contents:Read on speddling/homelab
+#
+# What this does:
+#   1. Install cert-manager v1.20.2 (CRDs + controller)
+#   2. Create Cloudflare API token secret for DNS-01 challenges
+#   3. Apply ClusterIssuers (staging + prod)
+#   4. Install ArgoCD v3.3.0
+#   5. Apply ArgoCD config (insecure mode, NodePort services, ingress)
+#   6. Create repo credentials secret for homelab repo access
+#   7. Apply App of Apps — ArgoCD takes over all subsequent management
+#
+# After this workflow completes:
+#   - ArgoCD UI: https://argocd.littlewolfacres.com (cert may take 2-3 min)
+#   - Fallback:  http://monolith.littlewolfacres.com:30880
+#   - Initial admin password: retrieve with command in workflow summary
+
+on:
+  workflow_dispatch:
+
+jobs:
+  bootstrap:
+    name: Bootstrap
+    runs-on: [self-hosted, monolith]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # ── cert-manager ──────────────────────────────────────────────────────
+
+      - name: Install cert-manager v1.20.2
+        run: |
+          kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.20.2/cert-manager.yaml
+          echo "Waiting for cert-manager webhooks to be ready..."
+          kubectl rollout status deployment/cert-manager -n cert-manager --timeout=120s
+          kubectl rollout status deployment/cert-manager-webhook -n cert-manager --timeout=120s
+          kubectl rollout status deployment/cert-manager-cainjector -n cert-manager --timeout=120s
+
+      - name: Create Cloudflare API token secret
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          kubectl create secret generic cloudflare-api-token \
+            --namespace cert-manager \
+            --from-literal=api-token="${CLOUDFLARE_API_TOKEN}" \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Apply ClusterIssuers
+        run: |
+          kubectl apply -f kubernetes/cluster/cert-manager/cluster-issuer-staging.yaml
+          kubectl apply -f kubernetes/cluster/cert-manager/cluster-issuer-prod.yaml
+
+      # ── ArgoCD ────────────────────────────────────────────────────────────
+
+      - name: Create argocd namespace
+        run: kubectl apply -f kubernetes/cluster/argocd/namespace.yaml
+
+      - name: Apply ArgoCD cmd params (insecure mode) before install
+        run: kubectl apply -f kubernetes/cluster/argocd/argocd-cmd-params-cm.yaml
+
+      - name: Install ArgoCD v3.3.0
+        run: |
+          kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/v3.3.0/manifests/install.yaml
+          echo "Waiting for ArgoCD server to be ready..."
+          kubectl rollout status deployment/argocd-server -n argocd --timeout=180s
+
+      - name: Apply ArgoCD services and ingress
+        run: |
+          kubectl apply -f kubernetes/cluster/argocd/argocd-server-svc.yaml
+          kubectl apply -f kubernetes/cluster/argocd/argocd-metrics-svcs.yaml
+          kubectl apply -f kubernetes/cluster/argocd/argocd-ingress.yaml
+
+      - name: Create homelab repo credentials secret
+        env:
+          ARGOCD_GITHUB_TOKEN: ${{ secrets.ARGOCD_GITHUB_TOKEN }}
+        run: |
+          kubectl create secret generic homelab-repo \
+            --namespace argocd \
+            --from-literal=type=git \
+            --from-literal=url=https://github.com/speddling/homelab \
+            --from-literal=username=speddling \
+            --from-literal=password="${ARGOCD_GITHUB_TOKEN}" \
+            --dry-run=client -o yaml \
+          | kubectl label --local -f - argocd.argoproj.io/secret-type=repository --dry-run=client -o yaml \
+          | kubectl apply -f -
+
+      # ── App of Apps ───────────────────────────────────────────────────────
+
+      - name: Apply App of Apps — ArgoCD takes over
+        run: kubectl apply -f kubernetes/bootstrap/apps-of-apps.yaml
+
+      # ── Summary ───────────────────────────────────────────────────────────
+
+      - name: Print bootstrap summary
+        run: |
+          echo "================================================================"
+          echo "  ArgoCD Bootstrap Complete"
+          echo "================================================================"
+          echo ""
+          echo "  UI (HTTPS):  https://argocd.littlewolfacres.com"
+          echo "  UI (fallback): http://monolith.littlewolfacres.com:30880"
+          echo ""
+          echo "  Initial admin password:"
+          kubectl -n argocd get secret argocd-initial-admin-secret \
+            -o jsonpath='{.data.password}' | base64 -d
+          echo ""
+          echo ""
+          echo "  Change the password via the ArgoCD UI immediately after login."
+          echo "  The initial secret can then be deleted:"
+          echo "  kubectl -n argocd delete secret argocd-initial-admin-secret"
+          echo ""
+          echo "  cert-manager ClusterIssuers:"
+          kubectl get clusterissuer
+          echo ""
+          echo "  ArgoCD Applications (may still be syncing):"
+          kubectl get applications -n argocd
+          echo "================================================================"

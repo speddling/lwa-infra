@@ -1,0 +1,25 @@
+# kube-state-metrics lives in kubernetes/manifests/ as a single file.
+# ArgoCD manages the whole directory — only one file in there currently.
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kube-state-metrics
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/speddling/homelab
+    targetRevision: master
+    path: kubernetes/manifests
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kube-system
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

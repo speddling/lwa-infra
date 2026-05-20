@@ -1,0 +1,34 @@
+# cert-manager — cluster-level resources managed by ArgoCD
+#
+# Note: cert-manager CRDs and the controller itself are installed by the
+# bootstrap workflow (kubectl apply of the upstream static manifest).
+# ArgoCD adopts and manages the cluster-level config: namespace, Cloudflare
+# secret placeholder, and ClusterIssuers.
+#
+# The Cloudflare secret actual value is set by the bootstrap workflow —
+# ArgoCD will show it as Synced since the placeholder is overwritten
+# before ArgoCD first sees it.
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cert-manager
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/speddling/homelab
+    targetRevision: master
+    path: kubernetes/cluster/cert-manager
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: cert-manager
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true   # required for CRD-backed resources like ClusterIssuer
