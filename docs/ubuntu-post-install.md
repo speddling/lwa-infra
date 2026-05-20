@@ -47,40 +47,45 @@ timedatectl status
 
 ## 2. Install Base Tools
 
+> **Note:** The install command below is split into groups for readability.
+> Run it as a single block — bash does not allow inline comments (`#`) inside
+> a multi-line `apt install` command. Strip the group headers if copying
+> line by line, or run each group as a separate `apt install` call.
+
 ```bash
 sudo apt install -y \
-  # Diagnostics
-  dmidecode \
-  htop \
-  ncdu \
-  iotop \
-  net-tools \
-  dnsutils \
-  traceroute \
-  mtr \
-  nmap \
-  tcpdump \
-  # System
-  curl \
-  wget \
-  git \
-  rsync \
-  unzip \
-  jq \
-  tree \
-  # Security
-  ufw \
-  fail2ban \
-  unattended-upgrades \
-  apt-listchanges \
-  # Monitoring prep
-  lsof \
-  sysstat \
-  # Quality of life
-  vim \
-  tmux \
-  bash-completion
+  dmidecode htop ncdu iotop net-tools dnsutils traceroute mtr nmap tcpdump \
+  curl wget git rsync unzip jq tree \
+  ufw fail2ban unattended-upgrades apt-listchanges \
+  lsof sysstat \
+  vim tmux bash-completion
 ```
+
+What each group covers:
+
+| Package(s) | Purpose |
+|---|---|
+| `dmidecode` | Read hardware info (RAM, BIOS, chassis) from DMI/SMBIOS |
+| `htop` | Interactive process viewer |
+| `ncdu` | Interactive disk usage analyser |
+| `iotop` | I/O usage by process |
+| `net-tools` | `ifconfig`, `netstat`, `route` |
+| `dnsutils` | `dig`, `nslookup` |
+| `traceroute`, `mtr` | Network path tracing |
+| `nmap` | Port scanning and host discovery |
+| `tcpdump` | Packet capture |
+| `curl`, `wget` | HTTP clients |
+| `git` | Version control |
+| `rsync` | Efficient file sync and backup |
+| `unzip`, `jq`, `tree` | Archive handling, JSON processing, directory visualisation |
+| `ufw` | Firewall management frontend |
+| `fail2ban` | Brute force protection |
+| `unattended-upgrades`, `apt-listchanges` | Automatic security patching |
+| `lsof` | List open files and sockets |
+| `sysstat` | `iostat`, `mpstat`, `sar` — system performance stats |
+| `vim` | Terminal editor |
+| `tmux` | Terminal multiplexer — persistent sessions over SSH |
+| `bash-completion` | Tab completion for common commands |
 
 ---
 
