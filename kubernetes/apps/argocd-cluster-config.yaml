@@ -48,4 +48,4 @@ spec:
       selfHeal: true
     syncOptions:
       - CreateNamespace=false   # argocd namespace already exists
-      - ServerSideApply=true
+      - RespectIgnoreDifferences=true
