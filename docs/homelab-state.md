@@ -322,6 +322,23 @@ all k8s workloads. Replaces the per-app `kubectl apply` GitHub Actions workflows
 | ArgoCDControllerDown | Controller scrape fails > 1m | critical |
 | ArgoCDServerDown | Server scrape fails > 1m | critical |
 
+### Credential Management
+
+ArgoCD authenticates to `speddling/homelab` via a GitHub fine-grained PAT.
+
+| Aspect | Detail |
+|---|---|
+| Secret name | `homelab-repo` in `argocd` namespace |
+| Vault variable | `vault_argocd_github_token` in `ansible/vars/vault.yml` |
+| PAT type | Fine-grained, single-repo scope, Contents: Read, no expiration |
+| Initial creation | `bootstrap-argocd.yml` (manual, runs once) |
+| Ongoing rotation | `rotate-argocd-credentials.yml` (manual trigger + quarterly schedule) |
+| Rotation runbook | See `docs/runbook.md` → ArgoCD → Rotating Repository Credentials |
+
+> The secret is managed out-of-band — never via ArgoCD sync (circular dependency).
+> The Ansible playbook writes a 0600 temp file, applies it, then shreds it.
+> The token never appears in Ansible output or CI logs (`no_log: true`).
+
 ### IaC
 
 | Layer | Location |
@@ -330,6 +347,8 @@ all k8s workloads. Replaces the per-app `kubectl apply` GitHub Actions workflows
 | Bootstrap | `kubernetes/bootstrap/apps-of-apps.yaml` |
 | App manifests | `kubernetes/apps/` |
 | Bootstrap workflow | `.github/workflows/bootstrap-argocd.yml` (manual, runs once) |
+| Rotation workflow | `.github/workflows/rotate-argocd-credentials.yml` |
+| Rotation playbook | `services/monolith/ansible/playbooks/argocd-credentials.yml` |
 
 ---
 
@@ -341,7 +360,6 @@ certificates via Cloudflare DNS-01 challenge (no inbound port required).
 ### ClusterIssuers
 
 | Name | Endpoint | Use |
-|---|---|---|
 | `letsencrypt-prod` | acme-v02.api.letsencrypt.org | All production ingress resources |
 | `letsencrypt-staging` | acme-staging-v02.api.letsencrypt.org | Testing only — certs not browser-trusted |
 

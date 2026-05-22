@@ -13,6 +13,55 @@
 | Primary | https://argocd.littlewolfacres.com | Normal operations |
 | Fallback | http://monolith.littlewolfacres.com:30880 | DNS unstable or cert issue |
 
+### Rotating Repository Credentials
+
+ArgoCD pulls manifests from `speddling/homelab` using a GitHub fine-grained PAT
+stored in `ansible/vars/vault.yml` as `vault_argocd_github_token`.
+
+**Normal rotation procedure:**
+
+```bash
+# 1. Generate a new fine-grained PAT at:
+#    GitHub → Settings → Developer Settings → Fine-grained tokens → Generate new token
+#    Repository: speddling/homelab only
+#    Permission: Contents → Read
+#    Expiration: No expiration (preferred)
+
+# 2. Update the vault on apex
+ansible-vault edit ansible/vars/vault.yml \
+  --vault-password-file ~/homelab/.vault_pass
+# Update vault_argocd_github_token with the new PAT value
+
+# 3. Commit the encrypted vault change
+git checkout -b fix/rotate-argocd-pat
+git add ansible/vars/vault.yml
+git commit -m "fix: rotate ArgoCD GitHub PAT"
+git push -u origin fix/rotate-argocd-pat
+gh pr create --title "fix: rotate ArgoCD GitHub PAT" --body "Routine PAT rotation."
+
+# 4. After merge — run the rotation workflow
+gh workflow run rotate-argocd-credentials.yml
+```
+
+**Emergency rotation (PAT compromised or expired, can't wait for PR merge):**
+
+```bash
+# Run the playbook directly from apex against the current vault
+cd services/monolith/ansible
+ansible-playbook -i inventory.ini playbooks/argocd-credentials.yml \
+  --vault-password-file ~/homelab/.vault_pass
+
+# Then update the vault and open the PR as above
+```
+
+**Verify rotation succeeded:**
+
+```bash
+kubectl get pods -n argocd -l app.kubernetes.io/name=argocd-repo-server
+kubectl get applications -n argocd
+# All apps should show Synced / Healthy within ~60s
+```
+
 ### Health Checks
 
 ```bash
