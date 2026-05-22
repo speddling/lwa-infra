@@ -143,6 +143,17 @@ nut_monitor_user:    "monuser"
 # Monitor password: vault_nut_monitor_password (see vault.yml)
 
 # -----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
+# ArgoCD — repository credential management
+# -----------------------------------------------------------------------------
+argocd_namespace:        "argocd"
+argocd_repo_secret_name: "homelab-repo"
+argocd_repo_url:         "https://github.com/speddling/homelab"
+argocd_repo_username:    "speddling"
+# Token: vault_argocd_github_token (see vault.yml)
+# Rotation: Actions → Rotate ArgoCD Credentials → Run workflow
+
+# -----------------------------------------------------------------------------
 # Apex — Scribe MCP server
 # -----------------------------------------------------------------------------
 scribe_port:        "{{ port_scribe }}"

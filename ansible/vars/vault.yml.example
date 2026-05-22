@@ -40,3 +40,8 @@ vault_reolink_nvr_password: "REPLACE_ME"
 
 # SNMP (community string stored in vault for snmp_exporter)
 vault_snmp_community: "REPLACE_ME"
+
+# ArgoCD — GitHub PAT for homelab repo access
+# Fine-grained PAT: single repo scope, Contents: Read, no expiration recommended.
+# Rotated via: Actions → Rotate ArgoCD Credentials → Run workflow
+vault_argocd_github_token: "REPLACE_ME"
