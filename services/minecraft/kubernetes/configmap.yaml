@@ -5,9 +5,10 @@ metadata:
   namespace: minecraft
 data:
   EULA: "TRUE"
-  LEVEL_NAME: "my-realm"        # must match extracted world folder name
+  LEVEL_NAME: "littlewolfacres"
   GAMEMODE: "survival"
   DIFFICULTY: "normal"
-  MAX_PLAYERS: "3"
-  SERVER_NAME: "Homelab SMP"
+  MAX_PLAYERS: "2"
+  SERVER_NAME: "Little Wolf Acres"
   ALLOW_CHEATS: "false"
+  ONLINE_MODE: "true"

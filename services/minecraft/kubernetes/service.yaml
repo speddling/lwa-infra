@@ -4,10 +4,11 @@ metadata:
   name: minecraft-bedrock
   namespace: minecraft
 spec:
-  type: LoadBalancer
+  type: NodePort
   selector:
     app: minecraft-bedrock
   ports:
     - port: 19132
       targetPort: 19132
+      nodePort: 30132
       protocol: UDP
