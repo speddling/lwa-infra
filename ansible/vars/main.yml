@@ -143,7 +143,6 @@ nut_monitor_user:    "monuser"
 # Monitor password: vault_nut_monitor_password (see vault.yml)
 
 # -----------------------------------------------------------------------------
-# -----------------------------------------------------------------------------
 # ArgoCD — repository credential management
 # -----------------------------------------------------------------------------
 argocd_namespace:        "argocd"
@@ -161,3 +160,18 @@ scribe_repo_roots:  "/Users/speddling/homelab"
 scribe_python:      "/opt/local/bin/python3.12"
 scribe_venv:        "~/.venv/scribe"
 scribe_label:       "com.littlewolfacres.scribe"
+
+# -----------------------------------------------------------------------------
+# Apex — Zombatron Importer (Slack bot)
+# -----------------------------------------------------------------------------
+zombatron_importer_label:         "com.littlewolfacres.zombatron-importer"
+zombatron_importer_venv:          "~/.venv/zombatron-importer"
+zombatron_importer_python:        "/opt/local/bin/python3.12"
+zombatron_importer_slack_channel: "C0B5C20R1SB"
+zombatron_importer_monolith_host: "{{ ip_monolith }}"
+zombatron_importer_monolith_user: "{{ ssh_user_monolith }}"
+zombatron_importer_import_path:   "/opt/minecraft/import/realm.mcworld"
+zombatron_importer_github_repo:   "speddling/homelab"
+zombatron_importer_workflow:      "slack-minecraft-import.yml"
+# Secrets: vault_slack_zombatron_bot_token, vault_slack_zombatron_app_token,
+#          vault_github_actions_pat (see vault.yml)

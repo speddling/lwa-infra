@@ -1,0 +1,55 @@
+---
+# roles/zombatron_importer/tasks/main.yml
+
+# 1. Python venv ---------------------------------------------------------------
+
+- name: Ensure Python venv exists for Zombatron Importer
+  command:
+    cmd: "{{ zombatron_importer_python }} -m venv {{ zombatron_importer_venv }}"
+    creates: "{{ zombatron_importer_venv }}/bin/python"
+
+- name: Upgrade pip inside venv
+  command: "{{ zombatron_importer_venv }}/bin/pip install --upgrade pip"
+  changed_when: false
+
+- name: Install Zombatron Importer dependencies
+  pip:
+    requirements: "{{ zombatron_importer_src_dir }}/requirements.txt"
+    virtualenv: "{{ zombatron_importer_venv }}"
+    state: present
+
+# 2. LaunchAgent ---------------------------------------------------------------
+
+- name: Ensure ~/Library/LaunchAgents exists
+  file:
+    path: "{{ ansible_env.HOME }}/Library/LaunchAgents"
+    state: directory
+    mode: "0755"
+
+- name: Deploy Zombatron Importer launchd plist
+  template:
+    src: com.littlewolfacres.zombatron-importer.plist.j2
+    dest: "{{ zombatron_importer_plist }}"
+    mode: "0644"
+  register: plist_result
+
+# 3. Load / restart ------------------------------------------------------------
+
+- name: Unload service (if already running)
+  command: launchctl unload {{ zombatron_importer_plist }}
+  when: plist_result.changed
+  failed_when: false
+
+- name: Load service
+  command: launchctl load {{ zombatron_importer_plist }}
+  when: plist_result.changed
+
+- name: Ensure service is loaded (first install)
+  command: launchctl list {{ zombatron_importer_label }}
+  register: svc_check
+  failed_when: false
+  changed_when: false
+
+- name: Load service (first install)
+  command: launchctl load {{ zombatron_importer_plist }}
+  when: svc_check.rc != 0

@@ -1,0 +1,4 @@
+slack-bolt>=1.18
+slack_sdk>=3.27
+paramiko>=3.4
+requests>=2.31

@@ -45,3 +45,15 @@ vault_snmp_community: "REPLACE_ME"
 # Fine-grained PAT: single repo scope, Contents: Read, no expiration recommended.
 # Rotated via: Actions → Rotate ArgoCD Credentials → Run workflow
 vault_argocd_github_token: "REPLACE_ME"
+
+# Slack — Zombatron Importer bot
+# Bot token:     OAuth & Permissions → Bot Token (xoxb-)
+# App token:     Basic Information → App-Level Tokens → connections:write (xapp-)
+# Signing secret: Basic Information → Signing Secret
+vault_slack_zombatron_bot_token:      "xoxb-REPLACE_ME"
+vault_slack_zombatron_signing_secret: "REPLACE_ME"
+vault_slack_zombatron_app_token:      "xapp-REPLACE_ME"
+
+# GitHub — Fine-grained PAT for Zombatron Importer workflow dispatch
+# Scopes: Actions: Read & Write (single repo: speddling/homelab)
+vault_github_actions_pat: "github_pat_REPLACE_ME"

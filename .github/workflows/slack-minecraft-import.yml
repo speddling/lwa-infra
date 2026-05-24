@@ -1,0 +1,20 @@
+name: Slack - Import Minecraft World
+
+on:
+  workflow_dispatch:
+
+jobs:
+  import:
+    runs-on: [self-hosted, monolith]
+
+    steps:
+      - name: Clear import marker
+        run: |
+          kubectl exec -n minecraft \
+            $(kubectl get pod -n minecraft -l app=minecraft-bedrock -o jsonpath='{.items[0].metadata.name}') \
+            -- rm -f /data/worlds/.imported
+
+      - name: Bounce pod to trigger world import
+        run: |
+          kubectl delete pod -n minecraft -l app=minecraft-bedrock
+          kubectl rollout status deployment/minecraft-bedrock -n minecraft --timeout=120s

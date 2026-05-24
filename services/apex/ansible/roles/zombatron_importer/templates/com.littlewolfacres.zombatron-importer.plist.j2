@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+
+  <key>Label</key>
+  <string>{{ zombatron_importer_label }}</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>{{ zombatron_importer_venv }}/bin/python</string>
+    <string>{{ zombatron_importer_src_dir }}/importer.py</string>
+  </array>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>SLACK_BOT_TOKEN</key>
+    <string>{{ vault_slack_zombatron_bot_token }}</string>
+    <key>SLACK_APP_TOKEN</key>
+    <string>{{ vault_slack_zombatron_app_token }}</string>
+    <key>ZOMBATRON_CHANNEL_ID</key>
+    <string>{{ zombatron_importer_slack_channel }}</string>
+    <key>MONOLITH_HOST</key>
+    <string>{{ zombatron_importer_monolith_host }}</string>
+    <key>MONOLITH_USER</key>
+    <string>{{ zombatron_importer_monolith_user }}</string>
+    <key>MONOLITH_IMPORT_PATH</key>
+    <string>{{ zombatron_importer_import_path }}</string>
+    <key>GITHUB_TOKEN</key>
+    <string>{{ vault_github_actions_pat }}</string>
+    <key>GITHUB_REPO</key>
+    <string>{{ zombatron_importer_github_repo }}</string>
+    <key>IMPORT_WORKFLOW</key>
+    <string>{{ zombatron_importer_workflow }}</string>
+    <key>PATH</key>
+    <string>/opt/local/bin:/opt/local/sbin:/usr/local/bin:/usr/bin:/bin</string>
+  </dict>
+
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+
+  <key>StandardOutPath</key>
+  <string>{{ zombatron_importer_log }}</string>
+  <key>StandardErrorPath</key>
+  <string>{{ zombatron_importer_log }}</string>
+
+</dict>
+</plist>

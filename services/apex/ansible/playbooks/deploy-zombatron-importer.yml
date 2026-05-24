@@ -1,0 +1,8 @@
+---
+- name: Deploy Zombatron Importer
+  hosts: apex
+  vars_files:
+    - ../../../../ansible/vars/main.yml
+    - ../../../../ansible/vars/vault.yml
+  roles:
+    - zombatron_importer

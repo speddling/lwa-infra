@@ -1,0 +1,25 @@
+name: Deploy Zombatron Importer
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'services/apex/zombatron-importer/**'
+      - 'services/apex/ansible/roles/zombatron_importer/**'
+      - 'services/apex/ansible/playbooks/deploy-zombatron-importer.yml'
+      - '.github/workflows/deploy-zombatron-importer.yml'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, apex]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy Zombatron Importer via Ansible
+        run: |
+          ansible-playbook \
+            --vault-password-file ~/.vault_pass \
+            -i services/apex/ansible/inventory.ini \
+            services/apex/ansible/playbooks/deploy-zombatron-importer.yml
