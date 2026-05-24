@@ -9,8 +9,8 @@
 
   <key>ProgramArguments</key>
   <array>
-    <string>{{ zombatron_importer_venv }}/bin/python</string>
-    <string>{{ zombatron_importer_src_dir }}/importer.py</string>
+    <string>{{ ansible_env.HOME }}/.venv/zombatron-importer/bin/python</string>
+    <string>{{ ansible_env.HOME }}/homelab/services/apex/zombatron-importer/importer.py</string>
   </array>
 
   <key>EnvironmentVariables</key>
@@ -43,9 +43,9 @@
   <true/>
 
   <key>StandardOutPath</key>
-  <string>{{ zombatron_importer_log }}</string>
+  <string>{{ ansible_env.HOME }}/Library/Logs/zombatron-importer.log</string>
   <key>StandardErrorPath</key>
-  <string>{{ zombatron_importer_log }}</string>
+  <string>{{ ansible_env.HOME }}/Library/Logs/zombatron-importer.log</string>
 
 </dict>
 </plist>
