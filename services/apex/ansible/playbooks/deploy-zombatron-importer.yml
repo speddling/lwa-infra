@@ -1,8 +1,11 @@
 ---
 - name: Deploy Zombatron Importer
   hosts: apex
+  gather_facts: true
+
   vars_files:
-    - ../../../../ansible/vars/main.yml
-    - ../../../../ansible/vars/vault.yml
+    - "{{ playbook_dir }}/../../../../ansible/vars/main.yml"
+    - "{{ playbook_dir }}/../../../../ansible/vars/vault.yml"
+
   roles:
-    - zombatron_importer
+    - role: "{{ playbook_dir }}/../roles/zombatron_importer"
