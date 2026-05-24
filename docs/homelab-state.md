@@ -449,7 +449,19 @@ Long-term AI platform. Not current plan — placeholder if the AI path continues
 | Layer | Tool | Location |
 |---|---|---|
 | Config | Ansible | `services/apex/ansible/` |
-| Pipelines | GitHub Actions | `.github/workflows/deploy-scribe.yml`, `deploy-zombatron-importer.yml` |
+| Deploy | Manual from apex | No inbound SSH — GitHub Actions cannot reach apex |
+
+```bash
+# Deploy Scribe
+ansible-playbook --vault-password-file ~/homelab/.vault_pass \
+  -i services/apex/ansible/inventory.ini \
+  services/apex/ansible/playbooks/scribe.yml
+
+# Deploy Zombatron Importer
+ansible-playbook --vault-password-file ~/homelab/.vault_pass \
+  -i services/apex/ansible/inventory.ini \
+  services/apex/ansible/playbooks/deploy-zombatron-importer.yml
+```
 
 ---
 

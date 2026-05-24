@@ -358,6 +358,27 @@ ansible-vault view group_vars/all/vault.yml \
   --vault-password-file=~/homelab/.vault_pass
 ```
 
+### Apex
+
+Apex is a workstation with no inbound SSH — GitHub Actions cannot deploy to it.
+All apex services (Scribe, Zombatron Importer) are deployed manually from apex itself.
+
+```bash
+# Scribe
+cd ~/homelab
+ansible-playbook \
+  --vault-password-file .vault_pass \
+  -i services/apex/ansible/inventory.ini \
+  services/apex/ansible/playbooks/scribe.yml
+
+# Zombatron Importer
+cd ~/homelab
+ansible-playbook \
+  --vault-password-file .vault_pass \
+  -i services/apex/ansible/inventory.ini \
+  services/apex/ansible/playbooks/deploy-zombatron-importer.yml
+```
+
 ### Monolith
 
 ```bash
@@ -474,7 +495,7 @@ gh workflow run deploy-monolith.yml
 | `deploy-watchtower.yml` | Push to master (watchtower paths) | DNS, monitoring, exporters |
 | `deploy-monolith.yml` | Push to master (monolith paths) | Firewall, monitoring agents |
 | `deploy-fileserver.yml` | Manual | Samba config |
-| `deploy-zombatron-importer.yml` | Push to master (`services/apex/**`) | Zombatron Importer launchd service on apex |
+| ~~`deploy-zombatron-importer.yml`~~ | Deleted — apex has no inbound SSH. Deploy manually from apex. |
 | `import-minecraft-world.yml` | Manual (confirm: yes) | Stage world via Ansible + bounce pod |
 | `slack-minecraft-import.yml` | Zombatron Importer bot | Clear import marker + bounce pod |
 | `bootstrap-argocd.yml` | Manual (once) | cert-manager + ArgoCD install |

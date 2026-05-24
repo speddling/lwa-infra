@@ -58,11 +58,12 @@ chore/*   Maintenance, dependency updates
 | `deploy-watchtower.yml` | Push to master (`services/watchtower/**`) | DNS, monitoring, exporters |
 | `deploy-monolith.yml` | Push to master | Firewall, monitoring agents |
 | `deploy-fileserver.yml` | Manual | Samba config |
-| `deploy-zombatron-importer.yml` | Push to master (`services/apex/**`) | Zombatron Importer launchd service on apex |
 | `import-minecraft-world.yml` | Manual (`workflow_dispatch`, confirm: yes) | Stage world via Ansible + bounce pod |
 | `slack-minecraft-import.yml` | Zombatron Importer bot (GitHub API) | Clear import marker + bounce pod |
 | `bootstrap-argocd.yml` | Manual (once) | cert-manager + ArgoCD install |
 | `provision-k3s.yml` | Manual | k3s cluster init |
+
+> Apex services (Scribe, Zombatron Importer) are deployed manually from apex — no inbound SSH.
 
 ## Services
 
