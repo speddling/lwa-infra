@@ -201,6 +201,7 @@ services/apex/
 |---|---|
 | Repo lock | `SCRIBE_REPO_ROOTS` hardcoded in plist env — not a tool parameter |
 | Branch protection | Tools refuse `master`/`main` at the Python level before any subprocess call |
+| Merged-PR guard | `git_commit`, `git_rm`, `git_push`, `git_pr` call `gh pr view` and refuse if the branch's PR is already merged. Fails open if gh is unavailable. |
 | Staging allowlist | `git_commit` resolves and validates every path before `git add` |
 | Network exposure | Port restricted to LAN — UFW to taste |
 | Auth | Runs as `speddling`, inherits `~/.ssh/id_ed25519` and `gh` token |

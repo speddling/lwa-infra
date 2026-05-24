@@ -20,6 +20,9 @@ Auth:      None — apex firewall restricts the port to LAN only
 Security:
   - Repo-locked: SCRIBE_REPO_ROOTS env var; never a tool parameter
   - Branch-protected: mutating tools refuse main/master at the Python level
+  - Merged-PR guard: mutating tools call 'gh pr view' and refuse to operate
+    on a branch whose PR has already been merged — prevents writing to stale
+    branches. Fails open if gh is unavailable or no PR exists.
   - Path-allowlisted staging: git_commit resolves every path inside the repo
     root before touching it — no wildcard git add .
   - No shell passthrough: every tool is a hardcoded, single-purpose function
@@ -143,6 +146,31 @@ def _assert_not_protected(branch: str) -> None:
         )
 
 
+def _assert_pr_not_merged(branch: str, repo: pathlib.Path) -> None:
+    """Raise if the branch has a merged PR on GitHub.
+
+    Calls 'gh pr view' to check the PR state. If the PR is merged, raises
+    ValueError with instructions to run git_sync and start a fresh branch.
+    Fails open (allows the operation) if gh is unavailable or no PR exists.
+    """
+    try:
+        result = subprocess.run(
+            ["gh", "pr", "view", branch, "--json", "state", "--jq", ".state"],
+            cwd=repo,
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode == 0 and result.stdout.strip() == "MERGED":
+            raise ValueError(
+                f"Branch '{branch}' has a merged PR on GitHub. "
+                "Run git_sync to return to master, then create a new branch "
+                "before making further changes."
+            )
+    except FileNotFoundError:
+        # gh CLI not available — skip the check rather than blocking all commits
+        logger.warning("gh CLI not found; skipping merged-PR guard for branch '%s'", branch)
+
+
 def _run(cmd: list[str], cwd: pathlib.Path) -> str:
     """Run a subprocess command, raise on non-zero exit, return combined output."""
     logger.info("$ %s  (cwd=%s)", " ".join(cmd), cwd)
@@ -220,6 +248,7 @@ def git_commit(paths: list[str], message: str, repo: Optional[str] = None) -> st
     repo_path = _resolve_repo(repo)
     branch = _current_branch(repo_path)
     _assert_not_protected(branch)
+    _assert_pr_not_merged(branch, repo_path)
 
     # Resolve and validate every path before touching the index.
     resolved: list[pathlib.Path] = []
@@ -265,6 +294,7 @@ def git_rm(paths: list[str], repo: Optional[str] = None) -> str:
     repo_path = _resolve_repo(repo)
     branch = _current_branch(repo_path)
     _assert_not_protected(branch)
+    _assert_pr_not_merged(branch, repo_path)
 
     # Resolve and validate every path before touching anything.
     resolved: list[pathlib.Path] = []
@@ -294,6 +324,7 @@ def git_push(repo: Optional[str] = None) -> str:
     repo_path = _resolve_repo(repo)
     branch = _current_branch(repo_path)
     _assert_not_protected(branch)
+    _assert_pr_not_merged(branch, repo_path)
     out = _run(["git", "push", "--set-upstream", "origin", branch], repo_path)
     return f"Pushed '{branch}' to origin.\n{out}"
 
@@ -317,6 +348,7 @@ def git_pr(title: str, body: str, repo: Optional[str] = None) -> str:
     repo_path = _resolve_repo(repo)
     branch = _current_branch(repo_path)
     _assert_not_protected(branch)
+    _assert_pr_not_merged(branch, repo_path)
 
     out = _run(
         ["gh", "pr", "create", "--title", title, "--body", body or ""],
