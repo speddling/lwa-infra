@@ -596,7 +596,7 @@
     <p class="hero-eyebrow">Homelab Journal</p>
     <h1>Production discipline.<br /><em>Residential address.</em></h1>
     <div class="hero-rule"></div>
-    <p class="hero-lead">I've been messing with computers since the early internet days, back when configuring IRQ settings was a survival skill. I do it professionally now, but the itch to have a real lab at home never went away. This is mine... and I treat it exactly like I treat production.</p>
+    <p class="hero-lead">Christmas 1981 brought a TI-99/4A and the beginning of something that never really stopped. A few decades of ISP work, carrier NOC operations, cloud infrastructure, and DevOps later, the itch to have a real lab at home has never left. This is mine... and I treat it exactly like I treat production.</p>
   </div>
 
   <!-- ── Main ───────────────────────────────────────────────────────── -->
@@ -607,14 +607,18 @@
       <p class="section-label">The Context</p>
       <h2>A real place. A real lab.</h2>
 
-      <p>Little Wolf Acres is the name of the property where my wife, daughter, two beagles (Soul and Makamakamelon... yes, really), and I live in rural New Jersey. At some point the house acquired a proper homelab. It started, as these things do, with one server. Then a second machine for DNS. Then monitoring. Then GitOps. Then three MCP servers so my AI assistant could read logs and open pull requests.</p>
+      <p>I was writing BASIC, drawing sprites, and sharing cassette-tape games with local user groups before most people knew what a personal computer was. High school at brand-new Wallkill Valley Regional in Hamburg, NJ brought BASIC, machine language, Pascal, and FORTRAN. The head of the computer lab, Mr. Zimmerman, told me programmers were going to be glorified secretaries and the real money was in hardware design. So I pivoted. The world did not.</p>
+
+      <p>The correction came when I found out our local BBS had purchased an internet gateway. I upgraded my Apple IIc to a Performa 6200CD and figured out the rest as I went. ISP work, carrier NOC operations, cloud infrastructure, DevOps... and somewhere along the way, I ended up back at university, pursuing a BS in Computer Science at <a href="https://maestro.org" style="color: var(--ember); text-decoration: none; border-bottom: 0.5px solid rgba(232,135,74,0.4);">Maestro University</a>, with a focus on AI. The lab isn't separate from that path. It's part of it.</p>
+
+      <p>Little Wolf Acres is 2.3 acres in rural New Jersey. The household includes my wife, our daughter, two Kangals (Brutus and Junia, people-sized house dogs with strong opinions about the property line), two beagles (Soul and Maka, the latter better known online as Makamakamelon), and Cooper the rescued tuxedo cat. At some point the house also acquired a proper homelab. It started, as these things do, with one server. Then a second machine for DNS. Then monitoring. Then GitOps. Then three MCP servers so my AI assistant could read logs and open pull requests.</p>
 
       <p>That escalated appropriately.</p>
 
-      <p>The goal was never just to have stuff running. The goal was to build infrastructure the same way I build it at work: everything in code, nothing clicked through a UI and forgotten, changes tracked and reviewed, documentation kept current. If I wouldn't do it in production without a PR, I don't do it here without one either.</p>
+      <p>The goal was never just to have stuff running. The goal was to build infrastructure the same way I build it at work: everything in code, nothing clicked through a UI and forgotten, changes tracked and reviewed, documentation kept current. If I wouldn't do it in production without a PR, I don't do it here without one either. The lab grows as I grow. Right now that means getting more serious about AI infrastructure, local inference, and where the industry is heading. School is changing how I see the landscape, and the lab is where I work it out in practice.</p>
 
       <div class="callout">
-        <p><strong>The honest pitch to technical people:</strong> this is a portfolio in infrastructure form. Every config file, Ansible role, Kubernetes manifest, and GitHub Actions workflow lives in a private repo with commit history going back to the first line. If I put this level of rigor into a home network that serves two people and two dogs, you can imagine what I bring to the job.</p>
+        <p><strong>The honest pitch to technical people:</strong> this is a portfolio in infrastructure form. Every config file, Ansible role, Kubernetes manifest, and GitHub Actions workflow lives in the <a href="https://github.com/speddling/homelab" style="color: var(--ember); text-decoration: none; border-bottom: 0.5px solid rgba(232,135,74,0.4);">public homelab repo</a> with commit history going back to the first line. If I put this level of rigor into a home network that serves a family and their very large dogs, you can imagine what I bring to the job.</p>
       </div>
 
       <p>The page you're reading is the story of how it's all built, what's running, and where it's going. The short version lives here; the deep technical specs are in the expandable sections throughout.</p>
@@ -636,7 +640,7 @@
         <div class="node-card">
           <div class="node-name">Monolith</div>
           <div class="node-role">Compute Node</div>
-          <div class="node-desc">AMD Ryzen 7 5700G desktop, repurposed as a single-node Kubernetes cluster. Runs everything: services, storage, the works. Named for its intentional single-node architecture.</div>
+          <div class="node-desc">AMD Ryzen 7 5700G desktop, repurposed as a single-node Kubernetes cluster. Five drives inside: NVMe for the OS, a dedicated SSD for Kubernetes storage, a workspace SSD, a 3.6TB primary data drive, and a 1.8TB redundant backup mirror. Named for its intentional single-node architecture.</div>
         </div>
         <div class="node-card">
           <div class="node-name">Watchtower</div>
@@ -673,7 +677,7 @@
                 <td>Monolith</td>
                 <td>Ryzen 7 5700G · 32GB DDR4-3200</td>
                 <td>Ubuntu Server 24.04 LTS</td>
-                <td>512GB NVMe (OS) + 500GB SSD (k8s PVCs) + 256GB SSD (workspace) + 3.6TB HDD (music/bulk) + 1.8TB HDD (mirror)</td>
+                <td>512GB NVMe (OS) + 500GB SSD (k8s PVCs) + 256GB SSD (workspace) + 3.6TB HDD (primary: music library, Samba shares, bulk) + 1.8TB HDD (nightly rsync redundant backup — separate drive to protect against primary failure)</td>
               </tr>
               <tr>
                 <td>Watchtower</td>
@@ -898,6 +902,8 @@
 
       <p style="margin-top: 1.5rem;">All three are FastMCP servers running as system services (launchd on Apex, systemd on Watchtower, Kubernetes on Monolith). Claude Desktop connects to them via Streamable HTTP. UFW restricts each to Apex's IP only.</p>
 
+      <p style="margin-top: 1rem;">Alongside the MCP layer, Apex runs <strong style="color: var(--cream);">B-4</strong>, an Ollama instance using the M4's unified memory for local LLM inference via Metal backend. It's the starting point for AI/ML workflows until <strong style="color: var(--cream);">Lore</strong> (a dedicated Mac Mini M4 Pro with 48GB) can be added later this year. School is the context: I'm at Maestro University studying CS with an AI focus, and the lab is where theory meets the actual hardware.</p>
+
       <details>
         <summary>MCP security model</summary>
         <div class="details-body">
@@ -964,7 +970,7 @@
 
       <p><strong style="color: var(--cream);">UPS coverage.</strong> The NUT role is written and waiting. The hardware budget just hasn't landed on a CyberPower unit yet.</p>
 
-      <p><strong style="color: var(--cream);">Lore.</strong> A Mac Mini M4 Pro with 48GB of unified memory, headless in a closet, running Ollama as a dedicated inference node for the LAN. Eventually. Budget pending.</p>
+      <p><strong style="color: var(--cream);">Lore.</strong> A Mac Mini M4 Pro with 48GB of unified memory, headless, running Ollama as a dedicated inference node for the LAN. B-4 on Apex handles it for now. Lore is later this year.</p>
 
       <p><strong style="color: var(--cream);">Loki.</strong> Log aggregation on Watchtower. The Prometheus stack is solid; logs are the missing piece of the observability triad.</p>
 
@@ -979,7 +985,7 @@
     <p>Rural New Jersey &nbsp;·&nbsp; Built and maintained by <a href="resume/">James Hart</a></p>
     <div class="footer-links">
       <a href="https://littlewolfacres.com">littlewolfacres.com</a>
-      <a href="https://github.com/speddling">github.com/speddling</a>
+      <a href="https://github.com/speddling/homelab">github.com/speddling/homelab</a>
       <a href="resume/">View Resume</a>
     </div>
   </footer>
