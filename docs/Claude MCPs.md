@@ -160,7 +160,7 @@ Claude (claude.ai)
 - **Host:** `apex.littlewolfacres.com`
 - **Port:** `8765`
 - **Transport:** Streamable HTTP (FastMCP)
-- **Deploy method:** launchd service on apex — GitHub Actions `deploy-scribe.yml`
+- **Deploy method:** launchd service on apex — deployed manually from apex (no inbound SSH; GitHub Actions cannot reach apex)
 - **User:** `speddling` (inherits existing SSH key and `gh` auth)
 - **MCP URL:** `http://apex.littlewolfacres.com:8765/mcp`
 
@@ -182,8 +182,14 @@ services/apex/
             ├── tasks/main.yml
             └── templates/
                 └── com.littlewolfacres.scribe.plist.j2
-.github/workflows/
-└── deploy-scribe.yml
+```
+
+**Deploy from apex:**
+```bash
+cd ~/homelab
+ansible-playbook --vault-password-file .vault_pass \
+  -i services/apex/ansible/inventory.ini \
+  services/apex/ansible/playbooks/scribe.yml
 ```
 
 ### Key Defaults
