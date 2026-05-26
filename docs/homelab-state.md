@@ -591,6 +591,7 @@ gh workflow run deploy-watchtower.yml
 | Obelisk — client workspace on `/mnt/ssd-b` | Low | Isolated client environment, reserved name |
 | Synapse — health endpoint | Low | Add /health route to FastMCP app for proper k8s probes |
 | Watchtower service units — network-online.target | ✅ Done | All monitoring service units updated to wait for IP before starting — fixes post-power-loss crash |
+| Healthchecks.io dead-man's switch | Pending | Code deployed — add `vault_healthchecks_daily_summary_url` to vault.yml with ping URL from healthchecks.io (period: 12h, grace: 1h) |
 
 ---
 

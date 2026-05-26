@@ -54,6 +54,11 @@ vault_slack_zombatron_bot_token:      "xoxb-REPLACE_ME"
 vault_slack_zombatron_signing_secret: "REPLACE_ME"
 vault_slack_zombatron_app_token:      "xapp-REPLACE_ME"
 
+# Healthchecks.io — dead-man's switch for daily summary pipeline
+# Create a check at healthchecks.io: period=12h, grace=1h
+# Paste the ping URL here (https://hc-ping.com/<uuid>)
+vault_healthchecks_daily_summary_url: "https://hc-ping.com/REPLACE_ME"
+
 # GitHub — Fine-grained PAT for Zombatron Importer workflow dispatch
 # Scopes: Actions: Read & Write (single repo: speddling/homelab)
 vault_github_actions_pat: "github_pat_REPLACE_ME"

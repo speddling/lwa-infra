@@ -14,6 +14,7 @@ PROMETHEUS_URL = "http://localhost:{{ port_prometheus }}/api/v1"
 SLACK_URL      = "{{ vault_slack_webhook_url }}"
 GRAFANA_URL    = "http://{{ fqdn_grafana }}:{{ port_grafana }}"
 MONOLITH       = "{{ fqdn_monolith }}:{{ port_node_exporter }}"
+HEALTHCHECKS_URL = "{{ vault_healthchecks_daily_summary_url }}"
 
 {% raw %}
 # ---------------------------------------------------------------------------
@@ -152,4 +153,13 @@ try:
 except Exception as e:
     print(f"Slack post failed: {e}", file=sys.stderr)
     sys.exit(1)
+
+# ---------------------------------------------------------------------------
+# Ping healthchecks.io — dead-man's switch confirms pipeline is alive
+# If this ping stops arriving, healthchecks.io alerts via email/Slack.
+# ---------------------------------------------------------------------------
+try:
+    urllib.request.urlopen(HEALTHCHECKS_URL, timeout=5)
+except Exception as e:
+    print(f"[warn] healthchecks.io ping failed: {e}", file=sys.stderr)
 {% endraw %}
