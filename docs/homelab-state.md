@@ -390,14 +390,49 @@ And add a `spec.tls` block referencing a `secretName`. cert-manager handles the 
 
 ### B-4 — apex (Active)
 
-Local LLM workspace running Ollama on the MacBook Air M4. Entry-point for AI/ML development. All 16GB unified memory available for inference via Metal backend. Runs 7B–13B models comfortably.
+Local LLM workspace running Ollama on the MacBook Air M4. Entry-point for AI/ML development and MLOps workflow experimentation. All 16GB unified memory available for inference via Metal backend.
 
 | Spec | Detail |
 |---|---|
 | Host | `apex` (MacBook Air M4, 16GB unified memory) |
-| Software | Ollama (Metal backend) |
+| Install path | `~/B-4/` |
+| Software | Ollama |
 | API | `http://localhost:11434` |
-| Status | Active — beginner AI/ML workflow |
+| Status | Active |
+
+### Models
+
+| Model | Size | Command | Use |
+|---|---|---|---|
+| `gemma4` | ~12GB | `ollama launch claude` then select `gemma4` | Claude Code integration via Ollama — agentic coding workflows |
+| `llama3.2:3b` | ~2GB | `ollama run llama3.2:3b` | Direct chat — fast, low footprint, good for quick queries and learning |
+
+### Quick Reference
+
+```bash
+# Claude Code via Ollama (gemma4)
+ollama launch claude
+# select gemma4 from the model picker
+
+# Direct chat (llama3.2:3b)
+ollama run llama3.2:3b
+
+# List all downloaded models
+ollama list
+
+# Pull a new model
+ollama pull <model-name>
+
+# Check Ollama API is running
+curl http://localhost:11434
+```
+
+### Next Model (when ready to step up)
+`llama3.1:8b` — fits comfortably in 16GB, noticeably more capable than 3b, good daily driver until Lore arrives.
+```bash
+ollama pull llama3.1:8b
+ollama run llama3.1:8b
+```
 
 ### Lore — Mac Mini (Planned)
 
