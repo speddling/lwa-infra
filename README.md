@@ -90,11 +90,20 @@ Three MCP servers give Claude structured, safe access to the homelab:
 
 **Synapse** (`monolith:30800`) — Claude's eyes on the cluster. Read-only access to k3s pod state, Prometheus metrics, Alertmanager alerts, and the monolith filesystem.
 
-**Scribe** (`apex:8765`) — Claude's git control plane. Branch, stage, commit, push, and open PRs against this repo — with branch protection and path allowlisting baked in at the server level.
+**Scribe** (`apex:8765`) — Claude's git control plane. Branch, stage, commit, push, and open PRs against this repo — with branch protection, merged-PR guard, and path allowlisting baked in at the server level.
 
 **Argus** (`watchtower:9800`) — Claude's eyes on the monitoring layer. Read-only access to live Alertmanager and Prometheus configs, systemd service state, journald logs, and monitoring HTTP APIs.
 
 See `docs/Claude MCPs.md` for full reference.
+
+**B-4** (`~/B-4/` on apex) — local LLM inference via Ollama on the M4's unified memory (Metal backend). Two models currently loaded:
+
+| Model | Command | Use |
+|---|---|---|
+| `gemma4` (~12GB) | `ollama launch claude` | Claude Code integration via Ollama |
+| `llama3.2:3b` (~2GB) | `ollama run llama3.2:3b` | Direct chat — fast, low footprint |
+
+Next step up: `llama3.1:8b` when ready. Lore (Mac Mini M4 Pro 48GB) replaces B-4 as the dedicated LAN inference node later this year.
 
 ## Custom Exporters
 
@@ -108,8 +117,12 @@ See `docs/Claude MCPs.md` for full reference.
 - **Loki** — log aggregation on watchtower
 - **Minecraft PVC backups** — nightly CronJob to tarball world data to `/mnt/hdd-c`
 - **Minecraft realm import** — export world from Realm, import via `#zombatron`, cancel $8/month subscription
-- **Lore** — dedicated AI inference node, Mac Mini M4 Pro 48GB / 10GbE, headless. Added when B-4 on apex is outgrown
-- **Data** — aspirational. Maxed Mac Studio, long-term AI platform. Not current plan
+- **Zombatron web UI** — tablet-friendly world picker, server status, addon toggles; LAN-only pod
+- **Zombatron addon stack** — install free server-compatible addons (Naturalist, Dinosaur Era, Vanilla Biomes Plus, Location Warps, Spark Pets Lite, DragonFire Lite)
+- **Zombatron world switching** — Slack command (`!world <name>`) via Zombatron Importer
+- **Lore** — dedicated AI inference node, Mac Mini M4 Pro 48GB / 10GbE, headless. Arriving later this year.
+- **Data** — aspirational. Maxed Mac Studio, long-term AI/ML platform before Masters.
+- **VLAN design** — IoT, LAN, homelab, guest segments. Prerequisite for any WAN exposure.
 - **Obelisk** — isolated client workspace on `/mnt/ssd-b`
 - **JetStream switch** — replaces unmanaged TL-SG1210P, enables per-port SNMP stats
 - **NUT** — UPS monitoring via CyberPower CP1500PFCLCD (role ready, waiting on hardware)
