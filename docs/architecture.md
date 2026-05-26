@@ -78,7 +78,7 @@ monolith (192.168.0.20)
 │
 └── Samba (bare-metal, not k8s)
         ├── vault          → /mnt/ssd-b/vault
-        ├── studio-archive → /mnt/lab-backups/studio-archive
+        ├── studio-archive → /mnt/hdd-c/studio-archive
         └── music-library  → /mnt/hdd-c/music-library  ← Navidrome source
 ```
 
