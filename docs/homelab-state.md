@@ -1,5 +1,5 @@
 # Little Wolf Acres — Homelab Current State
-> Last updated: 2026-05-23 · Authored on apex · All IaC in `speddling/homelab` repo
+> Last updated: 2026-05-26 · Authored on apex · All IaC in `speddling/homelab` repo
 
 ---
 
@@ -590,6 +590,7 @@ gh workflow run deploy-watchtower.yml
 | Loki — log aggregation | Low | Add to Watchtower stack |
 | Obelisk — client workspace on `/mnt/ssd-b` | Low | Isolated client environment, reserved name |
 | Synapse — health endpoint | Low | Add /health route to FastMCP app for proper k8s probes |
+| Watchtower service units — network-online.target | ✅ Done | All monitoring service units updated to wait for IP before starting — fixes post-power-loss crash |
 
 ---
 
