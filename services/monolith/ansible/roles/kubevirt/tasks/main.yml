@@ -41,5 +41,7 @@
 
 - name: Create obelisk namespace
   ansible.builtin.command:
-    cmd: kubectl create namespace obelisk --dry-run=client -o yaml | kubectl apply -f -
-  changed_when: true
+    cmd: kubectl create namespace obelisk
+  register: ns_result
+  failed_when: ns_result.rc != 0 and 'already exists' not in ns_result.stderr
+  changed_when: ns_result.rc == 0
