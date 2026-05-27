@@ -221,7 +221,7 @@ Primary k3s worker node and household services platform. Hosts all Kubernetes wo
 | Name | Status | Description |
 |---|---|---|
 | Synapse | ✅ Active | MCP/AI tooling namespace. Claude's interface to the homelab. See `docs/Claude MCPs.md` |
-| Obelisk | Reserved | Client workspace on `/mnt/ssd-b` — isolated environment, future build |
+| Obelisk | 🔜 Bootstrapping | KubeVirt Win11 VM on `/mnt/ssd-b` — client workspace, RDP via `obelisk.littlewolfacres.com:33389` |
 
 ### Services
 
@@ -588,7 +588,7 @@ gh workflow run deploy-watchtower.yml
 | Minecraft — automated PVC backups | Low | k8s CronJob to tarball `/data` nightly to `/mnt/hdd-c` |
 | Fileserver idempotency | Low | Fix `smbpasswd -a` in fileserver playbook — fails on re-run when user exists |
 | Loki — log aggregation | Low | Add to Watchtower stack |
-| Obelisk — client workspace on `/mnt/ssd-b` | Low | Isolated client environment, reserved name |
+| Obelisk — client workspace on `/mnt/ssd-b` | 🔜 Bootstrapping | KubeVirt Win11 VM. Run `bootstrap-kubevirt.yml` workflow, then set `running:true` after ISO install. RDP: `obelisk.littlewolfacres.com:33389`. License: client-supplied. |
 | Synapse — health endpoint | Low | Add /health route to FastMCP app for proper k8s probes |
 | Watchtower service units — network-online.target | ✅ Done | All monitoring service units updated to wait for IP before starting — fixes post-power-loss crash |
 | Healthchecks.io dead-man's switch | Pending | Code deployed — add `vault_healthchecks_daily_summary_url` to vault.yml with ping URL from healthchecks.io (period: 12h, grace: 1h) |

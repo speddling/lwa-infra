@@ -1,0 +1,71 @@
+name: Bootstrap KubeVirt
+
+# Manual trigger only — runs once to install KubeVirt + CDI on the k3s cluster.
+# After this workflow completes, ArgoCD manages the obelisk VM declaratively.
+#
+# Prerequisites:
+#   - k3s running on monolith
+#   - ArgoCD bootstrapped (bootstrap-argocd.yml already run)
+#   - /mnt/ssd-b mounted and writable on monolith
+#
+# What this does:
+#   1. Runs the kubevirt Ansible role — installs KubeVirt + CDI operators
+#   2. Patches local-path-provisioner ConfigMap to register /mnt/ssd-b
+#   3. Applies the local-path-ssd-b StorageClass
+#   4. Applies DataVolumes — CDI begins downloading Win11 ISO (~6GB)
+#
+# After this workflow:
+#   - Monitor ISO download: kubectl get datavolume -n obelisk -w
+#   - When both DataVolumes are Succeeded, set VM running:true:
+#       kubectl patch vm obelisk -n obelisk --type merge -p '{"spec":{"running":true}}'
+#   - Watch install via VNC: virtctl vnc obelisk -n obelisk
+#   - RDP available at obelisk.littlewolfacres.com:33389 after install completes
+
+on:
+  workflow_dispatch:
+
+jobs:
+  bootstrap:
+    name: Bootstrap KubeVirt
+    runs-on: [self-hosted, monolith]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Write vault password
+        run: |
+          mkdir -p ~/homelab
+          echo '${{ secrets.ANSIBLE_VAULT_PASSWORD }}' > ~/homelab/.vault_pass
+          chmod 600 ~/homelab/.vault_pass
+
+      - name: Install Ansible dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ansible
+          ansible-galaxy collection install community.general
+
+      - name: Run kubevirt bootstrap role
+        working-directory: services/monolith/ansible
+        run: |
+          ansible-playbook -i inventory.ini playbooks/kubevirt.yml \
+            --vault-password-file ~/homelab/.vault_pass
+
+      - name: Patch local-path-provisioner to register /mnt/ssd-b
+        run: |
+          kubectl patch configmap local-path-config -n kube-system --type merge -p '{
+            "data": {
+              "config.json": "{\"nodePathMap\":[{\"node\":\"DEFAULT_PATH_FOR_NON_LISTED_NODES\",\"paths\":[\"/mnt/ssd-a\"]},{\"node\":\"monolith\",\"paths\":[\"/mnt/ssd-a\",\"/mnt/ssd-b\"]}]}"
+            }
+          }'
+
+      - name: Apply StorageClass for ssd-b
+        run: kubectl apply -f services/obelisk/kubernetes/storage.yaml
+
+      - name: Apply DataVolumes (begins ISO download)
+        run: kubectl apply -f services/obelisk/kubernetes/datavolumes.yaml
+
+      - name: Show DataVolume status
+        run: |
+          echo "DataVolume import started. Monitor with:"
+          echo "  kubectl get datavolume -n obelisk -w"
+          kubectl get datavolume -n obelisk

@@ -1,0 +1,268 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Obelisk — Unattended Windows 11 Answer File
+  ============================================
+  Produces a hardened, debloated Win11 install with:
+    - RDP enabled, NLA enforced
+    - Local admin account (obelisk / password from vault_obelisk_admin_password)
+    - windows_exporter installed and running on port 9182
+    - Telemetry, bloatware, and consumer features disabled
+    - Firewall rules for RDP (3389) and windows_exporter (9182)
+
+  This file is embedded in a secondary ISO (virtio-win + autounattend) by CDI
+  and attached to the VM as a second CD-ROM drive.
+
+  License: client-supplied — ProductKey left blank, activation deferred.
+-->
+<unattend xmlns="urn:schemas-microsoft-com:unattend">
+
+  <!-- ── Pass 1: windowsPE — disk layout + product key ─────────────────── -->
+  <settings pass="windowsPE">
+
+    <component name="Microsoft-Windows-International-Core-WinPE"
+               processorArchitecture="amd64"
+               publicKeyToken="31bf3856ad364e35"
+               language="neutral" versionScope="nonSxS"
+               xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State">
+      <SetupUILanguage>
+        <UILanguage>en-US</UILanguage>
+      </SetupUILanguage>
+      <InputLocale>en-US</InputLocale>
+      <SystemLocale>en-US</SystemLocale>
+      <UILanguage>en-US</UILanguage>
+      <UserLocale>en-US</UserLocale>
+    </component>
+
+    <component name="Microsoft-Windows-Setup"
+               processorArchitecture="amd64"
+               publicKeyToken="31bf3856ad364e35"
+               language="neutral" versionScope="nonSxS"
+               xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State">
+
+      <!-- Accept EULA; ProductKey left blank — client activates -->
+      <UserData>
+        <AcceptEula>true</AcceptEula>
+        <FullName>Obelisk</FullName>
+        <Organization>Little Wolf Acres</Organization>
+      </UserData>
+
+      <!-- Disk layout: single partition, all space -->
+      <DiskConfiguration>
+        <Disk wcm:action="add">
+          <DiskID>0</DiskID>
+          <WillWipeDisk>true</WillWipeDisk>
+          <CreatePartitions>
+            <CreatePartition wcm:action="add">
+              <Order>1</Order>
+              <Type>EFI</Type>
+              <Size>100</Size>
+            </CreatePartition>
+            <CreatePartition wcm:action="add">
+              <Order>2</Order>
+              <Type>MSR</Type>
+              <Size>16</Size>
+            </CreatePartition>
+            <CreatePartition wcm:action="add">
+              <Order>3</Order>
+              <Type>Primary</Type>
+              <Extend>true</Extend>
+            </CreatePartition>
+          </CreatePartitions>
+          <ModifyPartitions>
+            <ModifyPartition wcm:action="add">
+              <Order>1</Order>
+              <PartitionID>1</PartitionID>
+              <Label>System</Label>
+              <Format>FAT32</Format>
+            </ModifyPartition>
+            <ModifyPartition wcm:action="add">
+              <Order>2</Order>
+              <PartitionID>2</PartitionID>
+            </ModifyPartition>
+            <ModifyPartition wcm:action="add">
+              <Order>3</Order>
+              <PartitionID>3</PartitionID>
+              <Label>Windows</Label>
+              <Format>NTFS</Format>
+              <Letter>C</Letter>
+            </ModifyPartition>
+          </ModifyPartitions>
+        </Disk>
+      </DiskConfiguration>
+
+      <ImageInstall>
+        <OSImage>
+          <InstallTo>
+            <DiskID>0</DiskID>
+            <PartitionID>3</PartitionID>
+          </InstallTo>
+          <!-- Install Windows 11 Pro -->
+          <InstallFrom>
+            <MetaData wcm:action="add">
+              <Key>/IMAGE/INDEX</Key>
+              <Value>6</Value>
+            </MetaData>
+          </InstallFrom>
+        </OSImage>
+      </ImageInstall>
+
+    </component>
+  </settings>
+
+  <!-- ── Pass 4: specialize — hostname, locale ──────────────────────────── -->
+  <settings pass="specialize">
+
+    <component name="Microsoft-Windows-Shell-Setup"
+               processorArchitecture="amd64"
+               publicKeyToken="31bf3856ad364e35"
+               language="neutral" versionScope="nonSxS"
+               xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State">
+      <ComputerName>OBELISK</ComputerName>
+      <TimeZone>Eastern Standard Time</TimeZone>
+    </component>
+
+    <component name="Microsoft-Windows-International-Core"
+               processorArchitecture="amd64"
+               publicKeyToken="31bf3856ad364e35"
+               language="neutral" versionScope="nonSxS"
+               xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State">
+      <InputLocale>en-US</InputLocale>
+      <SystemLocale>en-US</SystemLocale>
+      <UILanguage>en-US</UILanguage>
+      <UserLocale>en-US</UserLocale>
+    </component>
+
+    <!-- Disable telemetry at specialize time -->
+    <component name="Microsoft-Windows-SQMAPI"
+               processorArchitecture="amd64"
+               publicKeyToken="31bf3856ad364e35"
+               language="neutral" versionScope="nonSxS"
+               xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State">
+      <CEIPEnabled>0</CEIPEnabled>
+    </component>
+
+  </settings>
+
+  <!-- ── Pass 7: oobeSystem — account, hardening, post-install ─────────── -->
+  <settings pass="oobeSystem">
+
+    <component name="Microsoft-Windows-Shell-Setup"
+               processorArchitecture="amd64"
+               publicKeyToken="31bf3856ad364e35"
+               language="neutral" versionScope="nonSxS"
+               xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State">
+
+      <OOBE>
+        <HideEULAPage>true</HideEULAPage>
+        <HideLocalAccountScreen>false</HideLocalAccountScreen>
+        <HideOEMRegistrationScreen>true</HideOEMRegistrationScreen>
+        <HideOnlineAccountScreens>true</HideOnlineAccountScreens>
+        <HideWirelessSetupInOOBE>true</HideWirelessSetupInOOBE>
+        <NetworkLocation>Work</NetworkLocation>
+        <ProtectYourPC>3</ProtectYourPC>
+        <SkipMachineOOBE>true</SkipMachineOOBE>
+        <SkipUserOOBE>true</SkipUserOOBE>
+      </OOBE>
+
+      <!-- Local admin account — password injected from vault at ISO build time -->
+      <UserAccounts>
+        <LocalAccounts>
+          <LocalAccount wcm:action="add">
+            <Name>obelisk</Name>
+            <DisplayName>Obelisk Admin</DisplayName>
+            <Group>Administrators</Group>
+            <Password>
+              <Value>OBELISK_ADMIN_PASSWORD_PLACEHOLDER</Value>
+              <PlainText>true</PlainText>
+            </Password>
+          </LocalAccount>
+        </LocalAccounts>
+      </UserAccounts>
+
+      <AutoLogon>
+        <Enabled>true</Enabled>
+        <LogonCount>1</LogonCount>
+        <Username>obelisk</Username>
+        <Password>
+          <Value>OBELISK_ADMIN_PASSWORD_PLACEHOLDER</Value>
+          <PlainText>true</PlainText>
+        </Password>
+      </AutoLogon>
+
+      <!--
+        FirstLogonCommands runs once as the autologon user.
+        Order matters — each command must complete before the next starts
+        when using synchronous execution (OrderedCommand).
+      -->
+      <FirstLogonCommands>
+
+        <!-- 1. Enable RDP with NLA -->
+        <SynchronousCommand wcm:action="add">
+          <Order>1</Order>
+          <CommandLine>cmd /c reg add "HKLM\SYSTEM\CurrentControlSet\Control\Terminal Server" /v fDenyTSConnections /t REG_DWORD /d 0 /f</CommandLine>
+        </SynchronousCommand>
+        <SynchronousCommand wcm:action="add">
+          <Order>2</Order>
+          <CommandLine>cmd /c reg add "HKLM\SYSTEM\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp" /v UserAuthentication /t REG_DWORD /d 1 /f</CommandLine>
+        </SynchronousCommand>
+
+        <!-- 2. Firewall — allow RDP and windows_exporter -->
+        <SynchronousCommand wcm:action="add">
+          <Order>3</Order>
+          <CommandLine>cmd /c netsh advfirewall firewall add rule name="RDP" protocol=TCP dir=in localport=3389 action=allow</CommandLine>
+        </SynchronousCommand>
+        <SynchronousCommand wcm:action="add">
+          <Order>4</Order>
+          <CommandLine>cmd /c netsh advfirewall firewall add rule name="windows_exporter" protocol=TCP dir=in localport=9182 action=allow</CommandLine>
+        </SynchronousCommand>
+
+        <!-- 3. Disable unnecessary services -->
+        <SynchronousCommand wcm:action="add">
+          <Order>5</Order>
+          <CommandLine>cmd /c sc config XblAuthManager start= disabled &amp; sc config XblGameSave start= disabled &amp; sc config XboxNetApiSvc start= disabled &amp; sc config XboxGipSvc start= disabled</CommandLine>
+        </SynchronousCommand>
+        <SynchronousCommand wcm:action="add">
+          <Order>6</Order>
+          <CommandLine>cmd /c sc config DiagTrack start= disabled &amp; sc config dmwappushservice start= disabled &amp; sc config WSearch start= disabled</CommandLine>
+        </SynchronousCommand>
+
+        <!-- 4. Disable telemetry via registry -->
+        <SynchronousCommand wcm:action="add">
+          <Order>7</Order>
+          <CommandLine>cmd /c reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\DataCollection" /v AllowTelemetry /t REG_DWORD /d 0 /f</CommandLine>
+        </SynchronousCommand>
+
+        <!-- 5. Disable Consumer Experience / suggested apps -->
+        <SynchronousCommand wcm:action="add">
+          <Order>8</Order>
+          <CommandLine>cmd /c reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\CloudContent" /v DisableWindowsConsumerFeatures /t REG_DWORD /d 1 /f</CommandLine>
+        </SynchronousCommand>
+
+        <!-- 6. Disable Cortana -->
+        <SynchronousCommand wcm:action="add">
+          <Order>9</Order>
+          <CommandLine>cmd /c reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\Windows Search" /v AllowCortana /t REG_DWORD /d 0 /f</CommandLine>
+        </SynchronousCommand>
+
+        <!-- 7. Download and install windows_exporter -->
+        <SynchronousCommand wcm:action="add">
+          <Order>10</Order>
+          <CommandLine>powershell -NoProfile -ExecutionPolicy Bypass -Command "Invoke-WebRequest -Uri 'https://github.com/prometheus-community/windows_exporter/releases/download/v0.29.2/windows_exporter-0.29.2-amd64.msi' -OutFile 'C:\windows_exporter.msi'"</CommandLine>
+        </SynchronousCommand>
+        <SynchronousCommand wcm:action="add">
+          <Order>11</Order>
+          <CommandLine>cmd /c msiexec /i C:\windows_exporter.msi ENABLED_COLLECTORS="cpu,cs,logical_disk,memory,net,os,service,system,tcp" LISTEN_PORT=9182 /qn /norestart</CommandLine>
+        </SynchronousCommand>
+
+        <!-- 8. Remove autologon after first boot -->
+        <SynchronousCommand wcm:action="add">
+          <Order>12</Order>
+          <CommandLine>cmd /c reg delete "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon" /v AutoAdminLogon /f</CommandLine>
+        </SynchronousCommand>
+
+      </FirstLogonCommands>
+
+    </component>
+  </settings>
+
+</unattend>

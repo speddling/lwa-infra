@@ -1,0 +1,14 @@
+---
+# KubeVirt bootstrap playbook — runs once via bootstrap-kubevirt.yml workflow.
+# Installs KubeVirt + CDI operators and creates the obelisk namespace.
+
+- name: Bootstrap KubeVirt on Monolith
+  hosts: monolith
+  become: true
+
+  vars_files:
+    - "{{ playbook_dir }}/../../../../ansible/vars/main.yml"
+    - "{{ playbook_dir }}/../../../../ansible/vars/vault.yml"
+
+  roles:
+    - kubevirt
