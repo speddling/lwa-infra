@@ -160,7 +160,60 @@ jobs:
       # ── Step 4: Provision Win11 ISO + disk ────────────────────────────────
 
       - name: Apply DataVolumes (begins Win11 ISO download)
-        run: kubectl apply -f services/obelisk/kubernetes/datavolumes.yaml
+        run: |
+          # Create PVs manually — local-path-provisioner can't provision Immediate
+          # PVCs without a node hint. Since monolith is the only node, we create
+          # PVs directly pointing to /mnt/ssd-b paths.
+          sudo mkdir -p /mnt/ssd-b/obelisk-win11-iso /mnt/ssd-b/obelisk-disk
+
+          kubectl apply -f - <<'EOF'
+          apiVersion: v1
+          kind: PersistentVolume
+          metadata:
+            name: obelisk-win11-iso-pv
+          spec:
+            capacity:
+              storage: 7Gi
+            accessModes:
+              - ReadWriteOnce
+            persistentVolumeReclaimPolicy: Retain
+            storageClassName: local-path-ssd-b
+            local:
+              path: /mnt/ssd-b/obelisk-win11-iso
+            nodeAffinity:
+              required:
+                nodeSelectorTerms:
+                  - matchExpressions:
+                      - key: kubernetes.io/hostname
+                        operator: In
+                        values:
+                          - monolith
+          ---
+          apiVersion: v1
+          kind: PersistentVolume
+          metadata:
+            name: obelisk-disk-pv
+          spec:
+            capacity:
+              storage: 80Gi
+            accessModes:
+              - ReadWriteOnce
+            persistentVolumeReclaimPolicy: Retain
+            storageClassName: local-path-ssd-b
+            local:
+              path: /mnt/ssd-b/obelisk-disk
+            nodeAffinity:
+              required:
+                nodeSelectorTerms:
+                  - matchExpressions:
+                      - key: kubernetes.io/hostname
+                        operator: In
+                        values:
+                          - monolith
+          EOF
+
+          # Now apply the DataVolumes — CDI will bind to the PVs above
+          kubectl apply -f services/obelisk/kubernetes/datavolumes.yaml
 
       - name: Wait for all DataVolumes to be Succeeded
         run: |
