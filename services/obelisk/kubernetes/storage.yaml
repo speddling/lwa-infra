@@ -14,6 +14,6 @@ metadata:
   name: local-path-ssd-b
 provisioner: rancher.io/local-path
 reclaimPolicy: Retain
-volumeBindingMode: WaitForFirstConsumer
+volumeBindingMode: Immediate
 parameters:
   nodePath: /mnt/ssd-b
