@@ -218,7 +218,7 @@ jobs:
       - name: Wait for all DataVolumes to be Succeeded
         run: |
           echo "Waiting for DataVolumes to be ready (Win11 ISO is ~6GB — may take 10-20 min)..."
-          for dv in obelisk-win11-iso obelisk-disk obelisk-autounattend; do
+          for dv in obelisk-win11-iso obelisk-disk; do
             kubectl wait datavolume/${dv} -n obelisk \
               --for=jsonpath='{.status.phase}'=Succeeded \
               --timeout=1800s
@@ -226,28 +226,6 @@ jobs:
           done
 
       # ── Step 5: Start the VM — Windows install begins ─────────────────────
-
-      - name: Update VirtualMachine manifest to mount autounattend ISO
-        run: |
-          # Patch the VM to add the autounattend DataVolume as a third CD-ROM
-          kubectl patch vm obelisk -n obelisk --type json -p '[
-            {
-              "op": "add",
-              "path": "/spec/template/spec/domain/devices/disks/-",
-              "value": {
-                "name": "autounattend",
-                "cdrom": {"bus": "sata", "readonly": true}
-              }
-            },
-            {
-              "op": "add",
-              "path": "/spec/template/spec/volumes/-",
-              "value": {
-                "name": "autounattend",
-                "dataVolume": {"name": "obelisk-autounattend"}
-              }
-            }
-          ]'
 
       - name: Start VM — Windows unattended install begins
         run: |
