@@ -46,6 +46,11 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y ansible genisoimage python3-yaml
           ansible-galaxy collection install community.general
+          # Install virtctl for CDI image upload
+          KUBEVIRT_VERSION=$(kubectl get kubevirt -n kubevirt -o jsonpath='{.items[0].status.observedKubeVirtVersion}' 2>/dev/null || echo "v1.4.0")
+          curl -sL -o /tmp/virtctl "https://github.com/kubevirt/kubevirt/releases/download/${KUBEVIRT_VERSION}/virtctl-${KUBEVIRT_VERSION}-linux-amd64"
+          chmod +x /tmp/virtctl
+          sudo mv /tmp/virtctl /usr/local/bin/virtctl
 
       # ── Step 1: Install KubeVirt + CDI ────────────────────────────────────
 
