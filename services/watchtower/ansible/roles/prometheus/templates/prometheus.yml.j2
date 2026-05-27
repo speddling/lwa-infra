@@ -161,3 +161,13 @@ scrape_configs:
     relabel_configs:
       - target_label: instance
         replacement: argocd
+
+  # ── Obelisk ─────────────────────────────────────────────────────────────
+  # windows_exporter running inside the Win11 VM, exposed via NodePort.
+  # Only active when the VM is running — scrape failures are expected when off.
+
+  - job_name: 'obelisk'
+    static_configs:
+      - targets: ['{{ fqdn_monolith }}:{{ port_obelisk_metrics }}']
+        labels:
+          instance: obelisk

@@ -1,0 +1,53 @@
+# Obelisk — DataVolumes
+#
+# Two volumes provisioned by CDI on /mnt/ssd-b:
+#
+#   obelisk-win11-iso  — downloads the Win11 evaluation ISO from Microsoft
+#   obelisk-disk       — blank 80GB disk for the Windows installation
+#
+# CDI streams the ISO directly into the PVC — no manual download needed.
+# The ISO URL points to the official Microsoft evaluation ISO (Win11 Pro, en-US).
+#
+# Note: ISO download is large (~6GB). CDI will show ImportInProgress until done.
+# Monitor with: kubectl get datavolume -n obelisk -w
+#
+# StorageClass: local-path on /mnt/ssd-b (isolated workspace drive)
+# A dedicated StorageClass for ssd-b is defined in storage.yaml.
+
+---
+apiVersion: cdi.kubevirt.io/v1beta1
+kind: DataVolume
+metadata:
+  name: obelisk-win11-iso
+  namespace: obelisk
+  annotations:
+    # Retain PVC if DataVolume is deleted — prevents accidental ISO loss
+    "cdi.kubevirt.io/storage.deleteAfterCompletion": "false"
+spec:
+  source:
+    http:
+      url: "https://software.download.prss.microsoft.com/dbazure/Win11_24H2_English_x64.iso"
+  pvc:
+    storageClassName: local-path-ssd-b
+    accessModes:
+      - ReadWriteOnce
+    resources:
+      requests:
+        storage: 7Gi
+
+---
+apiVersion: cdi.kubevirt.io/v1beta1
+kind: DataVolume
+metadata:
+  name: obelisk-disk
+  namespace: obelisk
+spec:
+  source:
+    blank: {}
+  pvc:
+    storageClassName: local-path-ssd-b
+    accessModes:
+      - ReadWriteOnce
+    resources:
+      requests:
+        storage: 80Gi

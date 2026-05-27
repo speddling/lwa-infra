@@ -73,6 +73,7 @@ monolith (192.168.0.20)
 ├── Navidrome (music streaming)          namespace: navidrome
 ├── Minecraft Bedrock                    namespace: minecraft   NodePort :30132 UDP
 ├── Synapse MCP                          namespace: synapse     NodePort :30800 TCP
+├── Obelisk (Win11 VM — KubeVirt)        namespace: obelisk     RDP NodePort :33389, metrics NodePort :39182
 │
 ├── kube-state-metrics                   → Prometheus on watchtower
 │
@@ -207,7 +208,7 @@ ArgoCD repo secret (homelab-repo)
 | NUT | watchtower | UPS monitoring — role ready, waiting on hardware |
 | JetStream switch | network | Replaces unmanaged TL-SG1210P, enables per-port SNMP |
 | Minecraft PVC backups | monolith | Nightly CronJob → /mnt/hdd-c |
-| Obelisk | monolith | Isolated client workspace on /mnt/ssd-b |
+| Obelisk | monolith | KubeVirt Win11 VM on /mnt/ssd-b — run bootstrap-kubevirt.yml to activate |
 | VLAN design | network | IoT · LAN · homelab · guest segments |
 | Lore | new node | Mac Mini M4 Pro 48GB — dedicated LAN inference |
 | Navidrome HTTPS | monolith | cert-manager annotation already understood — just needs applying |

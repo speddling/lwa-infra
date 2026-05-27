@@ -54,6 +54,11 @@ vault_slack_zombatron_bot_token:      "xoxb-REPLACE_ME"
 vault_slack_zombatron_signing_secret: "REPLACE_ME"
 vault_slack_zombatron_app_token:      "xapp-REPLACE_ME"
 
+# Obelisk — Windows 11 VM local accounts
+# Both accounts are Administrators. obelisk is the client-facing account.
+vault_obelisk_admin_password:    "REPLACE_ME"
+vault_speddling_obelisk_password: "REPLACE_ME"
+
 # Healthchecks.io — dead-man's switch for daily summary pipeline
 # Create a check at healthchecks.io: period=12h, grace=1h
 # Paste the ping URL here (https://hc-ping.com/<uuid>)

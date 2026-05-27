@@ -61,6 +61,13 @@ port_scribe:             8765
 port_argus_mcp:          9800
 
 # -----------------------------------------------------------------------------
+# Obelisk — KubeVirt Windows 11 VM
+# -----------------------------------------------------------------------------
+fqdn_obelisk:                  "obelisk.littlewolfacres.com"
+port_obelisk_rdp:              33389   # NodePort — RDP (3389 inside VM)
+port_obelisk_metrics:          39182   # NodePort — windows_exporter (9182 inside VM)
+
+# -----------------------------------------------------------------------------
 # SSH / Ansible connection
 # -----------------------------------------------------------------------------
 ansible_ssh_key:         "~/.ssh/id_ed25519"

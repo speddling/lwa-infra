@@ -1,0 +1,45 @@
+---
+# KubeVirt + CDI bootstrap role
+#
+# Installs KubeVirt and the Containerized Data Importer (CDI) operators
+# on the k3s cluster. Runs once via bootstrap-kubevirt.yml workflow.
+#
+# KubeVirt: enables VirtualMachine resources in Kubernetes
+# CDI:      enables DataVolume resources for VM disk provisioning
+#
+# After this role runs, ArgoCD manages the obelisk VirtualMachine declaratively.
+
+- name: Apply KubeVirt operator
+  ansible.builtin.command:
+    cmd: kubectl apply -f https://github.com/kubevirt/kubevirt/releases/download/{{ kubevirt_version }}/kubevirt-operator.yaml
+  changed_when: true
+
+- name: Apply KubeVirt CR
+  ansible.builtin.command:
+    cmd: kubectl apply -f https://github.com/kubevirt/kubevirt/releases/download/{{ kubevirt_version }}/kubevirt-cr.yaml
+  changed_when: true
+
+- name: Wait for KubeVirt to be ready
+  ansible.builtin.command:
+    cmd: kubectl wait --for=condition=Available kubevirt/kubevirt -n kubevirt --timeout=300s
+  changed_when: false
+
+- name: Apply CDI operator
+  ansible.builtin.command:
+    cmd: kubectl apply -f https://github.com/kubevirt/containerized-data-importer/releases/download/{{ cdi_version }}/cdi-operator.yaml
+  changed_when: true
+
+- name: Apply CDI CR
+  ansible.builtin.command:
+    cmd: kubectl apply -f https://github.com/kubevirt/containerized-data-importer/releases/download/{{ cdi_version }}/cdi-cr.yaml
+  changed_when: true
+
+- name: Wait for CDI to be ready
+  ansible.builtin.command:
+    cmd: kubectl wait --for=condition=Available cdi/cdi -n cdi --timeout=300s
+  changed_when: false
+
+- name: Create obelisk namespace
+  ansible.builtin.command:
+    cmd: kubectl create namespace obelisk --dry-run=client -o yaml | kubectl apply -f -
+  changed_when: true
