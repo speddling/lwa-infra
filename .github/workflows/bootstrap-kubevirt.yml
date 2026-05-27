@@ -1,32 +1,35 @@
 name: Bootstrap KubeVirt
 
-# Manual trigger only — runs once to install KubeVirt + CDI on the k3s cluster.
-# After this workflow completes, ArgoCD manages the obelisk VM declaratively.
+# Manual trigger only — runs once to install KubeVirt + CDI and provision
+# the Obelisk Windows 11 VM. After this workflow completes, ArgoCD manages
+# the VM declaratively.
 #
 # Prerequisites:
 #   - k3s running on monolith
 #   - ArgoCD bootstrapped (bootstrap-argocd.yml already run)
 #   - /mnt/ssd-b mounted and writable on monolith
+#   - ANSIBLE_VAULT_PASSWORD secret set in GitHub Actions
 #
 # What this does:
-#   1. Runs the kubevirt Ansible role — installs KubeVirt + CDI operators
-#   2. Patches local-path-provisioner ConfigMap to register /mnt/ssd-b
-#   3. Applies the local-path-ssd-b StorageClass
-#   4. Applies DataVolumes — CDI begins downloading Win11 ISO (~6GB)
+#   1. Install KubeVirt + CDI operators via Ansible
+#   2. Patch local-path-provisioner to register /mnt/ssd-b
+#   3. Apply StorageClass for ssd-b
+#   4. Build autounattend ISO with vault passwords injected
+#   5. Upload autounattend ISO as a DataVolume
+#   6. Apply Win11 ISO + disk DataVolumes (CDI begins download)
+#   7. Wait for all DataVolumes to be Succeeded
+#   8. Set VM running:true — Windows install begins automatically
 #
-# After this workflow:
-#   - Monitor ISO download: kubectl get datavolume -n obelisk -w
-#   - When both DataVolumes are Succeeded, set VM running:true:
-#       kubectl patch vm obelisk -n obelisk --type merge -p '{"spec":{"running":true}}'
-#   - Watch install via VNC: virtctl vnc obelisk -n obelisk
-#   - RDP available at obelisk.littlewolfacres.com:33389 after install completes
+# After this workflow, Windows installs unattended (~30-45 min).
+# RDP available at obelisk.littlewolfacres.com:33389 when complete.
+# Monitor install via: virtctl vnc obelisk -n obelisk
 
 on:
   workflow_dispatch:
 
 jobs:
   bootstrap:
-    name: Bootstrap KubeVirt
+    name: Bootstrap KubeVirt + Obelisk
     runs-on: [self-hosted, monolith]
 
     steps:
@@ -38,17 +41,22 @@ jobs:
           echo '${{ secrets.ANSIBLE_VAULT_PASSWORD }}' > ~/homelab/.vault_pass
           chmod 600 ~/homelab/.vault_pass
 
-      - name: Install Ansible dependencies
+      - name: Install dependencies
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y ansible
+          sudo apt-get install -y ansible genisoimage python3-pip
           ansible-galaxy collection install community.general
+          pip3 install ansible-vault --quiet
+
+      # ── Step 1: Install KubeVirt + CDI ────────────────────────────────────
 
       - name: Run kubevirt bootstrap role
         working-directory: services/monolith/ansible
         run: |
           ansible-playbook -i inventory.ini playbooks/kubevirt.yml \
             --vault-password-file ~/homelab/.vault_pass
+
+      # ── Step 2: Configure storage ──────────────────────────────────────────
 
       - name: Patch local-path-provisioner to register /mnt/ssd-b
         run: |
@@ -61,11 +69,139 @@ jobs:
       - name: Apply StorageClass for ssd-b
         run: kubectl apply -f services/obelisk/kubernetes/storage.yaml
 
-      - name: Apply DataVolumes (begins ISO download)
+      # ── Step 3: Build autounattend ISO with injected passwords ─────────────
+
+      - name: Decrypt vault and extract passwords
+        run: |
+          # Decrypt vault, extract the two obelisk passwords, write to env file
+          ansible-vault decrypt ansible/vars/vault.yml \
+            --vault-password-file ~/homelab/.vault_pass \
+            --output /tmp/vault-plain.yml
+          OBELISK_PASS=$(python3 -c "
+          import yaml
+          with open('/tmp/vault-plain.yml') as f:
+              v = yaml.safe_load(f)
+          print(v['vault_obelisk_admin_password'])
+          ")
+          SPEDDLING_PASS=$(python3 -c "
+          import yaml
+          with open('/tmp/vault-plain.yml') as f:
+              v = yaml.safe_load(f)
+          print(v['vault_speddling_obelisk_password'])
+          ")
+          # Write to masked env file — never echoed to logs
+          echo "OBELISK_PASS=${OBELISK_PASS}" >> /tmp/obelisk-env
+          echo "SPEDDLING_PASS=${SPEDDLING_PASS}" >> /tmp/obelisk-env
+          chmod 600 /tmp/obelisk-env
+          # Shred plaintext vault immediately
+          shred -u /tmp/vault-plain.yml
+
+      - name: Inject passwords into autounattend.xml and build ISO
+        run: |
+          source /tmp/obelisk-env
+          mkdir -p /tmp/autounattend-iso
+
+          # Inject passwords — sed with delimiter | to avoid issues with special chars
+          sed \
+            -e "s|OBELISK_ADMIN_PASSWORD_PLACEHOLDER|${OBELISK_PASS}|g" \
+            -e "s|SPEDDLING_PASSWORD_PLACEHOLDER|${SPEDDLING_PASS}|g" \
+            services/obelisk/autounattend.xml > /tmp/autounattend-iso/autounattend.xml
+
+          # Build ISO
+          genisoimage \
+            -o /tmp/autounattend.iso \
+            -J -r \
+            /tmp/autounattend-iso/
+
+          # Shred env file and injected xml
+          shred -u /tmp/obelisk-env
+          shred -u /tmp/autounattend-iso/autounattend.xml
+          rmdir /tmp/autounattend-iso
+
+      - name: Upload autounattend ISO as DataVolume
+        run: |
+          # Create a PVC on ssd-b to hold the autounattend ISO
+          kubectl apply -f - <<EOF
+          apiVersion: cdi.kubevirt.io/v1beta1
+          kind: DataVolume
+          metadata:
+            name: obelisk-autounattend
+            namespace: obelisk
+            annotations:
+              "cdi.kubevirt.io/storage.deleteAfterCompletion": "false"
+          spec:
+            source:
+              upload: {}
+            pvc:
+              storageClassName: local-path-ssd-b
+              accessModes:
+                - ReadWriteOnce
+              resources:
+                requests:
+                  storage: 10Mi
+          EOF
+
+          # Wait for upload proxy to be ready
+          kubectl wait --for=condition=Ready datavolume/obelisk-autounattend \
+            -n obelisk --timeout=60s 2>/dev/null || true
+
+          # Upload the ISO via CDI upload proxy
+          virtctl image-upload datavolume obelisk-autounattend \
+            --namespace obelisk \
+            --image-path /tmp/autounattend.iso \
+            --insecure \
+            --wait-secs=120
+
+          # Shred the ISO from runner disk
+          shred -u /tmp/autounattend.iso
+
+      # ── Step 4: Provision Win11 ISO + disk ────────────────────────────────
+
+      - name: Apply DataVolumes (begins Win11 ISO download)
         run: kubectl apply -f services/obelisk/kubernetes/datavolumes.yaml
 
-      - name: Show DataVolume status
+      - name: Wait for all DataVolumes to be Succeeded
         run: |
-          echo "DataVolume import started. Monitor with:"
-          echo "  kubectl get datavolume -n obelisk -w"
-          kubectl get datavolume -n obelisk
+          echo "Waiting for DataVolumes to be ready (Win11 ISO is ~6GB — may take 10-20 min)..."
+          for dv in obelisk-win11-iso obelisk-disk obelisk-autounattend; do
+            kubectl wait datavolume/${dv} -n obelisk \
+              --for=jsonpath='{.status.phase}'=Succeeded \
+              --timeout=1800s
+            echo "${dv}: Succeeded"
+          done
+
+      # ── Step 5: Start the VM — Windows install begins ─────────────────────
+
+      - name: Update VirtualMachine manifest to mount autounattend ISO
+        run: |
+          # Patch the VM to add the autounattend DataVolume as a third CD-ROM
+          kubectl patch vm obelisk -n obelisk --type json -p '[
+            {
+              "op": "add",
+              "path": "/spec/template/spec/domain/devices/disks/-",
+              "value": {
+                "name": "autounattend",
+                "cdrom": {"bus": "sata", "readonly": true}
+              }
+            },
+            {
+              "op": "add",
+              "path": "/spec/template/spec/volumes/-",
+              "value": {
+                "name": "autounattend",
+                "dataVolume": {"name": "obelisk-autounattend"}
+              }
+            }
+          ]'
+
+      - name: Start VM — Windows unattended install begins
+        run: |
+          kubectl patch vm obelisk -n obelisk \
+            --type merge -p '{"spec":{"running":true}}'
+          echo ""
+          echo "✅ Obelisk VM started. Windows is installing unattended (~30-45 min)."
+          echo ""
+          echo "Monitor install:  virtctl vnc obelisk -n obelisk"
+          echo "RDP when ready:   obelisk.littlewolfacres.com:33389"
+          echo "Credentials:      obelisk / <vault_obelisk_admin_password>"
+          echo "                  speddling / <vault_speddling_obelisk_password>"

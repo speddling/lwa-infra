@@ -59,6 +59,12 @@ spec:
               cdrom:
                 bus: sata
                 readonly: true
+            # autounattend ISO — drives unattended install on first boot
+            # Built and uploaded by bootstrap-kubevirt.yml with vault passwords injected
+            - name: autounattend
+              cdrom:
+                bus: sata
+                readonly: true
           interfaces:
             - name: default
               model: virtio
@@ -101,6 +107,10 @@ spec:
         - name: virtio-drivers
           containerDisk:
             image: quay.io/kubevirt/virtio-container-disk:v0.59.0
+        # autounattend ISO — uploaded by bootstrap-kubevirt.yml
+        - name: autounattend
+          dataVolume:
+            name: obelisk-autounattend
 
 ---
 # RDP NodePort — exposes port 3389 on monolith as 33389
