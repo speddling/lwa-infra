@@ -29,7 +29,7 @@ metadata:
   labels:
     app: obelisk
 spec:
-  running: false   # Set to true after DataVolumes are ready and ISO install is complete
+  running: true
   template:
     metadata:
       labels:
@@ -101,8 +101,8 @@ spec:
           dataVolume:
             name: obelisk-disk
         - name: win-iso
-          dataVolume:
-            name: obelisk-win11-iso
+          persistentVolumeClaim:
+            claimName: obelisk-win11-iso
         # virtio-win drivers — pulled from the official Fedora-hosted image
         - name: virtio-drivers
           containerDisk:
