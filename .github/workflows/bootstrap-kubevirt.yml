@@ -9,16 +9,22 @@ name: Bootstrap KubeVirt
 #   - ArgoCD bootstrapped (bootstrap-argocd.yml already run)
 #   - /mnt/ssd-b mounted and writable on monolith
 #   - ANSIBLE_VAULT_PASSWORD secret set in GitHub Actions
+#   - Win11 ISO pre-staged on monolith:
+#       scp Win11_25H2_English_x64_v2.iso \
+#         speddling@monolith:/mnt/ssd-b/obelisk-win11-iso/disk.img
+#     (Microsoft download URLs are session-authenticated and cannot be
+#      fetched directly by CDI — stage once, reuse forever)
 #
 # What this does:
-#   1. Install KubeVirt + CDI operators via Ansible
-#   2. Patch local-path-provisioner to register /mnt/ssd-b
-#   3. Apply StorageClass for ssd-b
-#   4. Build autounattend ISO with vault passwords injected
-#   5. Upload autounattend ISO as a DataVolume
-#   6. Apply Win11 ISO + disk DataVolumes (CDI begins download)
-#   7. Wait for all DataVolumes to be Succeeded
-#   8. Set VM running:true — Windows install begins automatically
+#   1. Preflight: verify Win11 ISO is staged on monolith
+#   2. Install KubeVirt + CDI operators via Ansible
+#   3. Patch local-path-provisioner to register /mnt/ssd-b
+#   4. Apply StorageClass for ssd-b
+#   5. Build autounattend ISO with vault passwords injected
+#   6. Upload autounattend ISO as a PVC
+#   7. Apply volumes (win11 PV+PVC + blank disk DataVolume)
+#   8. Wait for obelisk-disk DataVolume to be Succeeded
+#   9. Set VM running:true — Windows install begins automatically
 #
 # After this workflow, Windows installs unattended (~30-45 min).
 # RDP available at obelisk.littlewolfacres.com:33389 when complete.
@@ -34,6 +40,25 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Preflight — verify Win11 ISO is staged
+        run: |
+          ISO_PATH="/mnt/ssd-b/obelisk-win11-iso/disk.img"
+          if [ ! -f "${ISO_PATH}" ]; then
+            echo "❌ Win11 ISO not found at ${ISO_PATH}"
+            echo ""
+            echo "Stage the ISO before running this workflow:"
+            echo "  scp Win11_25H2_English_x64_v2.iso \\"
+            echo "    speddling@monolith:/mnt/ssd-b/obelisk-win11-iso/disk.img"
+            exit 1
+          fi
+          ISO_SIZE=$(stat -c%s "${ISO_PATH}")
+          MIN_SIZE=$((5 * 1024 * 1024 * 1024))
+          if [ "${ISO_SIZE}" -lt "${MIN_SIZE}" ]; then
+            echo "❌ ISO at ${ISO_PATH} is ${ISO_SIZE} bytes — looks incomplete (expected >5GB)"
+            exit 1
+          fi
+          echo "✅ Win11 ISO found: $(numfmt --to=iec ${ISO_SIZE})"
 
       - name: Write vault password
         run: |
@@ -159,36 +184,15 @@ jobs:
 
       # ── Step 4: Provision Win11 ISO + disk ────────────────────────────────
 
-      - name: Apply DataVolumes (begins Win11 ISO download)
+      - name: Apply volumes (win11 ISO PV+PVC + blank disk DataVolume)
         run: |
-          # Create PVs manually — local-path-provisioner can't provision Immediate
-          # PVCs without a node hint. Since monolith is the only node, we create
-          # PVs directly pointing to /mnt/ssd-b paths.
-          sudo mkdir -p /mnt/ssd-b/obelisk-win11-iso /mnt/ssd-b/obelisk-disk
+          # Create ssd-b path for blank disk — win11-iso path already exists
+          # (ISO was pre-staged there as a prerequisite)
+          sudo mkdir -p /mnt/ssd-b/obelisk-disk
 
+          # Create disk PV manually — local-path-provisioner can't provision
+          # Immediate PVCs without a node hint
           kubectl apply -f - <<'EOF'
-          apiVersion: v1
-          kind: PersistentVolume
-          metadata:
-            name: obelisk-win11-iso-pv
-          spec:
-            capacity:
-              storage: 7Gi
-            accessModes:
-              - ReadWriteOnce
-            persistentVolumeReclaimPolicy: Retain
-            storageClassName: local-path-ssd-b
-            local:
-              path: /mnt/ssd-b/obelisk-win11-iso
-            nodeAffinity:
-              required:
-                nodeSelectorTerms:
-                  - matchExpressions:
-                      - key: kubernetes.io/hostname
-                        operator: In
-                        values:
-                          - monolith
-          ---
           apiVersion: v1
           kind: PersistentVolume
           metadata:
@@ -212,7 +216,7 @@ jobs:
                           - monolith
           EOF
 
-          # Now apply the DataVolumes — CDI will bind to the PVs above
+          # Apply datavolumes.yaml — creates win11 PV+PVC and blank disk DataVolume
           kubectl apply -f services/obelisk/kubernetes/datavolumes.yaml
 
       - name: Wait for all DataVolumes to be Succeeded

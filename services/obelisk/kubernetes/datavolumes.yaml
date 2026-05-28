@@ -1,39 +1,59 @@
-# Obelisk — DataVolumes
+# Obelisk — Volumes
 #
-# Two volumes provisioned by CDI on /mnt/ssd-b:
+# obelisk-win11-iso  — PV + PVC backed by a pre-staged ISO on monolith
+#                      PREREQUISITE: stage the Win11 ISO manually before
+#                      running bootstrap-kubevirt.yml:
 #
-#   obelisk-win11-iso  — downloads the Win11 evaluation ISO from Microsoft
-#   obelisk-disk       — blank 80GB disk for the Windows installation
+#                        scp Win11_25H2_English_x64_v2.iso \
+#                          speddling@monolith:/mnt/ssd-b/obelisk-win11-iso/disk.img
 #
-# CDI streams the ISO directly into the PVC — no manual download needed.
-# The ISO URL points to the official Microsoft evaluation ISO (Win11 Pro, en-US).
+#                      Microsoft session-authenticated download URLs are not
+#                      stable — CDI cannot fetch them directly. The ISO must
+#                      be obtained from microsoft.com/software-download/windows11
+#                      and staged to monolith as a one-time prerequisite.
 #
-# Note: ISO download is large (~6GB). CDI will show ImportInProgress until done.
-# Monitor with: kubectl get datavolume -n obelisk -w
+# obelisk-disk       — blank 80Gi DataVolume (CDI provisions this automatically)
 #
 # StorageClass: local-path on /mnt/ssd-b (isolated workspace drive)
 # A dedicated StorageClass for ssd-b is defined in storage.yaml.
 
 ---
-apiVersion: cdi.kubevirt.io/v1beta1
-kind: DataVolume
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: obelisk-win11-iso-pv
+spec:
+  capacity:
+    storage: 8Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: local-path-ssd-b
+  local:
+    path: /mnt/ssd-b/obelisk-win11-iso
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: kubernetes.io/hostname
+              operator: In
+              values:
+                - monolith
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
 metadata:
   name: obelisk-win11-iso
   namespace: obelisk
-  annotations:
-    # Retain PVC if DataVolume is deleted — prevents accidental ISO loss
-    "cdi.kubevirt.io/storage.deleteAfterCompletion": "false"
 spec:
-  source:
-    http:
-      url: "https://software.download.prss.microsoft.com/dbazure/Win11_24H2_English_x64.iso"
-  pvc:
-    storageClassName: local-path-ssd-b
-    accessModes:
-      - ReadWriteOnce
-    resources:
-      requests:
-        storage: 7Gi
+  storageClassName: local-path-ssd-b
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 8Gi
+  volumeName: obelisk-win11-iso-pv
 
 ---
 apiVersion: cdi.kubevirt.io/v1beta1
