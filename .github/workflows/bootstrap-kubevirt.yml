@@ -233,6 +233,18 @@ jobs:
 
       - name: Start VM — Windows unattended install begins
         run: |
+          # Wait for ArgoCD to sync the VM manifest before patching
+          echo "Waiting for ArgoCD to sync obelisk VM manifest..."
+          for i in $(seq 1 24); do
+            if kubectl get vm obelisk -n obelisk &>/dev/null; then
+              echo "✅ VM manifest found"
+              break
+            fi
+            echo "  attempt ${i}/24 — waiting 5s..."
+            sleep 5
+          done
+          kubectl get vm obelisk -n obelisk || { echo "❌ VM manifest never appeared — check ArgoCD sync"; exit 1; }
+
           kubectl patch vm obelisk -n obelisk \
             --type merge -p '{"spec":{"running":true}}'
           echo ""
