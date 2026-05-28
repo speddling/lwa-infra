@@ -1,0 +1,24 @@
+# Obelisk — Services
+#
+# Exposes RDP (3389) from the Windows VM to the LAN via NodePort.
+# Connect via: monolith-ip:33389
+#
+# The VM's internal IP (10.42.x.x) is not directly reachable from the LAN —
+# traffic must enter via the NodePort on monolith and be forwarded to the
+# virt-launcher pod by kube-proxy.
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: obelisk-rdp
+  namespace: obelisk
+spec:
+  type: NodePort
+  selector:
+    kubevirt.io/vm: obelisk
+  ports:
+    - name: rdp
+      protocol: TCP
+      port: 3389
+      targetPort: 3389
+      nodePort: 33389
