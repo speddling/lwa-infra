@@ -1,23 +1,28 @@
 # Obelisk — KubeVirt VirtualMachine
 #
-# Windows 11 Pro VM running on monolith, isolated on /mnt/ssd-b.
+# Windows 11 VM running on monolith, isolated on /mnt/ssd-b.
 # Managed declaratively by ArgoCD — start/stop via virtctl or kubectl patch.
 #
+# Hardware config rationale:
+#   - win-disk: SATA bus — OVMF UEFI can boot SATA natively, no driver needed
+#   - network:  e1000e   — Windows has inbox drivers, no virtio-net required
+#   - virtio-drivers ISO removed — not needed without virtio devices
+#   - SecureBoot: off    — re-enable after confirmed clean boot
+#   - EFI persistent     — NVRAM survives VM restarts, boot entries preserved
+#
 # First boot:
-#   1. Bootstrap workflow applies DataVolumes — CDI downloads ISO (~6GB, ~10-20min)
-#   2. ArgoCD syncs this manifest — VM starts, boots from ISO
-#   3. autounattend.xml drives unattended install (~30-45min)
+#   1. Bootstrap workflow stages volumes and applies manifests
+#   2. ArgoCD syncs this manifest — VM starts, boots from win-iso (bootOrder 2)
+#   3. autounattend.xml drives unattended install (~30-45 min)
 #   4. VM reboots into Windows, runs FirstLogonCommands (RDP + windows_exporter)
 #   5. RDP available at obelisk.littlewolfacres.com:33389
 #
-# Subsequent boots: VM starts directly from obelisk-disk, ISO detached.
-#
 # Resource allocation:
-#   CPU:    4 cores  (half of Ryzen 7 5700G's 8c/16t)
+#   CPU:    4 cores  (half of Ryzen 7 5700G 8c/16t)
 #   Memory: 8Gi      (quarter of 32GB — leaves headroom for k3s workloads)
 #
-# To start:  kubectl patch vm obelisk -n obelisk --type merge -p '{"spec":{"running":true}}'
-# To stop:   kubectl patch vm obelisk -n obelisk --type merge -p '{"spec":{"running":false}}'
+# To start:  virtctl start obelisk -n obelisk
+# To stop:   virtctl stop obelisk -n obelisk
 # Console:   virtctl vnc obelisk -n obelisk
 
 ---
@@ -43,41 +48,33 @@ spec:
           guest: 8Gi
         devices:
           disks:
-            # Primary disk — Windows installation target
+            # Primary disk — SATA so OVMF can enumerate and boot it natively
             - name: win-disk
               bootOrder: 1
               disk:
                 bus: sata
-            # Windows 11 ISO — boot source for initial install
+            # Windows 11 ISO — install source, bootOrder 2
             - name: win-iso
               bootOrder: 2
               cdrom:
                 bus: sata
                 readonly: true
-            # virtio drivers ISO — required for virtio disk/net on Windows
-            - name: virtio-drivers
-              cdrom:
-                bus: sata
-                readonly: true
-            # autounattend ISO — drives unattended install on first boot
-            # Built and uploaded by bootstrap-kubevirt.yml with vault passwords injected
+            # autounattend ISO — drives unattended install
             - name: autounattend
               cdrom:
                 bus: sata
                 readonly: true
           interfaces:
+            # e1000e — inbox Windows driver, no virtio-net needed
             - name: default
-              model: virtio
+              model: e1000e
               masquerade: {}
-          # Enable tablet input for accurate mouse in VNC/RDP
           inputs:
             - type: tablet
               bus: usb
               name: tablet
-        # Machine type for Win11 compatibility
         machine:
           type: q35
-        # TPM required for Win11
         features:
           smm:
             enabled: true
@@ -92,7 +89,9 @@ spec:
         firmware:
           bootloader:
             efi:
+              # SecureBoot off — re-enable after confirmed clean boot
               secureBoot: false
+              # Persist NVRAM so EFI boot entries survive VM restarts
               persistent: true
       networks:
         - name: default
@@ -104,18 +103,12 @@ spec:
         - name: win-iso
           persistentVolumeClaim:
             claimName: obelisk-win11-iso
-        # virtio-win drivers — pulled from the official Fedora-hosted image
-        - name: virtio-drivers
-          containerDisk:
-            image: quay.io/kubevirt/virtio-container-disk:v0.59.0
-        # autounattend ISO — uploaded by bootstrap-kubevirt.yml
         - name: autounattend
           persistentVolumeClaim:
             claimName: obelisk-autounattend
 
 ---
 # RDP NodePort — exposes port 3389 on monolith as 33389
-# obelisk.littlewolfacres.com → 192.168.0.20:33389 (AdGuard rewrite)
 apiVersion: v1
 kind: Service
 metadata:
@@ -134,7 +127,6 @@ spec:
 
 ---
 # windows_exporter NodePort — exposes port 9182 on monolith as 39182
-# Prometheus on watchtower scrapes monolith:39182
 apiVersion: v1
 kind: Service
 metadata:
