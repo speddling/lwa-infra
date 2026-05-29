@@ -92,7 +92,8 @@ spec:
         firmware:
           bootloader:
             efi:
-              secureBoot: true
+              secureBoot: false
+              persistent: true
       networks:
         - name: default
           pod: {}
