@@ -47,7 +47,7 @@ spec:
             - name: win-disk
               bootOrder: 1
               disk:
-                bus: virtio
+                bus: sata
             # Windows 11 ISO — boot source for initial install
             - name: win-iso
               bootOrder: 2
