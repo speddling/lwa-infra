@@ -163,7 +163,7 @@ argocd_repo_username:    "speddling"
 # Apex — Scribe MCP server
 # -----------------------------------------------------------------------------
 scribe_port:        "{{ port_scribe }}"
-scribe_repo_roots:  "/Users/speddling/homelab"
+scribe_repo_roots:  "/Users/speddling/homelab:/Users/speddling/lwa-web"
 scribe_python:      "/opt/local/bin/python3.12"
 scribe_venv:        "~/.venv/scribe"
 scribe_label:       "com.littlewolfacres.scribe"
