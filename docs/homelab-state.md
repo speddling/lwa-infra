@@ -1,5 +1,6 @@
 # Little Wolf Acres — Homelab Current State
-> Last updated: 2026-05-26 · Authored on apex · All IaC in `speddling/homelab` repo
+> Last updated: 2026-05-30 · Authored on apex · All IaC in `speddling/homelab` repo
+> Future plans → `homelab-roadmap.md` · Operational debt and one-off tasks → `homelab-todo.md`
 
 ---
 
@@ -62,16 +63,16 @@
 
 ### Hardware
 
-| Spec     | Detail                        |
-| -------- | ----------------------------- |
-| Machine  | Asus VM40B Mini-PC            |
-| CPU      | Intel Celeron 1007U @ 1.50GHz — 2 cores / 2 threads |
-| RAM      | 8GB DDR3-1600 (2×4GB Micron 8KTF51264HZ-1G6E1) |
-| Storage  | 1TB SSD — Crucial CT1000MX500SSD1 |
-| OS       | Ubuntu Server 24.04.4 LTS       |
-| Kernel   | 6.8.0-111-generic              |
-| Hostname | `watchtower`                  |
-| IP       | 192.168.0.21 (DHCP MAC-bound) |
+| Spec | Detail |
+|---|---|
+| Machine | Asus VM40B Mini-PC |
+| CPU | Intel Celeron 1007U @ 1.50GHz — 2 cores / 2 threads |
+| RAM | 8 GB DDR3-1600 (2×4 GB Micron 8KTF51264HZ-1G6E1) |
+| Storage | 1 TB SSD — Crucial CT1000MX500SSD1 |
+| OS | Ubuntu Server 24.04.4 LTS |
+| Kernel | 6.8.0-111-generic |
+| Hostname | `watchtower` |
+| IP | 192.168.0.21 (DHCP MAC-bound) |
 
 ### Role
 
@@ -151,23 +152,23 @@ Alerting is owned by **Prometheus + Alertmanager**. Grafana is display-only.
 | WatchtowerHighCPU | > 85% sustained 5m | watchtower |
 | WatchtowerHighMemory | > 85% sustained 5m | watchtower |
 | WatchtowerLowDisk | > 80% used | watchtower |
-| WatchtowerPrometheusTSDB | TSDB blocks > 8GB (80% of 10GB retention limit) | watchtower |
+| WatchtowerPrometheusTSDB | TSDB blocks > 8 GB (80% of 10 GB retention limit) | watchtower |
 | WatchtowerNodeExporterDown | Scrape fails > 1m | watchtower |
 | DailySummary | Always firing — canary for pipeline health | all |
 
 ### UFW Rules
 
-| Port  | Protocol | Service          | Allowed From  |
-| ----- | -------- | ---------------- | ------------- |
-| 22    | TCP      | SSH              | apex only |
-| 53    | TCP+UDP  | AdGuard Home DNS | LAN           |
-| 3000  | TCP      | AdGuard Home UI  | LAN           |
-| 3001  | TCP      | Grafana          | LAN           |
-| 9090  | TCP      | Prometheus       | LAN           |
-| 9093  | TCP      | Alertmanager     | LAN           |
-| 9116  | TCP      | snmp_exporter    | LAN           |
-| 9618  | TCP      | adguard_exporter | LAN           |
-| 19999 | TCP      | Netdata          | LAN           |
+| Port | Protocol | Service | Allowed From |
+|---|---|---|---|
+| 22 | TCP | SSH | apex only |
+| 53 | TCP+UDP | AdGuard Home DNS | LAN |
+| 3000 | TCP | AdGuard Home UI | LAN |
+| 3001 | TCP | Grafana | LAN |
+| 9090 | TCP | Prometheus | LAN |
+| 9093 | TCP | Alertmanager | LAN |
+| 9116 | TCP | snmp_exporter | LAN |
+| 9618 | TCP | adguard_exporter | LAN |
+| 19999 | TCP | Netdata | LAN |
 
 ### IaC
 
@@ -178,39 +179,29 @@ Alerting is owned by **Prometheus + Alertmanager**. Grafana is display-only.
 | Pipeline | GitHub Actions | `.github/workflows/deploy-watchtower.yml` |
 | Runner | Self-hosted, label: `watchtower` | Installed on Watchtower as systemd service |
 
-### Pending
-
-- **NUT (UPS monitoring)** — role is written and ready, waiting for CyberPower CP1500PFCLCD hardware
-
 ---
 
 ## Monolith
 
 ### Hardware
 
-| Spec     | Detail                        |
-| -------- | ----------------------------- |
-| Machine  | AMD Tower (Fractal Design Define R4) |
-| CPU      | AMD Ryzen 7 5700G with Radeon Graphics — 8 cores / 16 threads |
-| GPU      | AMD Radeon Vega (integrated, Cezanne) |
-| RAM      | 32GB DDR4-3200 (2×16GB Corsair Vengeance LPX CMK32GX4M2E3200C16) |
-| OS       | Ubuntu Server 24.04.4 LTS       |
-| Kernel   | 6.8.0-111-generic              |
-| Hostname | `monolith`                    |
-| IP       | 192.168.0.20 (DHCP MAC-bound) |
-| Storage  | 512GB NVMe — Samsung PM9A1 — `/` (150G LVM, unallocated headroom) |
-|          | 500GB SSD — Crucial CT500MX500SSD1 — `/mnt/ssd-a` — k8s local-path provisioner |
-|          | 256GB SSD — Crucial CT256M55 — `/mnt/ssd-b` — isolated workspace / client jumpbox |
-|          | 3.6TB HDD — Seagate ST4000DM004 — `/mnt/hdd-c` — music library / fileserver / bulk storage |
-|          | 1.8TB HDD — Hitachi HUA72202 — `/mnt/hdd-d` — mirror of hdd-c |
+| Spec | Detail |
+|---|---|
+| Machine | AMD Tower (Fractal Design Define R4) |
+| CPU | AMD Ryzen 7 5700G — 8 cores / 16 threads |
+| GPU | AMD Radeon Vega (integrated, Cezanne) |
+| RAM | 32 GB DDR4-3200 (2×16 GB Corsair Vengeance LPX CMK32GX4M2E3200C16) |
+| OS | Ubuntu Server 24.04.4 LTS |
+| Kernel | 6.8.0-111-generic |
+| Hostname | `monolith` |
+| IP | 192.168.0.20 (DHCP MAC-bound) |
+| Storage | 512 GB NVMe — Samsung PM9A1 — `/` (150 G LVM, unallocated headroom) |
+| | 500 GB SSD — Crucial CT500MX500SSD1 — `/mnt/ssd-a` — k8s local-path provisioner |
+| | 256 GB SSD — Crucial CT256M55 — `/mnt/ssd-b` — isolated workspace / client jumpbox |
+| | 3.6 TB HDD — Seagate ST4000DM004 — `/mnt/hdd-c` — music library / fileserver / bulk storage |
+| | 1.8 TB HDD — Hitachi HUA72202 — `/mnt/hdd-d` — mirror of hdd-c |
 
-### Upgrade Roadmap
-
-| Order | Item | Notes |
-|---|---|---|
-| 1 | RAM — 2×16GB DDR4-3200 | Bring to 64GB. Cheap now, immediate headroom for k3s and CPU inference |
-
-> **Hardware freeze after RAM.** No GPU, no PSU replacement, no case fans. Monolith is stable and sufficient for its current role. AI workloads are handled by B-4 on apex and eventually Lore.
+> **RAM upgrade pending:** 2×16 GB DDR4-3200 to bring total to 64 GB — approximately 2 weeks out.
 
 ### Role
 
@@ -283,8 +274,7 @@ Primary k3s worker node and household services platform. Hosts all Kubernetes wo
 
 ## ArgoCD
 
-GitOps controller for k3s. Watches `speddling/homelab` on `master` and reconciles
-all k8s workloads. Replaces the per-app `kubectl apply` GitHub Actions workflows.
+GitOps controller for k3s. Watches `speddling/homelab` on `master` and reconciles all k8s workloads.
 
 ### Access
 
@@ -360,8 +350,7 @@ ArgoCD authenticates to `speddling/homelab` via a GitHub fine-grained PAT.
 
 ## cert-manager
 
-Automatic TLS certificate management for k3s. Issues and renews Let's Encrypt
-certificates via Cloudflare DNS-01 challenge (no inbound port required).
+Automatic TLS certificate management for k3s. Issues and renews Let's Encrypt certificates via Cloudflare DNS-01 challenge (no inbound port required).
 
 ### ClusterIssuers
 
@@ -372,7 +361,7 @@ certificates via Cloudflare DNS-01 challenge (no inbound port required).
 
 ### How to add TLS to an ingress
 
-Add these two annotations to any Ingress manifest:
+Add these annotations to any Ingress manifest:
 ```yaml
 traefik.ingress.kubernetes.io/router.entrypoints: websecure
 traefik.ingress.kubernetes.io/router.tls: "true"
@@ -393,11 +382,11 @@ And add a `spec.tls` block referencing a `secretName`. cert-manager handles the 
 
 ### B-4 — apex (Active)
 
-Local LLM workspace running Ollama on the MacBook Air M4. Entry-point for AI/ML development and MLOps workflow experimentation. All 16GB unified memory available for inference via Metal backend.
+Local LLM workspace running Ollama on the MacBook Air M4.
 
 | Spec | Detail |
 |---|---|
-| Host | `apex` (MacBook Air M4, 16GB unified memory) |
+| Host | `apex` (MacBook Air M4, 16 GB unified memory) |
 | Install path | `~/B-4/` |
 | Software | Ollama |
 | API | `http://localhost:11434` |
@@ -407,8 +396,8 @@ Local LLM workspace running Ollama on the MacBook Air M4. Entry-point for AI/ML 
 
 | Model | Size | Command | Use |
 |---|---|---|---|
-| `gemma4` | ~12GB | `ollama launch claude` then select `gemma4` | Claude Code integration via Ollama — agentic coding workflows |
-| `llama3.2:3b` | ~2GB | `ollama run llama3.2:3b` | Direct chat — fast, low footprint, good for quick queries and learning |
+| `gemma4` | ~12 GB | `ollama launch claude` then select `gemma4` | Claude Code integration via Ollama — agentic coding workflows |
+| `llama3.2:3b` | ~2 GB | `ollama run llama3.2:3b` | Direct chat — fast, low footprint, good for quick queries and learning |
 
 ### Quick Reference
 
@@ -431,49 +420,41 @@ curl http://localhost:11434
 ```
 
 ### Next Model (when ready to step up)
-`llama3.1:8b` — fits comfortably in 16GB, noticeably more capable than 3b, good daily driver until Lore arrives.
+`llama3.1:8b` — fits comfortably in 16 GB, noticeably more capable than 3b, good daily driver until Lore arrives.
 ```bash
 ollama pull llama3.1:8b
 ollama run llama3.1:8b
 ```
 
-### Lore — Mac Mini (Planned)
+### Lore — Mac Mini / Mac Studio (Planned)
 
-Dedicated AI inference node. Headless in closet. Added when B-4 on apex is outgrown.
+See `homelab-roadmap.md` for full spec and timing.
 
-| Spec | Detail |
+| Detail | Value |
 |---|---|
-| Hardware | Mac Mini M4 Pro — 14-core CPU, 20-core GPU |
-| Memory | 48GB unified memory |
-| Network | 10 Gigabit Ethernet |
-| Storage | 512GB SSD base — Thunderbolt 5 for expansion |
 | Hostname | `lore` (reserved) |
 | IP | TBD — DHCP MAC-bound on arrival |
-| Software | Ollama headless — API served to LAN |
-| Status | Planned — budget pending |
+| Status | Planned — awaiting M5 refresh |
 
-> Edu pricing applies via `.edu` email. 10GbE port future-proofs beyond current gigabit infrastructure.
+### Data — Linux AI Workstation (Aspirational)
 
-### Data — Mac Studio (Aspirational)
+See `homelab-roadmap.md` for full spec and rationale.
 
-Long-term AI platform. Not current plan — placeholder if the AI path continues and warrants the investment.
-
-| Spec | Detail |
+| Detail | Value |
 |---|---|
-| Hardware | Mac Studio (maxed chipset and RAM) |
 | Hostname | `data` (reserved) |
-| Status | Aspirational — not on current roadmap |
+| Status | Aspirational |
 
 ---
 
 ## Apex
 
-| Spec     | Detail                                                                 |
-| -------- | ---------------------------------------------------------------------- |
-| Machine  | MacBook Air M4 (2025) 16GB                                             |
-| Hostname | `apex`                                                                 |
-| IP       | 192.168.0.19 (DHCP MAC-bound)                                          |
-| Role     | Primary workstation — all authoring, config, and remote ops originate here |
+| Spec | Detail |
+|---|---|
+| Machine | MacBook Air M4 (2025) 16 GB |
+| Hostname | `apex` |
+| IP | 192.168.0.19 (DHCP MAC-bound) |
+| Role | Primary workstation — all authoring, config, and remote ops originate here |
 
 ### Services
 
@@ -506,11 +487,11 @@ ansible-playbook --vault-password-file ~/homelab/.vault_pass \
 ## Studio
 
 | Spec | Detail |
-| ---- | ------ |
+|---|---|
 | Machine | Dell Precision 5560 |
-| CPU | Intel Core i9-11950H @ 2.60GHz — 8 cores / 16 threads |
-| RAM | 32GB DDR4-3200 (2×16GB Samsung M471A2G43BB2-CWE) |
-| Storage | 512GB NVMe — Samsung PM9A1 |
+| CPU | Intel Core i9-11950H @ 2.60 GHz — 8 cores / 16 threads |
+| RAM | 32 GB DDR4-3200 (2×16 GB Samsung M471A2G43BB2-CWE) |
+| Storage | 512 GB NVMe — Samsung PM9A1 |
 | GPU | Intel UHD Graphics (Tiger Lake-H, integrated) |
 | OS | Ubuntu Studio 24.04 LTS (KDE Plasma 5.27.12 · Wayland) |
 | Kernel | 6.8.0-111-lowlatency |
@@ -534,8 +515,7 @@ ansible-playbook --vault-password-file ~/homelab/.vault_pass \
 
 ## Git Workflow
 
-All changes go through a branch → PR → merge to main flow.
-Direct pushes to main are disabled via branch protection.
+All changes go through a branch → PR → merge to main flow. Direct pushes to main are disabled via branch protection.
 
 Claude handles the full workflow via Scribe (see `docs/Claude MCPs.md`). Human action required only at PR review and merge.
 
@@ -566,45 +546,3 @@ gh workflow run deploy-watchtower.yml
 | `fix/*` | Bug fixes |
 | `docs/*` | Documentation only — does not trigger deploy |
 | `chore/*` | Maintenance, dependency updates |
-
----
-
-## Pending Work
-
-### Hardware
-
-| Item | Priority | Notes |
-| ---- | -------- | ----- |
-| RAM — 2×16GB DDR4-3200 | High | Bring Monolith to 64GB |
-| Lore — Mac Mini M4 Pro 48GB / 10GbE | Medium | Dedicated AI inference node. Headless. Edu pricing. Budget pending |
-| UPS — CyberPower CP1500PFCLCD | Low | NUT role ready, waiting on hardware budget |
-| JetStream managed switch | Low | Replaces unmanaged TL-SG1210P, enables SNMP per-port stats |
-
-### Software
-
-| Item | Priority | Notes |
-| ---- | -------- | ----- |
-| Minecraft — realm world import | Pending | Export from Realm → drop in `#zombatron` → cancel $8/month subscription |
-| Minecraft — automated PVC backups | Low | k8s CronJob to tarball `/data` nightly to `/mnt/hdd-c` |
-| Fileserver idempotency | Low | Fix `smbpasswd -a` in fileserver playbook — fails on re-run when user exists |
-| Loki — log aggregation | Low | Add to Watchtower stack |
-| Synapse — health endpoint | Low | Add /health route to FastMCP app for proper k8s probes |
-| Healthchecks.io dead-man's switch | Pending | Code deployed — add `vault_healthchecks_daily_summary_url` to vault.yml with ping URL from healthchecks.io (period: 12h, grace: 1h) |
-
-### GitHub PAT Audit
-
-One PAT per repo, one PAT per role. Review and rotate quarterly alongside ArgoCD credentials.
-
-| Token Name | Repo | Role | Scope | Notes |
-|---|---|---|---|---|
-| `argocd-homelab-reader` | `homelab` | ArgoCD repo auth | Contents: read | Rotated quarterly via `rotate-argocd-credentials.yml` |
-| `homelab-action-dispatch` | `homelab` | GitHub Actions | TBD | Audit scope |
-| `lwa-web-scribe` | `lwa-web` | Scribe MCP git ops | Contents r/w, PRs r/w, Metadata r | Added May 2026 — account-wide gh CLI credential, scope to repo only on next rotation |
-
-**TODO:** `lwa-web-scribe` is currently stored as account-wide gh CLI credential in macOS keychain. Scope it to `lwa-web` only on next quarterly rotation. Also create `lwa-web-deploy` PAT for GitHub Actions SFTP deploy workflow when that pipeline is built.
-
----
-
-## Post-Watchtower Cleanup
-- Remove UFW install task from fileserver Ansible playbook — UFW is now managed by `deploy-monolith.yml` via the `ufw` role
-- Fix `smbpasswd -a` idempotency in fileserver playbook (use `pdbedit -L` to check before adding)
