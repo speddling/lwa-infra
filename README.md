@@ -86,24 +86,19 @@ Three MCP servers give Claude structured, safe access to the homelab:
 
 See `docs/Claude MCPs.md` for full reference.
 
-**B-4** — local LLM inference via Ollama on apex M4 (Metal backend). Lore (Mac Mini M4 Pro 48GB) replaces B-4 as dedicated LAN inference node later this year.
-
-## Web Presence
-
-`speddling/lwa-web` — dedicated repo for `littlewolfacres.com`. PHP include architecture for `/tech/` — single header, single CSS, single footer. Scribe operates on both `homelab` and `lwa-web`.
+**B-4** — local LLM inference via Ollama on apex (Metal backend). Lore (dedicated Mac Mini or Mac Studio, M5 generation) arrives as a permanent headless LAN inference node after Apple's M5 refresh. Data (Linux, CUDA, production-parity ML environment) is the longer-term build. See `docs/homelab-roadmap.md`.
 
 ## Pending
 
 | Item | Priority |
 |---|---|
-| RAM — 2×16GB DDR4-3200 (64GB total) | High |
-| Minecraft — realm world import + cancel subscription | Pending |
-| Healthchecks.io dead-man's switch | Pending |
-| Lore — Mac Mini M4 Pro 48GB / 10GbE | Medium |
+| RAM — 2×16GB DDR4-3200 (64GB total on monolith) | High |
+| Loki — log aggregation on watchtower | High |
+| VLAN design — IoT / LAN / homelab / guest segments | High |
+| Minecraft — realm world import + cancel subscription | Medium |
+| Lore — Mac Mini or Mac Studio M5 (maxed, headless) | Medium |
 | UPS — CyberPower CP1500PFCLCD (NUT role ready) | Low |
-| Loki — log aggregation on watchtower | Low |
+| JetStream managed switch | Low |
 | Minecraft — automated PVC backups | Low |
 | Fileserver idempotency fix | Low |
 | Synapse health endpoint | Low |
-| JetStream managed switch | Low |
-| VLAN design — IoT / LAN / homelab / guest segments | Low |
