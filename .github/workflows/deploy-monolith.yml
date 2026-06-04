@@ -24,9 +24,9 @@ jobs:
 
       - name: Write vault password
         run: |
-          mkdir -p ~/homelab
-          echo '${{ secrets.ANSIBLE_VAULT_PASSWORD }}' > ~/homelab/.vault_pass
-          chmod 600 ~/homelab/.vault_pass
+          mkdir -p ~/lwa-homelab
+          echo '${{ secrets.ANSIBLE_VAULT_PASSWORD }}' > ~/lwa-homelab/.vault_pass
+          chmod 600 ~/lwa-homelab/.vault_pass
 
       - name: Install dependencies
         run: |
@@ -49,9 +49,9 @@ jobs:
 
       - name: Write vault password
         run: |
-          mkdir -p ~/homelab
-          echo '${{ secrets.ANSIBLE_VAULT_PASSWORD }}' > ~/homelab/.vault_pass
-          chmod 600 ~/homelab/.vault_pass
+          mkdir -p ~/lwa-homelab
+          echo '${{ secrets.ANSIBLE_VAULT_PASSWORD }}' > ~/lwa-homelab/.vault_pass
+          chmod 600 ~/lwa-homelab/.vault_pass
 
       - name: Install dependencies
         run: |
@@ -63,10 +63,10 @@ jobs:
         working-directory: services/monolith/ansible
         run: |
           ansible-playbook -i inventory.ini playbooks/firewall.yml \
-            --vault-password-file ~/homelab/.vault_pass
+            --vault-password-file ~/lwa-homelab/.vault_pass
 
       - name: Run Ansible — Monitoring agents
         working-directory: services/monolith/ansible
         run: |
           ansible-playbook -i inventory.ini playbooks/monitoring.yml \
-            --vault-password-file ~/homelab/.vault_pass
+            --vault-password-file ~/lwa-homelab/.vault_pass

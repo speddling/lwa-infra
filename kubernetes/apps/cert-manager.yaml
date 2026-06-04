@@ -20,7 +20,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/speddling/homelab
+    repoURL: https://github.com/speddling/lwa-homelab
     targetRevision: master
     path: kubernetes/cluster/cert-manager
   destination:

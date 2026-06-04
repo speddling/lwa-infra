@@ -65,5 +65,5 @@ vault_speddling_obelisk_password: "REPLACE_ME"
 vault_healthchecks_daily_summary_url: "https://hc-ping.com/REPLACE_ME"
 
 # GitHub — Fine-grained PAT for Zombatron Importer workflow dispatch
-# Scopes: Actions: Read & Write (single repo: speddling/homelab)
+# Scopes: Actions: Read & Write (single repo: speddling/lwa-homelab)
 vault_github_actions_pat: "github_pat_REPLACE_ME"

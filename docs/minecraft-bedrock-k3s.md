@@ -44,7 +44,7 @@ Server address: `zombatron.littlewolfacres.com:30132`
 ## Directory Structure
 
 ```
-homelab/
+lwa-homelab/
 ├── services/
 │   └── minecraft/
 │       ├── ansible/

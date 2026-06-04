@@ -50,7 +50,7 @@ SCRIBE_PORT = int(os.environ.get("SCRIBE_PORT", "8765"))
 
 # Colon-separated list of allowed absolute repo paths.
 # Only paths in this list may be operated on — never a raw Claude parameter.
-_raw_roots = os.environ.get("SCRIBE_REPO_ROOTS", "/Users/speddling/homelab")
+_raw_roots = os.environ.get("SCRIBE_REPO_ROOTS", "/Users/speddling/lwa-homelab")
 REPO_ROOTS: list[pathlib.Path] = [
     pathlib.Path(p.strip()).resolve()
     for p in _raw_roots.split(":")

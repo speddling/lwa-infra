@@ -80,7 +80,7 @@ Three MCP servers give Claude structured, safe access to the homelab:
 
 **Synapse** (`monolith:30800`) — read-only k3s pod state, Prometheus metrics, Alertmanager alerts, and monolith filesystem.
 
-**Scribe** (`apex:8765`) — git control plane. Branch, commit, push, open PRs against `speddling/homelab` and `speddling/lwa-web`. Branch-protected, path-allowlisted, merged-PR guard built in.
+**Scribe** (`apex:8765`) — git control plane. Branch, commit, push, open PRs against `speddling/lwa-homelab` and `speddling/lwa-web`. Branch-protected, path-allowlisted, merged-PR guard built in.
 
 **Argus** (`watchtower:9800`) — read-only live Alertmanager and Prometheus configs, systemd state, journald logs, monitoring HTTP APIs.
 

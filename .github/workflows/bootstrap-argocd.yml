@@ -7,7 +7,7 @@ name: Bootstrap ArgoCD
 # Prerequisites (set in GitHub Actions secrets before running):
 #   CLOUDFLARE_API_TOKEN  — Cloudflare API token (Zone:DNS:Edit, Zone:Zone:Read)
 #                           scoped to littlewolfacres.com
-#   ARGOCD_GITHUB_TOKEN   — GitHub PAT with Contents:Read on speddling/homelab
+#   ARGOCD_GITHUB_TOKEN   — GitHub PAT with Contents:Read on speddling/lwa-homelab
 #
 # What this does:
 #   1. Install cert-manager v1.20.2 (CRDs + controller)
@@ -111,7 +111,7 @@ jobs:
           kubectl create secret generic homelab-repo \
             --namespace argocd \
             --from-literal=type=git \
-            --from-literal=url=https://github.com/speddling/homelab \
+            --from-literal=url=https://github.com/speddling/lwa-homelab \
             --from-literal=username=speddling \
             --from-literal=password="${ARGOCD_GITHUB_TOKEN}" \
             --dry-run=client -o yaml \

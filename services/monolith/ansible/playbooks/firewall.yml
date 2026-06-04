@@ -7,7 +7,7 @@
 # Or manually:
 #   cd services/monolith/ansible
 #   ansible-playbook -i inventory.ini playbooks/firewall.yml \
-#     --vault-password-file ~/homelab/.vault_pass
+#     --vault-password-file ~/lwa-homelab/.vault_pass
 
 - name: Configure Monolith firewall
   hosts: monolith

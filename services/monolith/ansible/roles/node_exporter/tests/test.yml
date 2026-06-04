@@ -3,4 +3,4 @@
 - hosts: localhost
   remote_user: root
   roles:
-    - /Users/speddling/homelab/services/monolith/ansible/roles/node_exporter
+    - /Users/speddling/lwa-homelab/services/monolith/ansible/roles/node_exporter

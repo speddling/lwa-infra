@@ -154,7 +154,7 @@ nut_monitor_user:    "monuser"
 # -----------------------------------------------------------------------------
 argocd_namespace:        "argocd"
 argocd_repo_secret_name: "homelab-repo"
-argocd_repo_url:         "https://github.com/speddling/homelab"
+argocd_repo_url:         "https://github.com/speddling/lwa-homelab"
 argocd_repo_username:    "speddling"
 # Token: vault_argocd_github_token (see vault.yml)
 # Rotation: Actions → Rotate ArgoCD Credentials → Run workflow
@@ -163,7 +163,7 @@ argocd_repo_username:    "speddling"
 # Apex — Scribe MCP server
 # -----------------------------------------------------------------------------
 scribe_port:        "{{ port_scribe }}"
-scribe_repo_roots:  "/Users/speddling/homelab:/Users/speddling/lwa-web"
+scribe_repo_roots:  "/Users/speddling/lwa-homelab:/Users/speddling/lwa-main"
 scribe_python:      "/opt/local/bin/python3.12"
 scribe_venv:        "~/.venv/scribe"
 scribe_label:       "com.littlewolfacres.scribe"
@@ -178,7 +178,7 @@ zombatron_importer_slack_channel: "C0B5C20R1SB"
 zombatron_importer_monolith_host: "{{ ip_monolith }}"
 zombatron_importer_monolith_user: "{{ ssh_user_monolith }}"
 zombatron_importer_import_path:   "/opt/minecraft/import/realm.mcworld"
-zombatron_importer_github_repo:   "speddling/homelab"
+zombatron_importer_github_repo:   "speddling/lwa-homelab"
 zombatron_importer_workflow:      "slack-minecraft-import.yml"
 # Secrets: vault_slack_zombatron_bot_token, vault_slack_zombatron_app_token,
 #          vault_github_actions_pat (see vault.yml)

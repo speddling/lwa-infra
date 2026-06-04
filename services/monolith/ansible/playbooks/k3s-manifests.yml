@@ -1,7 +1,7 @@
 ---
 # Applies k3s manifests from the repo to Monolith.
 # Run from apex:
-#   cd ~/homelab/services/monolith/ansible
+#   cd ~/lwa-homelab/services/monolith/ansible
 #   ansible-playbook -i inventory.ini playbooks/k3s-manifests.yml
 #
 # This playbook is intentionally separate from monitoring.yml so manifests

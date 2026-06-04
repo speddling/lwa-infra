@@ -32,8 +32,8 @@ One PAT per repo, one PAT per role. Review and rotate quarterly alongside ArgoCD
 
 | Token Name | Repo | Role | Scope | Notes |
 |---|---|---|---|---|
-| `argocd-homelab-reader` | `homelab` | ArgoCD repo auth | Contents: read | Rotated quarterly via `rotate-argocd-credentials.yml` |
-| `homelab-action-dispatch` | `homelab` | GitHub Actions | TBD | Audit scope — confirm what this token actually needs |
+| `argocd-homelab-reader` | `lwa-homelab` | ArgoCD repo auth | Contents: read | Rotated quarterly via `rotate-argocd-credentials.yml` |
+| `homelab-action-dispatch` | `lwa-homelab` | GitHub Actions | TBD | Audit scope — confirm what this token actually needs |
 | `lwa-web-scribe` | `lwa-web` | Scribe MCP git ops | Contents r/w, PRs r/w, Metadata r | Added May 2026 — currently stored as account-wide gh CLI credential in macOS keychain. Scope to `lwa-web` repo only on next quarterly rotation |
 
 **Outstanding:**

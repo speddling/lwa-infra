@@ -1,5 +1,5 @@
 ---
 # Derived paths — composed from central vars in ansible/vars/main.yml
-zombatron_importer_src_dir: "{{ ansible_env.HOME }}/homelab/services/apex/zombatron-importer"
+zombatron_importer_src_dir: "{{ ansible_env.HOME }}/lwa-homelab/services/apex/zombatron-importer"
 zombatron_importer_log:     "{{ ansible_env.HOME }}/Library/Logs/zombatron-importer.log"
 zombatron_importer_plist:   "{{ ansible_env.HOME }}/Library/LaunchAgents/{{ zombatron_importer_label }}.plist"

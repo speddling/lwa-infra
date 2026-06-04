@@ -313,7 +313,7 @@ the k3s cluster dashboard (Grafana ID 15661) to show pod status, deployment heal
 
 ```bash
 # Deploy (run on monolith or from apex with kubeconfig)
-sudo k3s kubectl apply -f ~/homelab/kubernetes/manifests/kube-state-metrics.yml
+sudo k3s kubectl apply -f ~/lwa-homelab/kubernetes/manifests/kube-state-metrics.yml
 
 # Verify pod is running
 sudo k3s kubectl get pods -n kube-system | grep kube-state-metrics
@@ -384,19 +384,19 @@ sudo systemctl restart prometheus
 All monitoring config is managed by Ansible, run from **Apex** (`192.168.0.19`).
 
 ```bash
-cd ~/homelab/services/watchtower/ansible
+cd ~/lwa-homelab/services/watchtower/ansible
 
 # Deploy full monitoring stack (Prometheus, Alertmanager, Grafana, daily summary, Argus)
 ansible-playbook -i inventory.ini playbooks/monitoring.yml \
-  --vault-password-file=~/homelab/.vault_pass
+  --vault-password-file=~/lwa-homelab/.vault_pass
 
 # Dry run first
 ansible-playbook -i inventory.ini playbooks/monitoring.yml \
-  --check --vault-password-file=~/homelab/.vault_pass
+  --check --vault-password-file=~/lwa-homelab/.vault_pass
 
 # Deploy only exporters (node_exporter, blackbox, snmp, adguard, reolink, tmobile)
 ansible-playbook -i inventory.ini playbooks/exporters.yml \
-  --vault-password-file=~/homelab/.vault_pass
+  --vault-password-file=~/lwa-homelab/.vault_pass
 ```
 
 The `monitoring.yml` playbook applies roles in order:

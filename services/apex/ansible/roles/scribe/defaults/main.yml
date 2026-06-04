@@ -5,6 +5,6 @@
 # Override here only for non-standard apex configurations.
 
 # Derived paths — kept here as they compose from central vars
-scribe_src_dir: "{{ ansible_env.HOME }}/homelab/services/apex/scribe"
+scribe_src_dir: "{{ ansible_env.HOME }}/lwa-homelab/services/apex/scribe"
 scribe_log:     "{{ ansible_env.HOME }}/Library/Logs/scribe.log"
 scribe_plist:   "{{ ansible_env.HOME }}/Library/LaunchAgents/{{ scribe_label }}"

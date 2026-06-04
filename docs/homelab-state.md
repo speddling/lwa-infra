@@ -1,5 +1,5 @@
 # Little Wolf Acres — Homelab Current State
-> Last updated: 2026-05-30 · Authored on apex · All IaC in `speddling/homelab` repo
+> Last updated: 2026-05-30 · Authored on apex · All IaC in `speddling/lwa-homelab` repo
 > Future plans → `homelab-roadmap.md` · Operational debt and one-off tasks → `homelab-todo.md`
 
 ---
@@ -274,7 +274,7 @@ Primary k3s worker node and household services platform. Hosts all Kubernetes wo
 
 ## ArgoCD
 
-GitOps controller for k3s. Watches `speddling/homelab` on `master` and reconciles all k8s workloads.
+GitOps controller for k3s. Watches `speddling/lwa-homelab` on `master` and reconciles all k8s workloads.
 
 ### Access
 
@@ -320,7 +320,7 @@ GitOps controller for k3s. Watches `speddling/homelab` on `master` and reconcile
 
 ### Credential Management
 
-ArgoCD authenticates to `speddling/homelab` via a GitHub fine-grained PAT.
+ArgoCD authenticates to `speddling/lwa-homelab` via a GitHub fine-grained PAT.
 
 | Aspect | Detail |
 |---|---|
@@ -472,12 +472,12 @@ See `homelab-roadmap.md` for full spec and rationale.
 
 ```bash
 # Deploy Scribe
-ansible-playbook --vault-password-file ~/homelab/.vault_pass \
+ansible-playbook --vault-password-file ~/lwa-homelab/.vault_pass \
   -i services/apex/ansible/inventory.ini \
   services/apex/ansible/playbooks/scribe.yml
 
 # Deploy Zombatron Importer
-ansible-playbook --vault-password-file ~/homelab/.vault_pass \
+ansible-playbook --vault-password-file ~/lwa-homelab/.vault_pass \
   -i services/apex/ansible/inventory.ini \
   services/apex/ansible/playbooks/deploy-zombatron-importer.yml
 ```

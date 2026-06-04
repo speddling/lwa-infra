@@ -16,9 +16,9 @@ jobs:
       - uses: actions/checkout@v4
       - name: Write vault password
         run: |
-          mkdir -p ~/homelab
-          echo '${{ secrets.ANSIBLE_VAULT_PASSWORD }}' > ~/homelab/.vault_pass
-          chmod 600 ~/homelab/.vault_pass
+          mkdir -p ~/lwa-homelab
+          echo '${{ secrets.ANSIBLE_VAULT_PASSWORD }}' > ~/lwa-homelab/.vault_pass
+          chmod 600 ~/lwa-homelab/.vault_pass
 
 
       - name: Run Ansible — T-Mobile Exporter

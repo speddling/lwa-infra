@@ -146,7 +146,7 @@ Claude (claude.ai)
   └── MCP connection → http://apex.littlewolfacres.com:8765/mcp
         └── Scribe (FastMCP, launchd, apex)
               └── subprocess — git + gh CLI
-                    └── ~/homelab repo (and other configured REPO_ROOTS)
+                    └── ~/lwa-homelab repo (and other configured REPO_ROOTS)
 ```
 
 **Key design decisions:**
@@ -191,7 +191,7 @@ services/apex/
 | Variable | Default | Notes |
 |---|---|---|
 | `scribe_port` | `8765` | Port Scribe listens on |
-| `scribe_repo_roots` | `/Users/speddling/homelab` | Colon-separated list of allowed repo roots |
+| `scribe_repo_roots` | `/Users/speddling/lwa-homelab` | Colon-separated list of allowed repo roots |
 | `scribe_venv` | `~/.venv/scribe` | Python venv location |
 | `scribe_log` | `~/Library/Logs/scribe.log` | launchd stdout/stderr target |
 
@@ -256,7 +256,7 @@ Claude **must** run `git_status` on the target repo before any git operation, ev
 Set `SCRIBE_REPO_ROOTS` to a colon-separated list of absolute paths in the launchd plist. Each repo must already have `gh` auth and a configured remote.
 
 ```
-SCRIBE_REPO_ROOTS=/Users/speddling/homelab:/Users/speddling/other-repo
+SCRIBE_REPO_ROOTS=/Users/speddling/lwa-homelab:/Users/speddling/other-repo
 ```
 
 ---
@@ -364,7 +364,7 @@ Synapse never touches git. Scribe never touches the cluster. Argus never writes 
 Kiro is an AI coding agent that runs directly in the terminal on apex. Unlike the MCP setup above, it requires no running servers, no config files, and no Claude Desktop — just `kiro` in any repo directory.
 
 ```bash
-cd ~/homelab
+cd ~/lwa-homelab
 kiro
 ```
 
@@ -403,7 +403,7 @@ The MCP servers add structured guardrails (branch protection, path allowlists, r
 npm install -g @aws/kiro-cli   # or via the Kiro installer
 
 # Launch in any repo
-cd ~/homelab
+cd ~/lwa-homelab
 kiro
 ```
 

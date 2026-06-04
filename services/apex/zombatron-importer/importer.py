@@ -38,7 +38,7 @@ MONOLITH_SSH_KEY     = os.environ.get("MONOLITH_SSH_KEY", str(Path.home() / ".ss
 MONOLITH_IMPORT_PATH = os.environ.get("MONOLITH_IMPORT_PATH", "/opt/minecraft/import/realm.mcworld")
 
 GITHUB_TOKEN         = os.environ["GITHUB_TOKEN"]
-GITHUB_REPO          = os.environ.get("GITHUB_REPO", "speddling/homelab")
+GITHUB_REPO          = os.environ.get("GITHUB_REPO", "speddling/lwa-homelab")
 IMPORT_WORKFLOW      = os.environ.get("IMPORT_WORKFLOW", "slack-minecraft-import.yml")
 
 # ── State ─────────────────────────────────────────────────────────────────────

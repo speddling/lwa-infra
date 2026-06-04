@@ -39,7 +39,7 @@ EAP245   EAP245                    Wired LAN
 ```
 apex (author)
     │
-    ├── git push → GitHub (speddling/homelab)
+    ├── git push → GitHub (speddling/lwa-homelab)
     │       │
     │       ├── GitHub Actions (self-hosted runners on monolith + watchtower)
     │       │       ├── deploy-watchtower.yml  → Ansible → watchtower

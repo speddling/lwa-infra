@@ -15,7 +15,7 @@
 
 ### Rotating Repository Credentials
 
-ArgoCD pulls manifests from `speddling/homelab` using a GitHub fine-grained PAT
+ArgoCD pulls manifests from `speddling/lwa-homelab` using a GitHub fine-grained PAT
 stored in `ansible/vars/vault.yml` as `vault_argocd_github_token`.
 
 **Normal rotation procedure:**
@@ -23,13 +23,13 @@ stored in `ansible/vars/vault.yml` as `vault_argocd_github_token`.
 ```bash
 # 1. Generate a new fine-grained PAT at:
 #    GitHub → Settings → Developer Settings → Fine-grained tokens → Generate new token
-#    Repository: speddling/homelab only
+#    Repository: speddling/lwa-homelab only
 #    Permission: Contents → Read
 #    Expiration: No expiration (preferred)
 
 # 2. Update the vault on apex
 ansible-vault edit ansible/vars/vault.yml \
-  --vault-password-file ~/homelab/.vault_pass
+  --vault-password-file ~/lwa-homelab/.vault_pass
 # Update vault_argocd_github_token with the new PAT value
 
 # 3. Commit the encrypted vault change
@@ -49,7 +49,7 @@ gh workflow run rotate-argocd-credentials.yml
 # Run the playbook directly from apex against the current vault
 cd services/monolith/ansible
 ansible-playbook -i inventory.ini playbooks/argocd-credentials.yml \
-  --vault-password-file ~/homelab/.vault_pass
+  --vault-password-file ~/lwa-homelab/.vault_pass
 
 # Then update the vault and open the PR as above
 ```
@@ -189,7 +189,7 @@ sudo mount /music-library
 ```
 
 > **Password:** retrieve from vault on apex:
-> `ansible-vault view ~/homelab/ansible/vars/vault.yml --vault-password-file=~/homelab/.vault_pass`
+> `ansible-vault view ~/lwa-homelab/ansible/vars/vault.yml --vault-password-file=~/lwa-homelab/.vault_pass`
 
 ### Health Check
 
@@ -338,24 +338,24 @@ sudo systemctl restart alertmanager
 ### Watchtower
 
 ```bash
-cd ~/homelab/services/watchtower/ansible
+cd ~/lwa-homelab/services/watchtower/ansible
 
 ansible-playbook -i inventory.ini playbooks/dns.yml \
-  --vault-password-file=~/homelab/.vault_pass
+  --vault-password-file=~/lwa-homelab/.vault_pass
 ansible-playbook -i inventory.ini playbooks/monitoring.yml \
-  --vault-password-file=~/homelab/.vault_pass
+  --vault-password-file=~/lwa-homelab/.vault_pass
 ansible-playbook -i inventory.ini playbooks/exporters.yml \
-  --vault-password-file=~/homelab/.vault_pass
+  --vault-password-file=~/lwa-homelab/.vault_pass
 
 # Dry run
 ansible-playbook -i inventory.ini playbooks/monitoring.yml \
-  --check --vault-password-file=~/homelab/.vault_pass
+  --check --vault-password-file=~/lwa-homelab/.vault_pass
 
 # Vault operations
 ansible-vault edit group_vars/all/vault.yml \
-  --vault-password-file=~/homelab/.vault_pass
+  --vault-password-file=~/lwa-homelab/.vault_pass
 ansible-vault view group_vars/all/vault.yml \
-  --vault-password-file=~/homelab/.vault_pass
+  --vault-password-file=~/lwa-homelab/.vault_pass
 ```
 
 ### Apex
@@ -366,28 +366,28 @@ Run from `services/apex/ansible/` so `ansible.cfg` is picked up correctly.
 
 ```bash
 # Scribe
-cd ~/homelab/services/apex/ansible
-ansible-playbook --vault-password-file ~/homelab/.vault_pass \
+cd ~/lwa-homelab/services/apex/ansible
+ansible-playbook --vault-password-file ~/lwa-homelab/.vault_pass \
   -i inventory.ini playbooks/scribe.yml
 
 # Zombatron Importer
-cd ~/homelab/services/apex/ansible
-ansible-playbook --vault-password-file ~/homelab/.vault_pass \
+cd ~/lwa-homelab/services/apex/ansible
+ansible-playbook --vault-password-file ~/lwa-homelab/.vault_pass \
   -i inventory.ini playbooks/deploy-zombatron-importer.yml
 ```
 
 ### Monolith
 
 ```bash
-cd ~/homelab/services/monolith/ansible
+cd ~/lwa-homelab/services/monolith/ansible
 
 # Firewall rules
 ansible-playbook -i inventory.ini playbooks/firewall.yml \
-  --vault-password-file=~/homelab/.vault_pass
+  --vault-password-file=~/lwa-homelab/.vault_pass
 
 # Monitoring agents (node_exporter etc.)
 ansible-playbook -i inventory.ini playbooks/monitoring.yml \
-  --vault-password-file=~/homelab/.vault_pass
+  --vault-password-file=~/lwa-homelab/.vault_pass
 ```
 
 ---
@@ -396,12 +396,12 @@ ansible-playbook -i inventory.ini playbooks/monitoring.yml \
 
 ```bash
 # Watchtower
-cd ~/homelab/terraform/watchtower
+cd ~/lwa-homelab/terraform/watchtower
 terraform init && terraform plan
 terraform apply
 
 # Monolith
-cd ~/homelab/terraform/monolith
+cd ~/lwa-homelab/terraform/monolith
 terraform init && terraform plan
 terraform apply
 ```
@@ -459,7 +459,7 @@ dashboard not in the managed UID set. Add new dashboards to the Ansible grafana 
 ## Git Workflow
 
 ```bash
-cd ~/homelab
+cd ~/lwa-homelab
 git checkout -b feat/description-of-change
 
 git add <explicit paths>
