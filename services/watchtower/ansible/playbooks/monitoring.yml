@@ -10,6 +10,8 @@
   roles:
     - prometheus
     - alertmanager
+    - loki
+    - promtail
     - netdata
     - grafana
     - daily_summary

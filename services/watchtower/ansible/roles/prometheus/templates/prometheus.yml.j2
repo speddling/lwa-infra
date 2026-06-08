@@ -129,6 +129,39 @@ scrape_configs:
       - target_label: __address__
         replacement: localhost:{{ port_snmp_exporter }}
 
+  # ── Uncomment when SG2218P and EAP225-Outdoor are installed ──────────────
+  # Set ip_sg2218p and ip_eap225_outdoor in ansible/vars/main.yml first.
+
+  # - job_name: 'snmp-sg2218p'
+  #   static_configs:
+  #     - targets: ['{{ ip_sg2218p }}']
+  #   metrics_path: /snmp
+  #   params:
+  #     module: [if_mib]
+  #     auth: ['{{ snmp_auth_module }}']
+  #   relabel_configs:
+  #     - source_labels: [__address__]
+  #       target_label: __param_target
+  #     - source_labels: [__param_target]
+  #       target_label: instance
+  #     - target_label: __address__
+  #       replacement: localhost:{{ port_snmp_exporter }}
+
+  # - job_name: 'snmp-eap-outdoor'
+  #   static_configs:
+  #     - targets: ['{{ ip_eap225_outdoor }}']
+  #   metrics_path: /snmp
+  #   params:
+  #     module: [if_mib]
+  #     auth: ['{{ snmp_auth_module }}']
+  #   relabel_configs:
+  #     - source_labels: [__address__]
+  #       target_label: __param_target
+  #     - source_labels: [__param_target]
+  #       target_label: instance
+  #     - target_label: __address__
+  #       replacement: localhost:{{ port_snmp_exporter }}
+
   - job_name: 'tmobile'
     static_configs:
       - targets: ['localhost:{{ port_tmobile_exporter }}']
