@@ -267,3 +267,51 @@ Single source of truth for "how do I reach the homelab from outside": **WireGuar
 | School Chromebook | Guest VLAN | School-managed device the user does not control; access pattern matches guest |
 | Guest DNS | External (1.1.1.1) | Cleanest isolation, no Homelab punchthrough, no AdGuard log noise |
 | 10G uplinks | Skipped | Mac Mini M4 10GBASE-T firmware issues + can be added later as a separate concern |
+
+---
+
+## More things to consider
+
+### Apex needs a DHCP reservation — not optional
+
+The plan lists a DHCP reservation for apex as "optional," but the Monolith UFW role allows SSH specifically from `ip_apex` (`192.168.0.19`). After migration, apex is a wireless device that lands somewhere in the `192.168.20.100–200` DHCP pool. Without a reservation, the firewall rule silently breaks and the primary admin SSH path from apex to Monolith is lost. Capture apex's MAC before cutover and create a DHCP reservation at a `.20.x` static address. Update `ip_apex` in `ansible/vars/main.yml` to that address in the IaC PR.
+
+### Studio has no place in the new IP plan
+
+`ip_studio: "192.168.0.109"` is in shared vars and has a corresponding SSH allow rule in the Monolith UFW role. Studio does not appear anywhere in the new VLAN static IP tables. Determine whether studio is wired or wireless, which VLAN it belongs to, and what its new IP will be. If it's a LAN-class device on WiFi, add a DHCP reservation in the LAN VLAN and update the var. If it's being retired or renamed, remove the UFW rule.
+
+### Monolith UFW role needs a VLAN-aware rewrite, not a find-and-replace
+
+The current firewall rules use `192.168.0.0/24` as a single catch-all for "internal LAN." After migration, that range doesn't exist, and different VLANs have different trust levels. The UFW role needs to be updated to reflect the actual post-migration access policy:
+
+- **HTTP/HTTPS (80/443)** and **Samba (445/139)** — allow from `192.168.20.0/24` (LAN VLAN) only, not a broad internal range
+- **ArgoCD NodePort fallback and Obelisk RDP** — LAN VLAN only (`192.168.20.0/24`)
+- **node_exporter, ArgoCD metrics, kube-state-metrics** — watchtower only at its new IP (`192.168.30.11`)
+- **Synapse MCP** — apex only at its new reserved IP
+- **SSH** — apex and studio at their new IPs
+
+Simply replacing `192.168.0.0/24` with a new range would grant LAN trust to the wrong VLANs. Each rule class should reference the correct VLAN subnet explicitly. Plan for this to be the most time-intensive part of the IaC PR.
+
+### AdGuard rewrite sequencing: DNS must update before the IaC PR deploys
+
+Prometheus scrape jobs target Monolith via `fqdn_monolith` (`monolith.littlewolfacres.com`). If the IaC PR's Ansible run fires before AdGuard's local rewrites are updated to point that name to `192.168.30.10`, every `fqdn_monolith`-based scrape job fails with a connection error. The runbook has AdGuard prep in Phase 1 and the IaC PR in Phase 5 — make sure the rewrite list is actually pushed to AdGuard before the IaC deploy runs, not just prepared. Verify with `dig monolith.littlewolfacres.com @192.168.30.11` from a Homelab device before triggering the workflow.
+
+### Prometheus scrape job names should be updated in the IaC PR
+
+Once the OC200 rename of "Yarn Studio" → "Upstairs Hall" happens, the Prometheus job name `snmp-eap-yarn-studio` will be a permanent inconsistency in Grafana and the scrape config. Rename it to `snmp-eap-upstairs-hall` in the IaC PR while everything else is being touched. No functional impact — just clarity.
+
+### Blackbox ICMP probe targets are var-referenced — handled automatically
+
+The `blackbox-icmp` probe in `prometheus.yml.j2` targets `ip_monolith` and `ip_watchtower` directly (currently `192.168.0.20` and `192.168.0.21`). These are pulled from `ansible/vars/main.yml` rather than being hardcoded strings, so updating those vars in the IaC PR will update the probe targets automatically. No separate action needed — just confirming these are covered.
+
+### "VLAN-aware Proxmox bridge" doc correction
+
+The deferred item reads "VLAN-aware Proxmox bridge on monolith." Monolith runs bare-metal k3s, not Proxmox. This should read "VLAN-aware Linux bridge on monolith" — the concept is identical (create a VLAN-tagged bridge interface so future VMs can reach non-Homelab VLANs) but the tooling is a netplan/networkd config, not a Proxmox interface. Update this note before it causes confusion during implementation.
+
+### ER605 syslog destination will need updating post-migration
+
+When AT&T Internet Air WAN2 is added, the ER605 is configured to send syslog to Watchtower at `192.168.0.21:1514` for Promtail ingestion. After the VLAN migration, Watchtower moves to `192.168.30.11`. Remember to update the ER605 syslog destination in that same IaC cutover window, or the WAN event log stream will break silently.
+
+### AT&T Internet Air gateway lives outside the VLAN architecture
+
+The AT&T CGW450 connects to the ER605 WAN2 port and sits entirely outside the internal VLAN structure. Its LAN-side IP (typically `192.168.1.1`) is only visible to the ER605's WAN2 interface — no internal VLAN or firewall rule touches it. The `ip_att_gateway` var and the commented-out `snmp-att-cgw450` scrape job in `prometheus.yml.j2` are WAN-side concerns only. No VLAN planning is needed for the AT&T gateway.
