@@ -57,6 +57,9 @@ port_kube_state_metrics: 30900   # NodePort on Monolith; 30800 taken by synapse-
 port_argocd_nodeport:    30880   # ArgoCD UI fallback (primary: Traefik ingress)
 port_argocd_metrics_controller: 30885  # argocd-application-controller metrics → Prometheus
 port_argocd_metrics_server:     30883  # argocd-server metrics → Prometheus
+port_loki:               3100
+port_promtail:           9080
+port_promtail_syslog:    1514   # non-privileged syslog receiver (ER605 → Watchtower)
 port_scribe:             8765
 port_argus_mcp:          9800
 

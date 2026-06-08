@@ -1,0 +1,46 @@
+server:
+  http_listen_port: {{ port_promtail }}
+  grpc_listen_port: 0
+  log_level: warn
+
+positions:
+  filename: /var/lib/promtail/positions.yaml
+
+clients:
+  - url: http://localhost:{{ port_loki }}/loki/api/v1/push
+
+scrape_configs:
+
+  # ── Watchtower systemd journal ────────────────────────────────────────────
+  # Captures all unit logs: tmobile_exporter errors, daily-summary runs,
+  # alertmanager/prometheus events, reolink_exporter, argus, etc.
+  - job_name: watchtower-journal
+    journal:
+      max_age: 12h
+      labels:
+        job: watchtower-journal
+        host: watchtower
+    relabel_configs:
+      - source_labels: [__journal__systemd_unit]
+        target_label: unit
+      - source_labels: [__journal__priority_keyword]
+        target_label: level
+
+  # ── ER605 syslog receiver ─────────────────────────────────────────────────
+  # Captures WAN up/down, DHCP lease events, failover triggers.
+  # Configure ER605: System → Syslog → Remote Server → {{ ip_watchtower }}:{{ port_promtail_syslog }}
+  - job_name: er605-syslog
+    syslog:
+      listen_address: 0.0.0.0:{{ port_promtail_syslog }}
+      idle_timeout: 60s
+      label_structured_data: true
+      labels:
+        job: er605-syslog
+        host: er605
+    relabel_configs:
+      - source_labels: [__syslog_message_hostname]
+        target_label: hostname
+      - source_labels: [__syslog_message_app_name]
+        target_label: app
+      - source_labels: [__syslog_message_severity]
+        target_label: level

@@ -133,6 +133,24 @@ scrape_configs:
     static_configs:
       - targets: ['localhost:{{ port_tmobile_exporter }}']
 
+  # ── WAN2 placeholder ─────────────────────────────────────────────────────
+  # Uncomment and set ip_att_gateway once AT&T Internet Air is installed.
+  # Monitor at the ER605 SNMP level; CGW450 has no unauthenticated API.
+  # - job_name: 'snmp-att-cgw450'
+  #   static_configs:
+  #     - targets: ['{{ ip_att_gateway | default("192.168.1.1") }}']
+  #   metrics_path: /snmp
+  #   params:
+  #     module: [if_mib]
+  #     auth: ['{{ snmp_auth_module }}']
+  #   relabel_configs:
+  #     - source_labels: [__address__]
+  #       target_label: __param_target
+  #     - source_labels: [__param_target]
+  #       target_label: instance
+  #     - target_label: __address__
+  #       replacement: localhost:{{ port_snmp_exporter }}
+
   - job_name: 'reolink_nvr'
     static_configs:
       - targets: ['localhost:{{ port_reolink_exporter }}']
@@ -161,6 +179,22 @@ scrape_configs:
     relabel_configs:
       - target_label: instance
         replacement: argocd
+
+  # ── Loki / Promtail ──────────────────────────────────────────────────────
+
+  - job_name: 'loki'
+    static_configs:
+      - targets: ['localhost:{{ port_loki }}']
+    relabel_configs:
+      - target_label: instance
+        replacement: watchtower
+
+  - job_name: 'promtail'
+    static_configs:
+      - targets: ['localhost:{{ port_promtail }}']
+    relabel_configs:
+      - target_label: instance
+        replacement: watchtower
 
   # ── Obelisk ─────────────────────────────────────────────────────────────
   # windows_exporter running inside the Win11 VM, exposed via NodePort.

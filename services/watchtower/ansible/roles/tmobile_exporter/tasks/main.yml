@@ -43,3 +43,8 @@
     name: tmobile_exporter
     enabled: true
     state: started
+
+- name: Remove orphaned sagemcom_fast_exporter binary
+  ansible.builtin.file:
+    path: /usr/local/bin/sagemcom_fast_exporter
+    state: absent

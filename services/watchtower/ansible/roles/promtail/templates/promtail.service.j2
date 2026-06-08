@@ -1,0 +1,19 @@
+[Unit]
+Description=Promtail Log Collector
+After=network-online.target loki.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=promtail
+Group=promtail
+ExecStart=/usr/local/bin/promtail -config.file=/etc/promtail/promtail.yml
+Restart=on-failure
+RestartSec=10
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/promtail
+
+[Install]
+WantedBy=multi-user.target

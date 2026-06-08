@@ -179,3 +179,41 @@ groups:
           host: monolith
         annotations:
           description: "ArgoCD server is unreachable — UI and API unavailable at argocd.littlewolfacres.com"
+
+      # ── WAN / Connectivity ───────────────────────────────────────────────────────
+
+      - alert: WANDown
+        expr: probe_success{instance="1.1.1.1"} == 0
+        for: 3m
+        labels:
+          severity: critical
+          host: watchtower
+        annotations:
+          description: "WAN connectivity lost — ICMP probe to 1.1.1.1 failing for 3 minutes"
+
+      - alert: TMobileExporterDown
+        expr: up{job="tmobile"} == 0
+        for: 2m
+        labels:
+          severity: warning
+          host: watchtower
+        annotations:
+          description: "T-Mobile exporter is unreachable — gateway may be rebooting or API unavailable"
+
+      - alert: TMobile4GSignalWeak
+        expr: tmobile_4g_rsrp_dbm < -110
+        for: 10m
+        labels:
+          severity: warning
+          host: watchtower
+        annotations:
+          description: "T-Mobile 4G RSRP is {{ $value | printf \"%.0f\" }} dBm (threshold: -110) — tower performance may be degraded"
+
+      - alert: TMobile5GSignalWeak
+        expr: tmobile_5g_rsrp_dbm < -110
+        for: 10m
+        labels:
+          severity: warning
+          host: watchtower
+        annotations:
+          description: "T-Mobile 5G RSRP is {{ $value | printf \"%.0f\" }} dBm (threshold: -110) — tower performance may be degraded"
