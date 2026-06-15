@@ -1,6 +1,6 @@
 # Little Wolf Acres — Homelab Todo
 > Operational debt, one-off tasks, and things that need doing but don't belong in current state or roadmap.
-> Last updated: 2026-05-30
+> Last updated: 2026-06-15
 
 ---
 
@@ -10,6 +10,7 @@
 |---|---|---|
 | Minecraft — realm world import | Pending | Export from Realm → drop in `#zombatron` → cancel $8/month subscription |
 | Minecraft — automated PVC backups | Low | k8s CronJob to tarball `/data` nightly to `/mnt/hdd-c` |
+| Navidrome — DB backup CronJob | Low | `sqlite3 .backup` snapshot of `/data/navidrome.db` (~96MB of ~260MB `/data`) → watchtower SSD. Reuse config-backup-strategy.md rotation/ntfy pattern. Goal: restore users/playlists/ratings without a full PVC wipe next time. Not urgent — UPS arriving ~1 week closes the immediate power-outage risk. |
 | Fileserver idempotency | Low | Fix `smbpasswd -a` in fileserver playbook — fails on re-run when user exists. Use `pdbedit -L` to check before adding |
 | Loki — log aggregation | Low | Add to Watchtower stack |
 | Synapse — health endpoint | Low | Add `/health` route to FastMCP app for proper k8s liveness/readiness probes |

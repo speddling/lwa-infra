@@ -184,3 +184,4 @@ Tarball of `/etc/pve/` directory. Doesn't change frequently; weekly schedule lik
 - Reolink API specifics for headless export
 - Whether Brother's web UI exposes config export programmatically or requires manual save
 - Long-term: should ER605 / OC200 backups go through a unified Omada-controller-aware script vs per-device scripts
+- Application-data backups (not device configs) could reuse this same watchtower-PVC + rotation + ntfy pattern — e.g. Navidrome's `navidrome.db` (~96MB; see `homelab-todo.md` → Software → "Navidrome — DB backup CronJob")
