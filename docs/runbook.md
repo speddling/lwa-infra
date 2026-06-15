@@ -1,6 +1,6 @@
 # Little Wolf Acres — Homelab Runbook
 > Operational reference for day-to-day tasks, troubleshooting, and maintenance.
-> Last updated: 2026-05-23
+> Last updated: 2026-06-15
 
 ---
 
@@ -12,6 +12,11 @@
 |---|---|---|
 | Primary | https://argocd.littlewolfacres.com | Normal operations |
 | Fallback | http://monolith.littlewolfacres.com:30880 | DNS unstable or cert issue |
+
+> **CLI tip:** if every `argocd` command errors needing `--grpc-web` after a fresh
+> `argocd login`, pass it at login time instead —
+> `argocd login argocd.littlewolfacres.com --grpc-web` — the CLI persists this as
+> the default for that server context, so subsequent commands don't need it.
 
 ### Rotating Repository Credentials
 
@@ -205,6 +210,99 @@ kubectl exec -n navidrome deployment/navidrome -- ls /music | head -20
 kubectl rollout restart deployment/navidrome -n navidrome
 kubectl rollout status deployment/navidrome -n navidrome
 ```
+### Recovering from a Stuck or Corrupted Database (Full PVC Wipe)
+
+**When to use:** `data.db` is corrupted (e.g. after a power outage) and a normal
+`kubectl rollout restart` doesn't fix it — or you're locked out and need a
+genuinely fresh database. This wipes **all** Navidrome metadata: user accounts,
+playlists, favorites, ratings, play history. Music files on
+`/mnt/hdd-c/music-library` are untouched (separate hostPath mount) and get
+re-imported by the next scan.
+
+**Why the naive approach fails:** ArgoCD's `Automated (Prune)` / `Self-Heal`
+policy will race a manual `kubectl delete pvc` — it can recreate the PVC before
+`local-path-provisioner` finishes deleting the old directory, leaving you with a
+"new" PVC that's still bound to the old data (no migration run, old users still
+present, saved passwords stop working, no "Create Admin" prompt). The
+`argocd.argoproj.io/skip-reconcile` annotation prevents this race.
+
+#### 1. Freeze the ArgoCD Application
+
+```bash
+kubectl annotate application navidrome -n argocd argocd.argoproj.io/skip-reconcile="true" --overwrite
+```
+
+#### 2. Scale down and delete the PVC
+
+```bash
+kubectl scale deployment navidrome --replicas=0 -n navidrome
+kubectl delete pvc navidrome-db -n navidrome
+```
+
+#### 3. Checkpoint — confirm it's actually gone
+
+**Do not skip this.** Its absence is what let a stale database survive a "wipe"
+last time.
+
+```bash
+kubectl get pvc navidrome-db -n navidrome
+kubectl get pv | grep navidrome
+```
+
+Both should return empty/`NotFound` within ~30-60s. If the PVC hangs in
+`Terminating`, stop and check `kubectl describe pvc navidrome-db -n navidrome` for
+stuck finalizers before continuing.
+
+#### 4. Unfreeze and force a sync
+
+```bash
+kubectl annotate application navidrome -n argocd argocd.argoproj.io/skip-reconcile-
+argocd app sync navidrome --grpc-web
+```
+
+#### 5. Checkpoint — confirm a genuinely fresh database
+
+```bash
+kubectl get pods -n navidrome
+kubectl logs -n navidrome <new-pod-name> | head -60
+```
+
+Look for the fresh-DB bootstrap sequence:
+
+```
+level=info msg="Creating DB Schema"
+...
+level=info msg="Running initial setup"
+level=info msg="Creating new JWT secret, used for encrypting UI sessions"
+```
+
+If instead you see `goose: no migrations to run. current version: ...` with no
+preceding `OK <migration>.sql` lines, the database was **not** wiped — go back to
+step 3.
+
+#### 6. Watch for OOM during the initial scan
+
+A fresh DB means every folder is "new" (`updated=N` for every folder in the scan
+log, not just changed ones) — a cold full-library scan is far more memory-hungry
+than the normal hourly incremental scan. As of 2026-06-15, `deployment.yaml` sets
+`request: 512Mi` / `limit: 2Gi` specifically to cover this; monolith has plenty of
+headroom (16 cores / 32GB+) to go higher if needed.
+
+If the pod still crash-loops:
+
+```bash
+kubectl get pod -n navidrome -o wide   # check RESTARTS
+kubectl get pod -n navidrome -o jsonpath='{.status.containerStatuses[0].lastState}'
+```
+
+`"reason":"OOMKilled"`, `"exitCode":137` → bump the memory limit further.
+
+#### 7. Create the admin account
+
+Once stable, visit `https://navidrome.littlewolfacres.com/app/` — you should land
+on **Create Admin Account**. If the page won't load even though the pod is
+healthy, see "Browser Can't Reach *.littlewolfacres.com" under the DNS section
+below.
 
 ---
 
@@ -287,6 +385,31 @@ Process:
    - UDP services (e.g. Minecraft/Zombatron) cannot use Cloudflare proxy — grey cloud only
 3. PR → merge → `deploy-watchtower` applies the AdGuard rewrite automatically
 4. Update `homelab-state.md` DNS rewrites table
+
+### Browser Can't Reach *.littlewolfacres.com (DNS Resolves Fine)
+
+Two client-side issues that both present as a generic "Unable to connect" — neither
+is a cluster/DNS problem despite appearances:
+
+**1. Firefox's DNS-over-HTTPS bypasses AdGuard.** Firefox enables DoH by default,
+sending queries straight to a public resolver instead of the network's
+DHCP-assigned DNS server. Since the public Cloudflare record for
+`*.littlewolfacres.com` is DNS-only (grey cloud) pointing at the WAN IP — not
+port-forwarded — Firefox resolves to an address it can't reach.
+- Fix: `about:preferences#privacy` → "DNS over HTTPS" → **Off**, fully restart
+  Firefox, clear the cache on `about:networking#dns`.
+- Verify: `about:networking#dns` should resolve `*.littlewolfacres.com` to
+  `192.168.0.20`.
+
+**2. macOS "Local Network" permission (Sonoma+).** Even when DNS resolves
+correctly to `192.168.0.20`, macOS requires per-app permission to connect to
+devices on the local network — separate from internet access entirely. Without it,
+a browser resolves the hostname fine but the TCP connection silently fails, even
+for a raw `http://192.168.0.20:<port>` with no hostname or TLS involved.
+- Fix: **System Settings → Privacy & Security → Local Network** → enable the
+  toggle for the affected browser, then fully quit and relaunch it.
+- This is the one to check first if DNS already looks correct and the failure is
+  browser-specific (e.g. Chrome works, Firefox doesn't) on the same machine.
 
 ---
 
