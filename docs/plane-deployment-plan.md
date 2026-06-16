@@ -47,15 +47,11 @@ The ArgoCD Application currently uses `targetRevision: "*"` for the Helm chart, 
 
 ## Bootstrap sequence
 
-1. `bootstrap-plane.yml` GitHub Actions workflow (manual trigger, run once — same pattern as `bootstrap-argocd.yml`) is written and ready:
-   - Creates the `plane` namespace
-   - Generates random values for Postgres password, RabbitMQ password, MinIO root password, and the Plane `SECRET_KEY`, masking each immediately so they never appear in workflow logs
-   - Creates the 5 Kubernetes Secrets the chart's `external_secrets` config references
-   - No values are written to Ansible Vault or git — the Secret objects in the cluster are the only copy
-2. Merge `kubernetes/apps/plane.yaml` — ArgoCD picks it up via the app-of-apps, shows as a new Application, **does not auto-sync**
-3. Manually trigger Sync in the ArgoCD UI once the bootstrap secrets exist
+1. Merge this PR. `bootstrap-plane.yml` auto-triggers on the push (path filter on `kubernetes/apps/plane.yaml`) — no manual Actions click needed for this step. It's also safe to re-run manually or via future pushes to that file: it checks whether `plane-pgdb-secret` already exists and no-ops if so, rather than regenerating credentials that would no longer match whatever Postgres/RabbitMQ/MinIO already initialized with.
+2. ArgoCD's app-of-apps picks up `plane.yaml`, creates the child Application — shows as **OutOfSync**, does **not** auto-deploy
+3. Manually trigger Sync in the ArgoCD UI — kept manual deliberately, given this is a 13-container stateful stack's actual first boot (Postgres schema init, MinIO bucket creation, RabbitMQ, the migrator job). Worth watching happen once rather than chaining unverified automation (ArgoCD CLI auth from the runner, RBAC for patching Application objects, sync-timing assumptions) onto an already-complex first run.
 4. Verify all pods come up, `https://plane.littlewolfacres.com` loads, complete the `/god-mode` instance admin setup
-5. Add the AdGuard rewrite (already included in this round's PR — see below)
+5. AdGuard rewrite is already included in this PR
 6. Flip `syncPolicy.automated` on in a follow-up PR once confirmed stable
 
 ## Slack integration (manual, post-deploy)
