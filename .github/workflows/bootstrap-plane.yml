@@ -50,6 +50,9 @@ jobs:
     runs-on: [self-hosted, monolith]
 
     steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
       - name: Create plane namespace
         run: |
           kubectl create namespace plane \
