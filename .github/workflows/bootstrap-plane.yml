@@ -76,8 +76,31 @@ jobs:
           echo "::add-mask::$MINIO_ROOT_PASSWORD"
           echo "::add-mask::$SECRET_KEY"
 
+          # base64 output can contain '/' and '+' — both break URL parsing
+          # when embedded raw in a connection string (host:port boundary
+          # detection gets confused). Percent-encode the two passwords that
+          # get embedded in DATABASE_URL/AMQP_URL before they're used below.
+          urlencode() {
+            local string="${1}" strlen pos c o
+            strlen=${#string}
+            for (( pos=0 ; pos<strlen ; pos++ )); do
+              c=${string:$pos:1}
+              case "$c" in
+                [-_.~a-zA-Z0-9] ) o="${c}" ;;
+                * ) printf -v o '%%%02x' "'$c"
+              esac
+              printf '%s' "${o}"
+            done
+          }
+          PG_PASSWORD_ENC=$(urlencode "$PG_PASSWORD")
+          RABBITMQ_PASSWORD_ENC=$(urlencode "$RABBITMQ_PASSWORD")
+          echo "::add-mask::$PG_PASSWORD_ENC"
+          echo "::add-mask::$RABBITMQ_PASSWORD_ENC"
+
           echo "pg_password=$PG_PASSWORD" >> "$GITHUB_OUTPUT"
+          echo "pg_password_enc=$PG_PASSWORD_ENC" >> "$GITHUB_OUTPUT"
           echo "rabbitmq_password=$RABBITMQ_PASSWORD" >> "$GITHUB_OUTPUT"
+          echo "rabbitmq_password_enc=$RABBITMQ_PASSWORD_ENC" >> "$GITHUB_OUTPUT"
           echo "minio_root_password=$MINIO_ROOT_PASSWORD" >> "$GITHUB_OUTPUT"
           echo "secret_key=$SECRET_KEY" >> "$GITHUB_OUTPUT"
 
@@ -125,15 +148,15 @@ jobs:
         if: steps.check.outputs.exists == 'false'
         env:
           SECRET_KEY: ${{ steps.gen.outputs.secret_key }}
-          PG_PASSWORD: ${{ steps.gen.outputs.pg_password }}
-          RABBITMQ_PASSWORD: ${{ steps.gen.outputs.rabbitmq_password }}
+          PG_PASSWORD_ENC: ${{ steps.gen.outputs.pg_password_enc }}
+          RABBITMQ_PASSWORD_ENC: ${{ steps.gen.outputs.rabbitmq_password_enc }}
         run: |
           kubectl create secret generic plane-app-env-secret \
             --namespace plane \
             --from-literal=SECRET_KEY="${SECRET_KEY}" \
             --from-literal=REDIS_URL=redis://plane-redis.plane.svc.cluster.local:6379/ \
-            --from-literal=DATABASE_URL="postgresql://plane:${PG_PASSWORD}@plane-pgdb.plane.svc.cluster.local:5432/plane" \
-            --from-literal=AMQP_URL="amqp://plane:${RABBITMQ_PASSWORD}@plane-rabbitmq.plane.svc.cluster.local:5672/" \
+            --from-literal=DATABASE_URL="postgresql://plane:${PG_PASSWORD_ENC}@plane-pgdb.plane.svc.cluster.local:5432/plane" \
+            --from-literal=AMQP_URL="amqp://plane:${RABBITMQ_PASSWORD_ENC}@plane-rabbitmq.plane.svc.cluster.local:5672/" \
             --dry-run=client -o yaml | kubectl apply -f -
 
       - name: Create plane-live-env-secret
