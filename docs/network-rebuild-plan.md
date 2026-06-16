@@ -113,7 +113,16 @@ Guest VLAN uses `.50–.200` for DHCP (more dynamic capacity, less static need).
 
 ### LAN (192.168.20.0/24)
 
-Pure DHCP. All LAN-class devices are wireless — no wired clients on this VLAN today (apex is WiFi-only; watchtower with a monitor and keyboard is the wired admin/recovery path). Optional DHCP reservation for apex if you ever want predictable RDP-source filtering.
+Mostly DHCP, with two MAC-bound static reservations for devices needing predictable IPs for firewall targeting:
+
+| IP | Device | Notes |
+|---|---|---|
+| .20.2 | apex | WiFi-only. Needed for the Synapse MCP allow-rule and SSH admin path to monolith — without a fixed IP those rules silently stop matching post-migration. |
+| .20.3 | Studio | WiFi-only. Personal laptop — DAW/mastering, business use, upcoming music-library metadata work. Gets the same LAN-class access to Homelab as everything else, with one exception — see Firewall Rules below. |
+
+Both are MAC-bound DHCP reservations, not client-side static config — the network is actively changing right now (this whole rebuild), and a reservation automatically picks up new gateway/DNS values on each lease renewal where a hardcoded static config wouldn't. Before cutover, capture both MAC addresses and **explicitly disable WiFi MAC address randomization** for the `LittleWolfAcres` SSID on both devices (macOS: "Private Wi-Fi Address" per network; Windows: "Random hardware addresses" per network) — that's the one real failure mode for a MAC-bound reservation, and it's fully preventable.
+
+All other LAN-class devices are pure DHCP — no other wired clients on this VLAN today.
 
 ### Guest (192.168.50.0/24)
 
@@ -166,9 +175,10 @@ SG2218P, 16× 1G PoE+ ports + 2× SFP slots.
 
 | Destination | Port / Protocol | Purpose |
 |---|---|---|
-| Homelab .30.12 (Obelisk) | TCP 3389 | RDP from apex |
+| **Studio (.20.3) → Homelab .30.12 (Obelisk)** | **TCP 3389** | **Deny — must be ordered ABOVE the general RDP allow rule below. First-match firewall: if this isn't placed first, the broader LAN allow fires first and the exception never triggers.** |
+| Homelab .30.12 (Obelisk) | TCP 3389 | RDP from apex (and all other LAN devices except Studio, per the deny rule above) |
 | Homelab .30.11 (watchtower) | TCP/UDP 53 | DNS via AdGuard |
-| Homelab .30.10 (monolith) | TCP 445, 139 | Samba (wife laptop, daughter iPad) |
+| Homelab .30.10 (monolith) | TCP 445, 139 | Samba (wife laptop, daughter iPad, Studio — metadata editing against the music library) |
 | Homelab .30.20 (Lore) *(future)* | TCP 11434 | Ollama from apex |
 | Homelab .30.21 (Data) *(future)* | TCP 11434 | Ollama from apex |
 | IoT .40.20 (printer) | TCP 631, 9100; UDP 5353 | Print + mDNS discovery |
@@ -271,14 +281,6 @@ Single source of truth for "how do I reach the homelab from outside": **WireGuar
 ---
 
 ## More things to consider
-
-### Apex needs a DHCP reservation — not optional
-
-The plan lists a DHCP reservation for apex as "optional," but the Monolith UFW role allows SSH specifically from `ip_apex` (`192.168.0.19`). After migration, apex is a wireless device that lands somewhere in the `192.168.20.100–200` DHCP pool. Without a reservation, the firewall rule silently breaks and the primary admin SSH path from apex to Monolith is lost. Capture apex's MAC before cutover and create a DHCP reservation at a `.20.x` static address. Update `ip_apex` in `ansible/vars/main.yml` to that address in the IaC PR.
-
-### Studio has no place in the new IP plan
-
-`ip_studio: "192.168.0.109"` is in shared vars and has a corresponding SSH allow rule in the Monolith UFW role. Studio does not appear anywhere in the new VLAN static IP tables. Determine whether studio is wired or wireless, which VLAN it belongs to, and what its new IP will be. If it's a LAN-class device on WiFi, add a DHCP reservation in the LAN VLAN and update the var. If it's being retired or renamed, remove the UFW rule.
 
 ### Monolith UFW role needs a VLAN-aware rewrite, not a find-and-replace
 
