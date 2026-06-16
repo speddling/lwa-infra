@@ -1,0 +1,83 @@
+# Plane — self-hosted project/issue tracker (Community Edition, open source)
+#
+# DELIBERATELY NOT on automated sync. This is a first-time install of a
+# 13-service stateful stack (Postgres, Redis, RabbitMQ, MinIO + 7 app
+# deployments) — sync manually in the ArgoCD UI after the bootstrap-plane.yml
+# workflow has created the required secrets. See docs/plane-deployment-plan.md
+# for the full design and the bootstrap sequence.
+#
+# Flip syncPolicy to automated (matching navidrome.yaml / minecraft.yaml)
+# once this has been confirmed healthy after a manual sync.
+#
+# OPEN ITEM: the secret-reference field names below (marked TODO) are not
+# yet confirmed against the chart's actual values.yaml schema — see
+# docs/plane-deployment-plan.md → "Open item — needs verification before
+# merge" before merging this file.
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: plane
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://helm.plane.so/
+    chart: plane-ce
+    targetRevision: "*"   # TODO: pin to a specific chart version once confirmed via `helm search repo makeplane/plane-ce -l`
+    helm:
+      values: |
+        planeVersion: stable
+
+        ingress:
+          enabled: true
+          appHost: plane.littlewolfacres.com
+          ingressClass: traefik
+          ingress_annotations:
+            nginx.ingress.kubernetes.io/proxy-body-size: "5m"
+
+        ssl:
+          createIssuer: true
+          issuer: cloudflare
+          server: https://acme-v02.api.letsencrypt.org/directory
+          generateCerts: true
+          # email and token injected via the bootstrap workflow — see TODO below
+
+        postgres:
+          local_setup: true
+          storageClass: local-path
+          volumeSize: 5Gi
+
+        redis:
+          local_setup: true
+          storageClass: local-path
+          volumeSize: 1Gi
+
+        rabbitmq:
+          local_setup: true
+          storageClass: local-path
+          volumeSize: 100Mi
+
+        minio:
+          local_setup: true
+          storageClass: local-path
+          volumeSize: 5Gi
+
+        env:
+          default_cluster_domain: cluster.local
+          docstore_bucket: uploads
+          doc_upload_size_limit: 5242880
+          # secret_key, pgdb_username/password, rabbitmq credentials, minio
+          # root user/password: TODO — these need to reference the
+          # pre-created Kubernetes Secrets from bootstrap-plane.yml rather
+          # than being set as literal values here. Exact field path pending
+          # the `helm show values` verification in docs/plane-deployment-plan.md.
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: plane
+  syncPolicy:
+    syncOptions:
+      - CreateNamespace=true
+    # automated sync intentionally omitted — see header note
