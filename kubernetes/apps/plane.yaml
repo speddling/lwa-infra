@@ -83,6 +83,18 @@ spec:
           doc_store_existingSecret: plane-docstore-secret
           app_env_existingSecret: plane-app-env-secret
           live_env_existingSecret: plane-live-env-secret
+
+        # plane-worker OOMKilled (exitCode 137) against the chart's default
+        # 1000Mi limit. Its Celery banner showed "concurrency: 16 (prefork)"
+        # — 16 separate full-Python-process workers, not threads, each
+        # loading the entire Django app independently. Celery's default
+        # concurrency is the CPU count it detects, which on Monolith's
+        # 8c/16t host is 16. Rather than fight that indirectly via CPU
+        # limits (uncertain whether cgroup CPU quota reliably changes what
+        # Celery detects), just give it real headroom — Monolith has it.
+        worker:
+          memoryLimit: 4096Mi
+          memoryRequest: 512Mi
   destination:
     server: https://kubernetes.default.svc
     namespace: plane
