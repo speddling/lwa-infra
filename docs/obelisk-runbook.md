@@ -127,6 +127,8 @@ netsh advfirewall firewall add rule name="RDP" protocol=TCP dir=in localport=338
 
 ## TODO
 
+> **Client contract compliance items** (MFA, connection encryption, access logging, breach notification) tracked in `docs/homelab-todo.md` → "Client Contract — Security & Compliance". The "inbound RDP from internet" item below should wait until those are done.
+
 - [ ] Systemd service for QEMU process (start/stop/restart lifecycle)
 - [ ] windows_exporter install (port 9182 — Prometheus scrape target)
 - [ ] Firewall rule for windows_exporter (9182)

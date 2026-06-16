@@ -4,6 +4,23 @@
 
 ---
 
+## Client Contract — Security & Compliance (Obelisk / Win11 VM)
+
+> Engineering translation of DPA obligations from the Swiss client contract (nFADP/OFADP, GDPR where applicable) into concrete infra tasks. This is **not** a legal compliance review — confirm with the client or counsel that these implementations actually satisfy the contract language once built.
+
+| Item | Priority | Notes |
+|---|---|---|
+| MFA on Obelisk admin accounts | High | `speddling` and `obelisk` are currently password-only on the Win11 guest. Add a second factor before any client RDP session — options: Windows Hello for Business, a TOTP-gated RDP gateway in front of port 33389, or MFA on a VPN hop placed before RDP. |
+| Encrypt all administrative connections | High | RDP currently has NLA enabled (`UserAuthentication=1`) — that's authentication, not necessarily transport encryption. Verify/enforce TLS-encrypted RDP. SSH to monolith is already key-based — confirm and document this satisfies the requirement. Any future VPN (see Obelisk's "inbound RDP from internet" TODO) must use strong ciphers — WireGuard or OpenVPN w/ AES-256 — and that work should not proceed until this item and the two below are in place. |
+| Access logging for Obelisk | High | No audit/access logging exists today — `windows_exporter` (planned) is performance metrics only, not login activity. Enable Windows Security event logging for logon/logoff + RDP connection events, and ship logs off the VM to Watchtower. This is a strong argument to bump the existing Loki (log aggregation) item above "Low" priority. |
+| Data subject request procedure | Medium | Document a repeatable process for locating, exporting, or deleting an individual's personal data if the client passes along a data-subject request — needs to cover anywhere "Client Data" might live (see inventory item below). |
+| Breach notification runbook | High | Contract requires notifying the client within 24 hours of becoming aware of a breach or security incident. Add an incident-response entry to `runbook.md`: who to contact, what to capture/preserve immediately, a notification template. |
+| Client Data location inventory | Medium | The contract's "Client Data" definition is broad — personal data, docs, business plans, passwords, access tokens, source code, db schemas. Inventory where this actually lives in practice (Obelisk's disk, the `vault` Samba share, anywhere else) so it's unambiguous what's in scope for the controls above. |
+
+> See also: `docs/obelisk-runbook.md` → TODO, which has related items ("Document Swiss client RDP access procedure", "inbound RDP from internet") that should be sequenced after the High-priority items above.
+
+---
+
 ## Software
 
 | Item | Priority | Notes |
