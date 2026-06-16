@@ -221,7 +221,7 @@ groups:
           severity: warning
           host: watchtower
         annotations:
-          description: "T-Mobile 4G RSRP is {{ $value | printf \"%.0f\" }} dBm (threshold: -110) — tower performance may be degraded"
+          description: "T-Mobile 4G RSRP is {{ "{{" }} $value | printf \"%.0f\" {{ "}}" }} dBm (threshold: -110) — tower performance may be degraded"
 
       - alert: TMobile5GSignalWeak
         expr: tmobile_5g_rsrp_dbm < -110
@@ -230,4 +230,4 @@ groups:
           severity: warning
           host: watchtower
         annotations:
-          description: "T-Mobile 5G RSRP is {{ $value | printf \"%.0f\" }} dBm (threshold: -110) — tower performance may be degraded"
+          description: "T-Mobile 5G RSRP is {{ "{{" }} $value | printf \"%.0f\" {{ "}}" }} dBm (threshold: -110) — tower performance may be degraded"
