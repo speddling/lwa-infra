@@ -20,6 +20,7 @@ Work that can be done while the existing flat network keeps running.
   - `.30.10` monolith, `.30.11` watchtower, `.30.12` Obelisk
   - `.40.10` Big Brother, `.40.11–.12` Reolinks, `.40.20` printer
   - `.10.1–.6` infrastructure including the future `.10.6` Balcony AP (controller will mostly auto-assign these via Omada discovery)
+  - `.20.2` apex, `.20.3` Studio — capture both MAC addresses before cutover, and disable WiFi MAC address randomization for the `LittleWolfAcres` SSID on both devices first (this is the one thing that can quietly break a MAC-bound reservation)
 - [ ] Pre-stage the EAP245 rename in OC200: Foyer → **Downstairs Hall**, Yarn Studio → **Upstairs Hall**
 - [ ] Plan the physical relocation of the Upstairs Hall EAP245 (formerly Yarn Studio) to its new mounting location upstairs near daughter's bedroom — can be done before or after cutover, independent of the VLAN work
 - [ ] Pre-create new SSIDs (`LittleWolfAcres-IoT`, `LittleWolfAcres-Guest`) mapped to their VLANs, marked **disabled**
@@ -107,6 +108,8 @@ Per-VLAN smoke test. Don't skip any of these.
 ### Inter-VLAN rules
 
 - [ ] RDP from apex → Obelisk works
+- [ ] RDP from Studio → Obelisk is **blocked** (deliberate exception — confirms the deny rule is ordered correctly ahead of the general LAN allow)
+- [ ] Samba from Studio → monolith works (needed for the upcoming music-library metadata work)
 - [ ] Samba from wife's laptop → monolith works
 - [ ] Print job from any LAN device → printer succeeds
 - [ ] Print job from the Guest VLAN → printer succeeds
