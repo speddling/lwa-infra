@@ -572,7 +572,7 @@ dashboard not in the managed UID set. Add new dashboards to the Ansible grafana 
 
 ## NUT — When UPS Arrives
 
-1. Connect CyberPower CP1500PFCLCD via USB to Watchtower
+1. Connect CyberPower CP1000PFCLCD via USB to Watchtower
 2. Run monitoring playbook — NUT role activates automatically (`nut_enabled: true` in vars)
 3. Verify: `systemctl status nut-server nut-monitor`
 4. Check UPS status: `upsc cyberpower@localhost`

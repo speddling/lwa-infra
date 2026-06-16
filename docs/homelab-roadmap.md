@@ -1,6 +1,6 @@
 # Little Wolf Acres — Homelab Roadmap
 > Future plans, upgrades, and aspirational builds. Current state lives in `homelab-state.md`. Operational debt and one-off tasks live in `homelab-todo.md`.
-> Last updated: 2026-05-30
+> Last updated: 2026-06-16
 
 ---
 
@@ -96,7 +96,7 @@ OS and model storage should be separate. Models are large, frequently swapped, a
 
 | Item | Priority | Notes |
 |---|---|---|
-| RAM — 2×16 GB DDR4-3200 | High | Bring to 64 GB. ~2 weeks out. |
+| RAM — 2×16 GB DDR4-3200 | High | Bring to 64 GB. Arriving today (2026-06-16). |
 
 > After RAM: hardware freeze. No GPU, no PSU, no case fans. Monolith's role is k3s and household services — AI workloads belong to Lore and Data.
 
@@ -106,5 +106,5 @@ OS and model storage should be separate. Models are large, frequently swapped, a
 
 | Item | Priority | Notes |
 |---|---|---|
-| JetStream managed switch | Low | Replaces unmanaged TL-SG1210P — enables per-port SNMP stats in Grafana |
-| UPS — CyberPower CP1500PFCLCD | Low | NUT Ansible role is written and tested — waiting on hardware budget |
+| JetStream managed switch | Low | Replaces unmanaged TL-SG1210P — enables per-port SNMP stats in Grafana. Arriving today (2026-06-16). |
+| UPS — CyberPower CP1000PFCLCD | Low | NUT Ansible role is written and tested — same port config as the CP1500PFCLCD it was originally scoped against (minus the expansion port), confirmed NUT-compatible. Arriving 2026-06-17. |
