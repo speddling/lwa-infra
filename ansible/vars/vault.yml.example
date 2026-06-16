@@ -74,18 +74,9 @@ vault_healthchecks_watchdog_url: "https://hc-ping.com/REPLACE_ME"
 # Scopes: Actions: Read & Write (single repo: speddling/lwa-homelab)
 vault_github_actions_pat: "github_pat_REPLACE_ME"
 
-# Plane (self-hosted project tracker) — secrets for bootstrap-plane.yml
-# Generate random values for each before running the bootstrap workflow.
-# These become Kubernetes Secrets in the plane namespace, never applied
-# via Ansible directly — k3s/ArgoCD is the deployment path, not this vault
-# file. Recorded here only so they're recoverable if the namespace is
-# ever rebuilt from scratch.
-vault_plane_postgres_password: "REPLACE_ME"
-vault_plane_rabbitmq_password: "REPLACE_ME"
-vault_plane_minio_root_password: "REPLACE_ME"
-vault_plane_secret_key: "REPLACE_ME"          # Django/app secret key — random 50+ char string
-# The Cloudflare API token for cert-manager DNS-01 is NOT confirmed to live
-# in this vault file under a known name — the cert-manager.yaml Application
-# comment says it's "injected by the bootstrap workflow," which may mean a
-# GitHub Actions secret rather than an Ansible vault variable. Check
-# bootstrap-argocd.yml before assuming a name; don't invent one here.
+# Plane (self-hosted project tracker) — no Ansible Vault entries needed.
+# All of Plane's runtime secrets (Postgres, RabbitMQ, MinIO, app SECRET_KEY)
+# are generated fresh by .github/workflows/bootstrap-plane.yml and exist
+# only as Kubernetes Secret objects in the plane namespace. Re-run that
+# workflow to generate new ones if the namespace is ever rebuilt —
+# there's no prior value to recover from this vault.

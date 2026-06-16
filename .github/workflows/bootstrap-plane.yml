@@ -1,0 +1,137 @@
+name: Bootstrap Plane
+
+# Manual trigger only — runs once to create the secrets Plane's Helm chart
+# needs before kubernetes/apps/plane.yaml can be synced in ArgoCD.
+#
+# Unlike bootstrap-argocd.yml, this workflow needs NO pre-configured GitHub
+# Actions secrets. Every credential Plane needs (Postgres password,
+# RabbitMQ password, MinIO root password, app SECRET_KEY) is generated
+# fresh at runtime and exists only as Kubernetes Secret objects afterward —
+# nothing is round-tripped into git or Ansible Vault. If the plane
+# namespace is ever rebuilt from scratch, re-run this workflow to generate
+# new secrets; there's no prior value to recover or restore.
+#
+# Service hostnames below assume the Helm release name "plane" in the
+# "plane" namespace (set explicitly via source.helm.releaseName in
+# kubernetes/apps/plane.yaml) — e.g. plane-pgdb.plane.svc.cluster.local.
+#
+# What this does:
+#   1. Create the plane namespace
+#   2. Generate random secrets (masked in logs immediately on creation)
+#   3. Create the 5 Kubernetes Secrets the chart's external_secrets config
+#      references (see kubernetes/apps/plane.yaml)
+#
+# After this workflow completes:
+#   1. Merge kubernetes/apps/plane.yaml if not already merged
+#   2. In the ArgoCD UI, manually Sync the "plane" Application
+#      (deliberately not on automated sync — see that file's header note)
+#   3. Wait for all pods to come up: kubectl get pods -n plane
+#   4. Visit https://plane.littlewolfacres.com and complete /god-mode setup
+
+on:
+  workflow_dispatch:
+
+jobs:
+  bootstrap:
+    name: Bootstrap
+    runs-on: [self-hosted, monolith]
+
+    steps:
+      - name: Create plane namespace
+        run: |
+          kubectl create namespace plane \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Generate secrets
+        id: gen
+        run: |
+          PG_PASSWORD=$(openssl rand -base64 24)
+          RABBITMQ_PASSWORD=$(openssl rand -base64 24)
+          MINIO_ROOT_PASSWORD=$(openssl rand -base64 24)
+          SECRET_KEY=$(openssl rand -base64 48)
+
+          # Mask immediately so none of these ever print in plain text below
+          echo "::add-mask::$PG_PASSWORD"
+          echo "::add-mask::$RABBITMQ_PASSWORD"
+          echo "::add-mask::$MINIO_ROOT_PASSWORD"
+          echo "::add-mask::$SECRET_KEY"
+
+          echo "pg_password=$PG_PASSWORD" >> "$GITHUB_OUTPUT"
+          echo "rabbitmq_password=$RABBITMQ_PASSWORD" >> "$GITHUB_OUTPUT"
+          echo "minio_root_password=$MINIO_ROOT_PASSWORD" >> "$GITHUB_OUTPUT"
+          echo "secret_key=$SECRET_KEY" >> "$GITHUB_OUTPUT"
+
+      - name: Create plane-pgdb-secret
+        env:
+          PG_PASSWORD: ${{ steps.gen.outputs.pg_password }}
+        run: |
+          kubectl create secret generic plane-pgdb-secret \
+            --namespace plane \
+            --from-literal=POSTGRES_USER=plane \
+            --from-literal=POSTGRES_PASSWORD="${PG_PASSWORD}" \
+            --from-literal=POSTGRES_DB=plane \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Create plane-rabbitmq-secret
+        env:
+          RABBITMQ_PASSWORD: ${{ steps.gen.outputs.rabbitmq_password }}
+        run: |
+          kubectl create secret generic plane-rabbitmq-secret \
+            --namespace plane \
+            --from-literal=RABBITMQ_DEFAULT_USER=plane \
+            --from-literal=RABBITMQ_DEFAULT_PASS="${RABBITMQ_PASSWORD}" \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Create plane-docstore-secret
+        env:
+          MINIO_ROOT_PASSWORD: ${{ steps.gen.outputs.minio_root_password }}
+        run: |
+          kubectl create secret generic plane-docstore-secret \
+            --namespace plane \
+            --from-literal=USE_MINIO=1 \
+            --from-literal=MINIO_ROOT_USER=admin \
+            --from-literal=MINIO_ROOT_PASSWORD="${MINIO_ROOT_PASSWORD}" \
+            --from-literal=AWS_ACCESS_KEY_ID=admin \
+            --from-literal=AWS_SECRET_ACCESS_KEY="${MINIO_ROOT_PASSWORD}" \
+            --from-literal=AWS_S3_BUCKET_NAME=uploads \
+            --from-literal=AWS_S3_ENDPOINT_URL=http://plane-minio.plane.svc.cluster.local:9000 \
+            --from-literal=FILE_SIZE_LIMIT=5242880 \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Create plane-app-env-secret
+        env:
+          SECRET_KEY: ${{ steps.gen.outputs.secret_key }}
+          PG_PASSWORD: ${{ steps.gen.outputs.pg_password }}
+          RABBITMQ_PASSWORD: ${{ steps.gen.outputs.rabbitmq_password }}
+        run: |
+          kubectl create secret generic plane-app-env-secret \
+            --namespace plane \
+            --from-literal=SECRET_KEY="${SECRET_KEY}" \
+            --from-literal=REDIS_URL=redis://plane-redis.plane.svc.cluster.local:6379/ \
+            --from-literal=DATABASE_URL="postgresql://plane:${PG_PASSWORD}@plane-pgdb.plane.svc.cluster.local:5432/plane" \
+            --from-literal=AMQP_URL="amqp://plane:${RABBITMQ_PASSWORD}@plane-rabbitmq.plane.svc.cluster.local:5672/" \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Create plane-live-env-secret
+        run: |
+          kubectl create secret generic plane-live-env-secret \
+            --namespace plane \
+            --from-literal=REDIS_URL=redis://plane-redis.plane.svc.cluster.local:6379/ \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Print bootstrap summary
+        run: |
+          echo "================================================================"
+          echo "  Plane Secret Bootstrap Complete"
+          echo "================================================================"
+          echo ""
+          echo "  Secrets created in namespace 'plane':"
+          kubectl get secrets -n plane
+          echo ""
+          echo "  Next steps:"
+          echo "  1. Merge kubernetes/apps/plane.yaml if not already merged"
+          echo "  2. In the ArgoCD UI, manually Sync the 'plane' Application"
+          echo "     (it is deliberately not on automated sync)"
+          echo "  3. kubectl get pods -n plane   — wait for everything Running"
+          echo "  4. Visit https://plane.littlewolfacres.com, complete /god-mode setup"
+          echo "================================================================"

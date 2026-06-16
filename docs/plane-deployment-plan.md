@@ -24,34 +24,34 @@ Chart guidance recommends **8GB RAM minimum** for a comfortable install across a
 |---|---|---|
 | Chart | `makeplane/plane-ce` from `https://helm.plane.so/` | Official chart, Community Edition specifically — the open-source path. Avoid `plane-enterprise` chart entirely. |
 | Namespace | `plane` | Matches single-word namespace convention (navidrome, minecraft, synapse) |
+| Release name | `plane` (explicit, via `source.helm.releaseName`) | Pinned explicitly rather than left to ArgoCD's default inference, since in-cluster service DNS names (e.g. `plane-pgdb.plane.svc.cluster.local`) depend on it and the bootstrap workflow's secrets reference those names directly |
 | Hostname | `plane.littlewolfacres.com` | Matches existing `*.littlewolfacres.com` convention |
 | Exposure | Internal LAN + WireGuard only | Matches the established remote-access architecture in `network-rebuild-plan.md` — no public port forward, no Cloudflare Tunnel. Reachable from outside only via the WireGuard tunnel once that's configured. |
 | Ingress class | `traefik` | k3s ships Traefik by default; same as every other ingress in this cluster. No need to install nginx-ingress just for this chart's documented default. |
 | Storage class | `local-path` | Matches existing PVC convention (`navidrome-db`, `minecraft-data`) |
-| TLS | Chart's own cert-manager automation (`ssl.createIssuer=true`, `ssl.issuer=cloudflare`), reusing the same Cloudflare credential the existing `letsencrypt-prod` ClusterIssuer uses | Creates a namespace-scoped Issuer rather than touching the existing cluster-wide `letsencrypt-prod`/`letsencrypt-staging` ClusterIssuers — no interference with what's already working. **Unconfirmed:** where that credential actually lives (vault vs. a GitHub Actions secret injected by `bootstrap-argocd.yml`) — check that workflow before assuming a vault variable name. |
+| TLS | Standard `cert-manager.io/cluster-issuer: letsencrypt-prod` annotation, reusing the existing cluster-wide ClusterIssuer — chart's own `ssl.createIssuer` automation deliberately NOT used | The chart's own TLS automation requires embedding the Cloudflare API token directly as a literal Helm value, which would mean committing it to git in plaintext. The existing ClusterIssuer already has that credential wired up via its own out-of-band secret (confirmed: lives as the `CLOUDFLARE_API_TOKEN` GitHub Actions secret, created once by `bootstrap-argocd.yml`) — Plane just needs the standard annotation, same as Navidrome and ArgoCD's own ingress, and never needs to know about that credential at all. |
 | Postgres / Redis / RabbitMQ / MinIO | All `local_setup: true` (in-cluster, chart-managed) | No existing shared Postgres/Redis in this homelab to point at instead; simplest path for a first deploy |
-| Secrets | Generated random values, created as native Kubernetes Secrets by a bootstrap workflow, **never committed to git** | Same pattern as the `cloudflare-api-token` secret for cert-manager — out-of-band creation, `ignoreDifferences` in the ArgoCD Application so GitOps sync never tries to overwrite or diff it |
+| Secrets | Generated fresh at runtime by `bootstrap-plane.yml`, masked in CI logs, created as native Kubernetes Secrets, **never committed to git or stored in Ansible Vault** | Confirmed via `helm show values makeplane/plane-ce`: a top-level `external_secrets:` map takes the literal name of a pre-existing Secret per logical group (`pgdb_existingSecret`, `rabbitmq_existingSecret`, `doc_store_existingSecret`, `app_env_existingSecret`, `live_env_existingSecret`). Since these are locally-generated credentials with no external counterpart to preserve, the Kubernetes Secret objects themselves are the only copy that needs to exist — a full namespace rebuild just re-runs the bootstrap workflow to generate fresh ones. |
 | Initial sync policy | **Manual**, not `automated` | Unlike every other app in `kubernetes/apps/`, this one should NOT auto-sync on merge. First-time stateful multi-service installs are exactly the kind of thing you want to watch happen, not have silently triggered the moment a PR lands on master. Flip to `automated: {prune: true, selfHeal: true}` in a follow-up PR once it's confirmed healthy. |
 
-## Open item — needs verification before merge
+## Resolved during review
 
-The chart's README documents an "External Secrets Config" mechanism (`pgdb_existingSecret`, `rabbitmq_existingSecret`, `doc_store_existingSecret`, `app_env_existingSecret`, `live_env_existingSecret`) listing which environment variables each secret group should contain, but does **not** show the literal `values.yaml` field path for telling the chart "use this pre-existing Secret object by name." Run this on a machine with `helm` installed and paste the output back:
+Two items were flagged as open in the first draft of this plan and are now resolved:
 
-```bash
-helm repo add makeplane https://helm.plane.so/
-helm repo update
-helm show values makeplane/plane-ce | grep -B2 -A2 -i "existingsecret\|existing_secret"
-```
+1. **Secret field names** — confirmed via `helm show values makeplane/plane-ce`. See the `external_secrets:` row above.
+2. **Cloudflare credential location** — confirmed via reading `bootstrap-argocd.yml`: it's the `CLOUDFLARE_API_TOKEN` GitHub Actions secret, not an Ansible Vault variable. Resolved by routing around the question entirely — Plane reuses the existing ClusterIssuer via annotation rather than referencing that credential directly.
 
-Once that's confirmed, the bootstrap workflow and Application values can be finalized with the real field names instead of the placeholder marked below.
+## Remaining open item
 
-## Bootstrap sequence (once the open item above is resolved)
+The ArgoCD Application currently uses `targetRevision: "*"` for the Helm chart, which floats to whatever the latest version is on every sync. Run `helm search repo makeplane/plane-ce -l` to see available versions and pin to a specific one before this is considered production-stable — floating chart versions on a stateful service is asking for an unplanned schema migration at a bad time.
 
-1. `bootstrap-plane.yml` GitHub Actions workflow (manual trigger, runs once — same pattern as `bootstrap-argocd.yml`):
-   - Generates random values for: Postgres password, RabbitMQ password, MinIO root password, Plane `SECRET_KEY`
+## Bootstrap sequence
+
+1. `bootstrap-plane.yml` GitHub Actions workflow (manual trigger, run once — same pattern as `bootstrap-argocd.yml`) is written and ready:
    - Creates the `plane` namespace
-   - `kubectl create secret` for each of the five secret groups documented above, using the confirmed field structure
-   - Secrets stored in `ansible/vars/vault.yml` so they're recoverable if the namespace is ever rebuilt, but never applied via Ansible directly — Ansible isn't part of k3s's deployment path
+   - Generates random values for Postgres password, RabbitMQ password, MinIO root password, and the Plane `SECRET_KEY`, masking each immediately so they never appear in workflow logs
+   - Creates the 5 Kubernetes Secrets the chart's `external_secrets` config references
+   - No values are written to Ansible Vault or git — the Secret objects in the cluster are the only copy
 2. Merge `kubernetes/apps/plane.yaml` — ArgoCD picks it up via the app-of-apps, shows as a new Application, **does not auto-sync**
 3. Manually trigger Sync in the ArgoCD UI once the bootstrap secrets exist
 4. Verify all pods come up, `https://plane.littlewolfacres.com` loads, complete the `/god-mode` instance admin setup
