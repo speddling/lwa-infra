@@ -193,6 +193,19 @@ SG2218P, 16× 1G PoE+ ports + 2× SFP slots.
 
 **No DNS allow to Homelab.** Guest DNS is pushed via DHCP as `1.1.1.1` and `9.9.9.9` — guests resolve externally, AdGuard query logs stay clean.
 
+### mDNS / Bonjour cross-VLAN discovery (printer)
+
+The `UDP 5353` entries in the LAN and Guest firewall tables above open the port, but **opening a port is not the same as enabling cross-VLAN multicast.** Standard L3 firewall ACLs govern unicast traffic; mDNS discovery (`224.0.0.251` multicast, used by AirPrint-style auto-discovery) doesn't cross VLAN boundaries on its own regardless of what the ACL permits. A separate mechanism is required.
+
+Omada Controller v5.6+ has a real, built-in feature for exactly this: **Settings → Services → mDNS → mDNS Repeater**, configured on the Gateway (ER605). It needs a forwarding rule for each direction: LAN → IoT and Guest → IoT, both scoped to the printer's Bonjour service specifically.
+
+Two things that can silently make this not work even when it looks configured correctly:
+
+- **Version gate:** Gateway-type mDNS forwarding requires Controller v5.6+. Selecting a *specific* Bonjour service (the printer's IPP service, rather than a blanket forward) requires Controller v5.8+ **and** matching ER605 firmware. Check both versions before assuming this is available.
+- **ACL interference:** even with the repeater rule configured correctly, an ACL prohibiting LAN/Guest → IoT can independently block the forwarded mDNS traffic. If discovery doesn't work after configuring the repeater, check the ACL before assuming the repeater rule itself is wrong.
+
+Fallback if this turns out to be more friction than it's worth: skip auto-discovery entirely and have devices add the printer by its static IP (`.40.20`) directly. Works regardless of mDNS Repeater state, at the cost of a one-time manual setup per device instead of "it just appears."
+
 ### From Homelab (192.168.30.0/24)
 
 | Destination | Port / Protocol | Purpose |
