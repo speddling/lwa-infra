@@ -117,6 +117,22 @@ spec:
       selfHeal: true
     syncOptions:
       - CreateNamespace=true
+      # The chart's plane-api-migrate Job embeds a fresh timestamp
+      # annotation in its pod template on every Helm render. Job pod
+      # templates are immutable in Kubernetes — ArgoCD's normal
+      # apply/patch fails every single sync with "field is immutable"
+      # once the Job already exists, since it's trying to patch a field
+      # that can never change post-creation. Replace=true tells ArgoCD
+      # to delete-and-recreate instead of patch, sidestepping the
+      # immutability conflict entirely. Applies app-wide (ArgoCD has no
+      # per-resource sync-option override reachable from a remote Helm
+      # source without forking the chart's templates) — the tradeoff is
+      # Deployments/StatefulSets get a full replace instead of a smart
+      # patch on every sync, which can mean an unnecessary rolling
+      # restart even when nothing meaningful changed. Acceptable given
+      # syncs are now infrequent (only on plane.yaml changes), not
+      # continuous.
+      - Replace=true
   ignoreDifferences:
     # WEB_URL has no Helm override field in this chart (confirmed via
     # helm show values) — it's hardcoded to http://<appHost>, which
