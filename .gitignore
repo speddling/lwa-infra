@@ -5,10 +5,18 @@ homelab-dump.txt
 .obsidian/
 
 # Never commit a plaintext vault — only the ansible-vault encrypted version
-# ansible/vars/vault.yml must be encrypted before committing
 ansible/vars/vault.yml.plaintext
 ansible/vars/vault.yml.tmp
 /tmp/*-vault.yml
+
+# Terraform — local provider cache and state pointer files, fully
+# regenerable via `terraform init`. Real state lives in Terraform Cloud.
+**/.terraform/
+*.tfstate
+*.tfstate.*.backup
+crash.log
+override.tf
+override.tf.json
 
 # Web assets — binary/media files managed outside the repo
 docs/web/lwa.jpg
