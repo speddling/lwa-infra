@@ -25,6 +25,7 @@ Work that can be done while the existing flat network keeps running.
 - [ ] Plan the physical relocation of the Upstairs Hall EAP245 (formerly Yarn Studio) to its new mounting location upstairs near daughter's bedroom — can be done before or after cutover, independent of the VLAN work
 - [ ] Pre-create new SSIDs (`LittleWolfAcres-IoT`, `LittleWolfAcres-Guest`) mapped to their VLANs, marked **disabled**
 - [ ] Plan to retain the existing `LittleWolfAcres` SSID name on the new LAN VLAN — family devices reconnect transparently
+- [ ] Check Controller and ER605 firmware versions, then configure the mDNS Repeater (Settings → Services → mDNS) for LAN → IoT and Guest → IoT, scoped to the printer's Bonjour service — see [Network Rebuild Plan → mDNS / Bonjour cross-VLAN discovery](network-rebuild-plan.md#mdns--bonjour-cross-vlan-discovery-printer) for why the `UDP 5353` firewall rule alone doesn't make auto-discovery work
 
 ### AdGuard prep
 
@@ -113,6 +114,7 @@ Per-VLAN smoke test. Don't skip any of these.
 - [ ] Samba from wife's laptop → monolith works
 - [ ] Print job from any LAN device → printer succeeds
 - [ ] Print job from the Guest VLAN → printer succeeds
+- [ ] If relying on auto-discovery (AirPrint, etc.) rather than a manually-added printer IP: confirm the printer actually *appears* in the device's printer list without manual IP entry — a successful print via manual IP doesn't prove the mDNS Repeater rule is working
 - [ ] LAN device cannot reach Homelab on any port other than the allowed ones (try SSH to monolith from a LAN device — should fail)
 - [ ] IoT device cannot reach LAN or Homelab (try `ping .30.10` from the NVR's debug shell — should fail)
 - [ ] Guest device cannot reach anything internal except the printer (try `ping .30.11` from a guest device — should fail)
