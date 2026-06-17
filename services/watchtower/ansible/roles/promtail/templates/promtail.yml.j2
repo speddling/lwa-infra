@@ -26,17 +26,30 @@ scrape_configs:
       - source_labels: [__journal__priority_keyword]
         target_label: level
 
-  # ── ER605 syslog receiver ─────────────────────────────────────────────────
-  # Captures WAN up/down, DHCP lease events, failover triggers.
+  # ── Network device syslog receiver ────────────────────────────────────────
+  # Shared UDP listener for any network device's syslog stream — ER605
+  # (WAN up/down, DHCP lease events, failover triggers) and Omada
+  # Controller (device join/leave, config changes, alerts, the "log
+  # storage near limit" class of system event). Devices are NOT split
+  # into separate jobs/ports — the hostname relabel below distinguishes
+  # them automatically from the syslog message itself.
+  #
+  # protocol: udp is explicit and required — Promtail's syslog stage
+  # defaults to TCP, but neither the ER605 nor Omada Controller's remote
+  # logging supports anything but UDP. Without this line the listener
+  # silently receives nothing from either source.
+  #
   # Configure ER605: System → Syslog → Remote Server → {{ ip_watchtower }}:{{ port_promtail_syslog }}
-  - job_name: er605-syslog
+  # Configure Omada Controller: Site Settings → Log Settings → Enable
+  #   Server → {{ ip_watchtower }}:{{ port_promtail_syslog }}
+  - job_name: network-syslog
     syslog:
       listen_address: 0.0.0.0:{{ port_promtail_syslog }}
+      protocol: udp
       idle_timeout: 60s
       label_structured_data: true
       labels:
-        job: er605-syslog
-        host: er605
+        job: network-syslog
     relabel_configs:
       - source_labels: [__syslog_message_hostname]
         target_label: hostname

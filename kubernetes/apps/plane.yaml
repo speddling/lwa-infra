@@ -1,13 +1,14 @@
 # Plane — self-hosted project/issue tracker (Community Edition, open source)
 #
-# DELIBERATELY NOT on automated sync. This is a first-time install of a
-# 13-service stateful stack (Postgres, Redis, RabbitMQ, MinIO + 7 app
-# deployments) — sync manually in the ArgoCD UI after bootstrap-plane.yml
-# has created the required secrets. See docs/plane-deployment-plan.md for
-# the full design and bootstrap sequence.
-#
-# Flip syncPolicy to automated (matching navidrome.yaml / minecraft.yaml)
-# once this has been confirmed healthy after a manual sync.
+# Automated sync enabled. Confirmed healthy through a real first install:
+# all 13 components (Postgres, Redis, RabbitMQ, MinIO, web, space, admin,
+# live, api, worker, beat-worker) survived an OOMKill fix, a TLS
+# misconfiguration, a missing secret key, and a Jinja2 templating bug
+# upstream of this file — manual sync was the right call for that first
+# boot, not for steady-state operation afterward. See
+# docs/plane-deployment-plan.md for the full design and bootstrap
+# sequence, and PRs #142/#144/#145/#146/#147 for what got fixed along
+# the way.
 #
 # Secret field names confirmed via `helm show values makeplane/plane-ce`:
 # a top-level `external_secrets:` map takes the literal NAME of a
@@ -111,9 +112,11 @@ spec:
     server: https://kubernetes.default.svc
     namespace: plane
   syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
     syncOptions:
       - CreateNamespace=true
-    # automated sync intentionally omitted — see header note
   ignoreDifferences:
     # WEB_URL has no Helm override field in this chart (confirmed via
     # helm show values) — it's hardcoded to http://<appHost>, which
