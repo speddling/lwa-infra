@@ -58,9 +58,9 @@ After all 13 pods were Running/Succeeded and `https://plane.littlewolfacres.com`
 - Android Private DNS (red herring from an earlier session — DNS was fine)
 - Missing IngressRoute path for `/god-mode` (it was already there)
 
-## Remaining open item
+## Chart version pinning
 
-The ArgoCD Application currently uses `targetRevision: "*"` for the Helm chart, which floats to whatever the latest version is on every sync. Run `helm search repo makeplane/plane-ce -l` to see available versions and pin to a specific one before this is considered production-stable — floating chart versions on a stateful service is asking for an unplanned schema migration at a bad time.
+Pinned to `targetRevision: "1.5.1"` (chart 1.5.1 = app 1.3.1) in `kubernetes/apps/plane.yaml`. When upgrading, check the release notes for schema migrations before bumping the pin — the `plane-api-migrate` Job will re-run on the next sync and the immutable-pod-template issue documented above may require a `kubectl delete job plane-api-migrate-1 -n plane` before selfHeal can recreate it cleanly.
 
 ## Lesson learned: Replace=true and ignoreDifferences are incompatible
 
