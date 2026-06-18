@@ -117,6 +117,13 @@ spec:
       selfHeal: true
     syncOptions:
       - CreateNamespace=true
+      # RespectIgnoreDifferences=true is the actual missing piece behind
+      # the whole WEB_URL saga. ignoreDifferences alone (with or without
+      # Replace=true, with either jqPathExpressions or jsonPointers
+      # syntax) only suppresses the OutOfSync *status display* — per
+      # ArgoCD's own docs, it does NOT by itself stop the field from
+      # being overwritten during an actual sync/apply. That's a separate
+      # opt-in, and this was the step missing the whole time.
       # Replace=true was tried and removed — it's incompatible with
       # ignoreDifferences below. ignoreDifferences only affects PATCH
       # computation; Replace does a full delete-and-recreate from
@@ -136,6 +143,7 @@ spec:
       # selfHeal will recreate it cleanly afterward, since creating a
       # missing Job doesn't hit the immutability conflict — only
       # patching an existing one does.
+      - RespectIgnoreDifferences=true
   ignoreDifferences:
     # WEB_URL has no Helm override field in this chart (confirmed via
     # helm show values) — it's hardcoded to http://<appHost>, which
