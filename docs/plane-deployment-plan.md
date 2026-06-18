@@ -44,6 +44,12 @@ Chart guidance recommends **8GB RAM minimum** for a comfortable install across a
 
 The ArgoCD Application currently uses `targetRevision: "*"` for the Helm chart, which floats to whatever the latest version is on every sync. Run `helm search repo makeplane/plane-ce -l` to see available versions and pin to a specific one before this is considered production-stable — floating chart versions on a stateful service is asking for an unplanned schema migration at a bad time.
 
+## Lesson learned: Replace=true and ignoreDifferences are incompatible
+
+Briefly tried `syncOptions: Replace=true` app-wide to solve the migrate Job's immutable-pod-template conflict (the chart embeds a fresh timestamp annotation on every Helm render, and Kubernetes Job pod templates can't be patched post-creation). This backfired: `ignoreDifferences` only affects how ArgoCD computes a *patch* — it has no effect at all on `Replace`, which does a full delete-and-recreate using exactly what's rendered from git. The very next sync silently wiped the live `WEB_URL` fix back to the chart's broken `http://` default, breaking the site with no error or warning — a worse failure mode than the loud, clear "field is immutable" error Replace was meant to solve.
+
+Reverted to no `Replace=true`. The accepted tradeoff instead: if a future chart/values change ever re-triggers a sync that touches the already-existing migrate Job, that one sync will fail with the immutable-field error, requiring a one-time manual `kubectl delete job plane-api-migrate-1 -n plane` before `selfHeal` can recreate it cleanly. Rare (only on an actual chart/values change, not routine reconciliation), loud when it happens, and doesn't silently corrupt anything else — a better trade than `Replace=true`'s silent `ignoreDifferences` bypass.
+
 ## Bootstrap sequence
 
 1. Merge this PR. `bootstrap-plane.yml` auto-triggers on the push (path filter on `kubernetes/apps/plane.yaml`) — no manual Actions click needed for this step. It's also safe to re-run manually or via future pushes to that file: it checks whether `plane-pgdb-secret` already exists and no-ops if so, rather than regenerating credentials that would no longer match whatever Postgres/RabbitMQ/MinIO already initialized with.
