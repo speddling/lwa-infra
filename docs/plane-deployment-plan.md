@@ -40,9 +40,27 @@ Chart guidance recommends **8GB RAM minimum** for a comfortable install across a
 | `LIVE_SERVER_SECRET_KEY` | Added to `plane-live-env-secret` via `bootstrap-plane.yml`, reusing the same value as the main app `SECRET_KEY` | The chart's documented `live_env_existingSecret` table only lists `REDIS_URL` as required — `live` actually also requires this key at startup (`live`'s own Node.js service threw a hard "Required" validation error without it). Not documented in the chart README at the version installed; discovered via the pod's crash log. |
 | `worker` memory limit | Raised from the chart default `1000Mi` to `4096Mi` | `plane-worker` was repeatedly OOMKilled (`exitCode 137`). Its own startup banner showed `concurrency: 16 (prefork)` — Celery's default concurrency equals the detected CPU count, and Monolith is 8c/16t, so it spawned 16 separate full Python processes rather than lightweight threads. No traceback ever appeared in logs since this is a kernel-level OOM kill, not an application exception. |
 
-## Remaining open item
+## Onboarding flow postmortem (resolved — June 2026)
 
-The ArgoCD Application currently uses `targetRevision: "*"` for the Helm chart, which floats to whatever the latest version is on every sync. Run `helm search repo makeplane/plane-ce -l` to see available versions and pin to a specific one before this is considered production-stable — floating chart versions on a stateful service is asking for an unplanned schema migration at a bad time.
+After all 13 pods were Running/Succeeded and `https://plane.littlewolfacres.com` loaded the welcome screen correctly, the **"Get Started"** button hung and timed out on every client. Root cause and resolution:
+
+**Root cause:** The `GET /api/instances/` response returns three fields — `admin_base_url`, `space_base_url`, `app_base_url` — that were all `null` because they had never been set (this is normal for a fresh install before the setup wizard completes). When these are null, the Next.js web frontend falls back to constructing the god-mode redirect URL client-side as `window.location.hostname + ":3000"`, producing `https://plane.littlewolfacres.com:3000/god-mode/`. Port 3000 is the admin container's internal listen port — it is not exposed externally and is not an entrypoint Traefik listens on. The request never reached the cluster, which is why `plane-api-wl` logs showed zero trace of the request.
+
+**The IngressRoute was already correct.** The chart-generated `plane-ingress` IngressRoute routes `Host(plane.littlewolfacres.com) && PathPrefix(/god-mode)` → `plane-admin:3000` on the `websecure` (443) entrypoint. `https://plane.littlewolfacres.com/god-mode/` works fine — the only broken path was the one the frontend generated with `:3000` appended.
+
+**Fix:** Navigate directly to `https://plane.littlewolfacres.com/god-mode/` in a browser (Chrome, with AdGuard DNS resolving the hostname), bypassing the "Get Started" button entirely. Complete the setup wizard — this sets `is_setup_done: true`, creates the first workspace, and populates the instance name. After setup, normal navigation goes straight to login/workspace and never touches the broken welcome-screen redirect again.
+
+**Note on `admin_base_url` / `space_base_url` / `app_base_url`:** These fields are not exposed anywhere in the god-mode UI in v1.3.1. They may be settable via env vars but were never needed — once `is_setup_done: true`, the welcome screen's "Get Started" redirect is no longer part of the flow. If a future DB reset forces another initial setup, navigate directly to `/god-mode/` again rather than using the welcome screen button.
+
+**What was ruled out during investigation:**
+- SMTP (both `ENABLE_SMTP` and `EMAIL_HOST` in `plane-app-vars` are empty — no mail server to hang on)
+- `WEB_URL` revert (confirmed still `https://plane.littlewolfacres.com`, `ignoreDifferences` + `RespectIgnoreDifferences=true` held)
+- Android Private DNS (red herring from an earlier session — DNS was fine)
+- Missing IngressRoute path for `/god-mode` (it was already there)
+
+## Chart version pinning
+
+Pinned to `targetRevision: "1.5.1"` (chart 1.5.1 = app 1.3.1) in `kubernetes/apps/plane.yaml`. When upgrading, check the release notes for schema migrations before bumping the pin — the `plane-api-migrate` Job will re-run on the next sync and the immutable-pod-template issue documented above may require a `kubectl delete job plane-api-migrate-1 -n plane` before selfHeal can recreate it cleanly.
 
 ## Lesson learned: Replace=true and ignoreDifferences are incompatible
 
