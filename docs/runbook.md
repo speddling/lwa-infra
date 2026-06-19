@@ -386,6 +386,36 @@ Process:
 3. PR → merge → `deploy-watchtower` applies the AdGuard rewrite automatically
 4. Update `homelab-state.md` DNS rewrites table
 
+### Internal-Only Services (No Public Port-Forward)
+
+Some services (Plane, currently) are deliberately LAN + WireGuard only — no
+port-forward exists for them, and none should be added. The process above still
+applies, with one important difference in step 2:
+
+**The Cloudflare A record value is the internal LAN IP itself (e.g.
+`192.168.0.20`), not the WAN IP.** There's no port-forward path for an external
+request to traverse, so pointing at the WAN IP would resolve to an address that
+goes nowhere useful for this hostname. Pointing directly at the LAN IP means the
+public record only ever resolves to something reachable for clients actually on
+the LAN — exactly the intended audience — while staying correctly unreachable
+from outside it.
+
+Proxy status is **still DNS only (grey cloud)** — non-negotiable here too.
+Cloudflare can't proxy to a private IP regardless of service type; setting it to
+proxied breaks the hostname for every client, including ones correctly using
+AdGuard, not just external ones.
+
+**Why a Cloudflare record is needed at all, when AdGuard already rewrites the
+same hostname for LAN clients:** not every device on the LAN actually uses
+AdGuard as its resolver. apex is the known case — it resolves via macOS's
+default system resolver rather than the DHCP-assigned `192.168.0.21`, so
+`plane.littlewolfacres.com` didn't resolve there at all until a public record
+was added. This matters most for any long-running local process on apex (e.g.
+the Atlas/Plane MCP server — see `docs/Claude MCPs.md`) that can't override DNS
+resolution per-call the way `curl --resolve` can. A one-off `/etc/hosts` entry
+on apex would also fix it locally, but the Cloudflare record is the durable fix —
+it works for any future device in the same situation, not just apex.
+
 ### Browser Can't Reach *.littlewolfacres.com (DNS Resolves Fine)
 
 Two client-side issues that both present as a generic "Unable to connect" — neither

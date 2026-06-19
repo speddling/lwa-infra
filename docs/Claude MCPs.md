@@ -1,14 +1,15 @@
 # Claude MCPs — Little Wolf Acres AI Tooling
 
-Three MCP servers give Claude structured, safe access to the homelab. Each has a distinct role and runs on a dedicated host. Together they cover the full operational surface: cluster state, git workflow, and monitoring layer.
+Four MCP servers give Claude structured access to the homelab. Three are in-house FastMCP servers deployed as dedicated services; the fourth (Atlas) is the official upstream Plane MCP server, run as a local subprocess. Together they cover the full operational surface: cluster state, git workflow, monitoring layer, and project management.
 
 | Server | Host | Role | Port | Transport |
 |---|---|---|---|---|
 | **Synapse** | monolith | k3s cluster, Prometheus metrics, monolith filesystem | 30800 | Streamable HTTP (FastMCP · Kubernetes) |
 | **Scribe** | apex | Git workflow — branch, commit, push, PR | 8765 | Streamable HTTP (FastMCP · launchd) |
 | **Argus** | watchtower | Live monitoring configs, systemd, journald, Alertmanager API, Prometheus rules | 9800 | Streamable HTTP (FastMCP · systemd) |
+| **Atlas** | apex (local subprocess) | Plane project management — work items, modules, cycles, projects | — (stdio, no listening port) | stdio (official `makeplane/plane-mcp-server` via `uvx`) |
 
-All three follow the same security pattern: dedicated system user, no shell, UFW-restricted to apex (`192.168.0.19`), no write surface except where explicitly scoped (Scribe — git only, branch-protected).
+Synapse, Scribe, and Argus follow the same security pattern: dedicated system user, no shell, UFW-restricted to apex (`192.168.0.19`), no write surface except where explicitly scoped (Scribe — git only, branch-protected). **Atlas is architecturally different and unscoped — see its section below before assuming the same guardrails apply.**
 
 ---
 
@@ -30,12 +31,23 @@ All three entries belong in `~/Library/Application Support/Claude/claude_desktop
     "argus": {
       "command": "/Users/speddling/.nvm/versions/node/v24.15.0/bin/npx",
       "args": ["mcp-remote", "http://watchtower.littlewolfacres.com:9800/mcp", "--allow-http"]
+    },
+    "atlas": {
+      "command": "uvx",
+      "args": ["plane-mcp-server", "stdio"],
+      "env": {
+        "PLANE_API_KEY": "<your_personal_access_token>",
+        "PLANE_WORKSPACE_SLUG": "<workspace_slug>",
+        "PLANE_BASE_URL": "https://plane.littlewolfacres.com"
+      }
     }
   }
 }
 ```
 
 Quit and relaunch Claude Desktop after editing. A hammer icon in the chat interface confirms the connections.
+
+**Never commit real values for `PLANE_API_KEY` or `PLANE_WORKSPACE_SLUG`** — this file documents the shape of the config only. Live values stay in `claude_desktop_config.json` on apex, which is not part of this repo.
 
 ---
 
@@ -341,6 +353,60 @@ sudo systemctl restart argus
 
 ---
 
+## Atlas — Plane MCP Server
+
+Claude's interface to Little Wolf Acres' Plane workspace. Unlike Synapse/Scribe/Argus — which are in-house FastMCP servers built specifically for this homelab with deliberately narrow tool surfaces — Atlas is the **official, unmodified upstream Plane MCP server** (`makeplane/plane-mcp-server`, MIT licensed), run locally via `uvx`. It exposes 100+ tools across 20 modules: work items, cycles, modules, milestones, initiatives, intake, pages, work logs, labels, states, and work item types.
+
+Named for the workspace itself — both ended up called "atlas" independently (the Plane workspace during initial setup, the MCP config key to match) and it stuck.
+
+### Why This One Is Different
+
+**No custom guardrails.** Synapse is read-only by RBAC. Argus is read-only by design. Scribe refuses to operate on `master`/`main` at the Python level. Atlas has none of that — it's a thin wrapper around Plane's REST API using a Personal Access Token with the same permissions as the account that generated it. `delete_project` and `delete_work_item` are real, unguarded tools. There is no branch-protection-equivalent here.
+
+**Local subprocess, not a deployed service.** Synapse/Scribe/Argus are long-running services on dedicated hosts with their own systemd/launchd units, UFW rules, and `docs/runbook.md` health-check commands. Atlas is spawned directly by Claude Desktop on apex via `uvx` and exits when Desktop closes — there's no host to check `systemctl status` on, no port to scan, nothing to deploy.
+
+**Auth is a bearer credential in plain env vars**, not a dedicated system user with no shell. Treat `PLANE_API_KEY` like any other credential — see `homelab-todo.md` → GitHub PAT Audit section for the rotation-discipline pattern this should probably follow eventually.
+
+### DNS Dependency (apex-specific gotcha)
+
+Apex does not use AdGuard Home as its DNS resolver by default, so `plane.littlewolfacres.com` doesn't resolve there out of the box — discovered when Atlas's first call failed with a `NameResolutionError`, even though the hostname already worked fine from AdGuard-resolved LAN clients. `curl` can work around this per-call with `--resolve`, but a long-running stdio subprocess can't — it needs the hostname to resolve correctly at the OS level, every time, with no per-call override available.
+
+Fixed via a public Cloudflare A record pointing directly at the internal LAN IP (DNS-only / grey cloud) — see `docs/runbook.md` → DNS → **Internal-Only Services (No Public Port-Forward)** for the general pattern and why it differs from the WAN-IP approach used for externally-reachable services.
+
+### Setup
+
+1. **Generate a Plane API token** — Plane → Profile Settings → API Tokens → Add access token. Copy immediately; shown once.
+2. **Find the workspace slug** — the path segment right after the domain once you're inside the workspace (`https://plane.littlewolfacres.com/<slug>/...`), or confirm via Workspace Settings → General → Workspace URL.
+3. **Confirm `uvx` is available on apex** — `which uvx` (installed via `uv`, `brew install uv` if missing).
+4. Add the config block above to `claude_desktop_config.json`, quit and relaunch Desktop.
+
+### Verifying Connectivity
+
+```bash
+# From apex — confirms the API key and base URL are valid before touching the MCP config at all
+curl -s --resolve plane.littlewolfacres.com:443:192.168.0.20 \
+  -H "x-api-key: YOUR_KEY" \
+  "https://plane.littlewolfacres.com/api/v1/users/me/" | python3 -m json.tool
+```
+
+A `200` with your user profile confirms the key works — narrows any further connection failure to either DNS (see above) or the workspace slug specifically, rather than auth.
+
+### Known API Quirks (Self-Hosted CE, v1.3.1)
+
+- `GET /api/v1/workspaces/` (list all workspaces) **404s** — this endpoint doesn't exist on this CE version. There's no "list my workspaces" call; you have to already know the slug.
+- An invalid/missing slug at `GET /api/v1/workspaces/{slug}/projects/` does **not** 404 — it returns a normal paginated envelope with `total_count: 0`. A wrong slug looks identical to an empty workspace. Confirm the slug via the UI (Workspace Settings → General), not by inferring it from an empty API response.
+
+### Security
+
+| Control | Detail |
+|---|---|
+| Scope | None — full account permissions of whichever Plane user generated the token |
+| Network exposure | None — stdio subprocess, no listening port, no UFW rule needed or applicable |
+| Credential storage | Plain env var in `claude_desktop_config.json` (not committed — see config section above) |
+| Write surface | Unrestricted — create/update/delete on projects, work items, comments, everything the token's user can do via the Plane UI |
+
+---
+
 ## What Belongs Where
 
 | Need | Use |
@@ -354,8 +420,10 @@ sudo systemctl restart argus
 | Check systemd service or timer state | Argus → `systemd_status` |
 | Read journald logs for a Watchtower service | Argus → `journald_tail` |
 | Read config files on Watchtower | Argus → `fs_read_file` / `fs_list_dir` |
+| Create/update/query Plane work items, modules, cycles | Atlas → `create_work_item` / `update_work_item` / `list_work_items` |
+| Manage Plane projects | Atlas → `create_project` / `list_projects` |
 
-Synapse never touches git. Scribe never touches the cluster. Argus never writes anything.
+Synapse never touches git. Scribe never touches the cluster. Argus never writes anything. **Atlas never touches infrastructure — but unlike the other three, it has no internal guardrails, so treat every write call as a real, unguarded action against production project data.**
 
 ---
 
