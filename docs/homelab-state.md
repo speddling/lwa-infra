@@ -45,6 +45,7 @@
 | `monolith.littlewolfacres.com` | 192.168.0.20 |
 | `navidrome.littlewolfacres.com` | 192.168.0.20 |
 | `argocd.littlewolfacres.com` | 192.168.0.20 |
+| `plane.littlewolfacres.com` | 192.168.0.20 |
 | `zombatron.littlewolfacres.com` | 192.168.0.20 |
 | `studio.littlewolfacres.com` | 192.168.0.109 |
 | `apex.littlewolfacres.com` | 192.168.0.19 |
