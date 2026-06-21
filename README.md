@@ -45,7 +45,7 @@ Local domain: `littlewolfacres.com` — all hosts resolve as `hostname.littlewol
 
 GitHub Actions pipelines on self-hosted runners (monolith, watchtower). All changes go through **branch → PR → merge**. Direct pushes to `master` are disabled. Claude handles the full git workflow via **Scribe**.
 
-Not in the table below, and not oversights: ArgoCD (a continuous GitOps controller, not a GitHub Actions workflow, no "trigger" in this sense, see Stack above and `docs/architecture.md` for where it's covered) and apex services like Scribe and Zombatron Importer (deployed manually via Ansible from apex, no CI runner, no inbound SSH).
+Not in the table below, and not oversights: ArgoCD (a continuous GitOps controller, not a GitHub Actions workflow, no "trigger" in this sense, see Stack above and `docs/architecture.md` for where it's covered) and apex services like Scribe (see AI Tooling) and Zombatron Importer (a Slack bot that listens for a realm-import command and triggers `slack-minecraft-import.yml`), both deployed manually via Ansible from apex, no CI runner, no inbound SSH.
 
 Most-used pipelines below — full list with exact triggers in `docs/architecture.md`.
 
@@ -94,6 +94,8 @@ Four MCP servers give Claude structured, safe access to the infrastructure:
 **Argus** (`watchtower:9800`) — read-only live Alertmanager and Prometheus configs, systemd state, journald logs, monitoring HTTP APIs.
 
 **Atlas** (apex, local stdio subprocess) — Plane project management: work items, modules, cycles. Official upstream `makeplane/plane-mcp-server`. Unscoped — full account permissions, no branch-protection equivalent unlike the other three.
+
+Plane itself (`plane.littlewolfacres.com`) is the accountability layer underneath all of this — every client obligation, upgrade, and piece of operational debt is a tracked ticket there. This repo describes what's running; Plane is the record of what's owed.
 
 See `docs/Claude MCPs.md` for full reference.
 
