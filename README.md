@@ -19,11 +19,12 @@ TP-Link Omada ecosystem — fully managed, SNMP-monitored. A 5-VLAN segmented re
 |---|---|
 | ER605 v2 | Multi-WAN VPN router · MAC-bound DHCP |
 | OC200 | Omada network controller |
-| TL-SG1210P | Unmanaged PoE switch, being replaced |
-| SG2218P | Managed PoE+ switch, on-site, not yet network-active |
+| SG2218P | Managed PoE+ switch — installed, OC200 config in progress |
 | 2× EAP245 | Access points — Foyer + Yarn Studio |
 
-**WAN:** T-Mobile Home Internet (Rely) — primary. AT&T Internet Air (CGW450) is being added as WAN2 on a separate cellular network, in progress.
+> TL-SG1210P (old unmanaged switch) is decommissioned, in the spare-parts pile.
+
+**WAN:** T-Mobile Home Internet (Rely) — primary. AT&T Internet Air (CGW450) is installed and running as WAN2 on a separate cellular network; final ER605 tuning and SNMP monitoring are deferred until after the VLAN cutover.
 
 DNS chain: **AdGuard Home → Unbound → root** — recursive, no upstream forwarder dependency.
 Public DNS: **Cloudflare** — authoritative for `littlewolfacres.com`.

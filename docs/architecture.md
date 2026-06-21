@@ -9,13 +9,17 @@
 ```
 Internet
     │
-    ├── T-Mobile FAST 5688W (5G WAN)
-    └── AT&T CGW450 (5G WAN2 — in progress, separate cellular network)
+    ├── T-Mobile FAST 5688W (5G WAN1)
+    │
+    └── AT&T CGW450 (5G WAN2, separate cellular network — installed and running)
             │
+            │   (both WAN1 and WAN2 terminate here — dual-WAN failover/load-balance.
+            │    Final tuning + SNMP monitoring for WAN2 deferred until after VLAN cutover)
+            ▼
         ER605 v2 (192.168.0.1)
         Multi-WAN VPN Router
             │
-        TL-SG1210P (unmanaged PoE switch — being replaced by SG2218P, in progress)
+        SG2218P (managed PoE+ switch — installed, OC200 adoption/config in progress)
             │
     ┌───────┼───────────────────────────┐
     │       │                           │
@@ -32,6 +36,8 @@ EAP245   EAP245                    Wired LAN
                                              Dell Precision 5560
                                              DAW / KDE workstation
 ```
+
+> TL-SG1210P (the old unmanaged switch) is decommissioned — disconnected, sitting in the spare-parts pile, not part of the live topology above.
 
 ---
 
@@ -162,8 +168,12 @@ Claude (apex)
     │       branch · stage · commit · push · open PRs
     │       branch protection + path allowlist enforced at server level
     │
-    └── Argus MCP (watchtower :9800)   ← read-only
-            Alertmanager config · Prometheus config · systemd state · journald logs
+    ├── Argus MCP (watchtower :9800)   ← read-only
+    │       Alertmanager config · Prometheus config · systemd state · journald logs
+    │
+    └── Atlas MCP (apex, local stdio subprocess — no port)  ← write, UNSCOPED
+            official makeplane/plane-mcp-server via uvx · 100+ tools, 20 modules
+            full account permissions of the token holder — no branch-protection equivalent
 
 B-4 (apex ~/B-4/)
     └── Ollama (Metal backend, 16GB unified)
@@ -174,6 +184,8 @@ B-4 (apex ~/B-4/)
 ---
 
 ## CI/CD Pipelines
+
+This table is GitHub Actions workflows specifically (trigger → runner → target). ArgoCD isn't a workflow, it's a continuously-running GitOps controller with no "trigger" in this sense, it's covered separately: see **Control Plane Flow** above for how a git push reaches it, and **Monolith — k3s Cluster** above for what it manages.
 
 | Workflow | Trigger | Runner | Target |
 |---|---|---|---|

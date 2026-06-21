@@ -11,12 +11,14 @@
 | Device | IP | Role | Status |
 |---|---|---|---|
 | ER605 v2.0 | 192.168.0.1 | Gigabit Multi-WAN VPN Router | ✅ Online |
+| AT&T CGW450 | — | 5G WAN2 (separate cellular network from T-Mobile) | ✅ Online — final ER605 tuning + SNMP monitoring deferred until after VLAN cutover |
 | OC200 | 192.168.0.7 | Omada Network Controller | ✅ Online |
-| TL-SG1210P | — | Unmanaged PoE Switch | ✅ Online (no SNMP) — being retired |
-| SG2218P | — | Managed PoE Switch (replacement) | 🔶 On-site, not yet network-active — blocked on power extension cables |
+| SG2218P | — | Managed PoE+ Switch | ✅ Installed — OC200 adoption/config in progress |
 | CyberPower CP1000PFCLCD | — | UPS | 🔶 Powered, all critical loads connected — monitoring not yet configured |
 | EAP245 — Foyer | 192.168.0.2 | Access Point | ✅ Online |
 | EAP245 — Yarn Studio | 192.168.0.5 | Access Point | ✅ Online |
+
+> TL-SG1210P (old unmanaged switch) is decommissioned — disconnected, in the spare-parts pile.
 
 ### Static DHCP Reservations (MAC-bound in ER605)
 
@@ -58,7 +60,7 @@
 - Community string: `littlewolfacres` (stored in Ansible vault)
 - SNMPv3 user: `prometheus` (stored in Ansible vault)
 - Monitored devices: ER605, EAP245 Foyer, EAP245 Yarn Studio
-- **Note:** TL-SG1210P is unmanaged — no SNMP support. Its replacement, the SG2218P, is on-site but not yet wired into the network (see Hardware table above), so it isn't providing SNMP data either.
+- **Note:** SG2218P is installed but OC200 adoption isn't finished yet, so it's not providing SNMP data. TL-SG1210P (decommissioned) never supported SNMP to begin with.
 
 ---
 
