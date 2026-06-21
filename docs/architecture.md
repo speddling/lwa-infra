@@ -1,5 +1,6 @@
-# Little Wolf Acres — Architecture Overview
-> Generated 2026-05-26 · Source of truth is README.md and homelab-state.md
+# LWA Infra — Architecture Overview
+> Last verified: 2026-06-21 · Source of truth is README.md and homelab-state.md
+> This is a structure doc: what's deployed and how it connects. Roadmap and in-flight work live in Plane (`LWA Infra` project), not here.
 
 ---
 
@@ -9,12 +10,12 @@
 Internet
     │
     ├── T-Mobile FAST 5688W (5G WAN)
-    └── [secondary WAN]
+    └── AT&T CGW450 (5G WAN2 — in progress, separate cellular network)
             │
         ER605 v2 (192.168.0.1)
         Multi-WAN VPN Router
             │
-        TL-SG1210P (unmanaged PoE switch)
+        TL-SG1210P (unmanaged PoE switch — being replaced by SG2218P, in progress)
             │
     ┌───────┼───────────────────────────┐
     │       │                           │
@@ -24,7 +25,7 @@ EAP245   EAP245                    Wired LAN
                     │                   │                   │
               apex (.19)         monolith (.20)      watchtower (.21)
          MacBook Air M4        AMD Ryzen 7 5700G     Asus VM40B
-         16GB unified          32GB DDR4             8GB DDR3
+         16GB unified          64GB DDR4             8GB DDR3
          Primary WS            k3s node              DNS + Monitoring
 
                                                   studio (.109)
@@ -70,17 +71,20 @@ monolith (192.168.0.20)
 ├── ArgoCD (GitOps controller)
 │       Manages: navidrome · minecraft · synapse · cert-manager · kube-state-metrics
 │
+├── KubeVirt + CDI (bootstrapped, not yet used — Obelisk still runs as a bare QEMU/KVM process below, not a KubeVirt VirtualMachine)
+│
 ├── Navidrome (music streaming)          namespace: navidrome
 ├── Minecraft Bedrock                    namespace: minecraft   NodePort :30132 UDP
 ├── Synapse MCP                          namespace: synapse     NodePort :30800 TCP
-├── Obelisk (Win11 VM — KubeVirt)        namespace: obelisk     RDP NodePort :33389, metrics NodePort :39182
 │
 ├── kube-state-metrics                   → Prometheus on watchtower
 │
-└── Samba (bare-metal, not k8s)
-        ├── vault          → /mnt/ssd-b/vault
-        ├── studio-archive → /mnt/hdd-c/studio-archive
-        └── music-library  → /mnt/hdd-c/music-library  ← Navidrome source
+└── Bare-metal (not k8s)
+        ├── Obelisk (Win11 VM)          QEMU/KVM process, RDP :33389, metrics :39182
+        └── Samba
+                ├── vault          → /mnt/ssd-b/vault
+                ├── studio-archive → /mnt/hdd-c/studio-archive
+                └── music-library  → /mnt/hdd-c/music-library  ← Navidrome source
 ```
 
 ### Monolith Storage
@@ -106,7 +110,7 @@ watchtower (192.168.0.21)
 │
 └── Monitoring
         Prometheus (:9090)
-            ├── scrapes: watchtower · monolith · argocd · kube-state-metrics · obelisk
+            ├── scrapes: watchtower · monolith · argocd-app-controller · argocd-server · kube-state-metrics
             ├── scrapes: snmp_exporter (ER605, EAP245×2)
             ├── scrapes: blackbox_exporter (HTTP/ICMP probes)
             ├── scrapes: adguard_exporter · tmobile_exporter · reolink_exporter
@@ -165,9 +169,6 @@ B-4 (apex ~/B-4/)
     └── Ollama (Metal backend, 16GB unified)
             ├── gemma4     (~12GB)  Claude Code integration
             └── llama3.2:3b (~2GB)  direct chat
-
-Lore (planned — Mac Mini M4 Pro 48GB / 10GbE)
-    └── Ollama headless → API served to LAN
 ```
 
 ---
@@ -176,11 +177,18 @@ Lore (planned — Mac Mini M4 Pro 48GB / 10GbE)
 
 | Workflow | Trigger | Runner | Target |
 |---|---|---|---|
-| `deploy-watchtower.yml` | Push to master (`services/watchtower/**`) | watchtower | Ansible → watchtower |
-| `deploy-monolith.yml` | Push to master | monolith | Ansible → monolith |
+| `deploy-watchtower.yml` | Push to master (`services/watchtower/**`, `terraform/watchtower/**`, `ansible/vars/**`) | watchtower | Ansible → watchtower |
+| `deploy-monolith.yml` | Push or PR to master (`services/monolith/ansible/**`, `ansible/vars/**`) | monolith | Ansible → monolith |
 | `deploy-fileserver.yml` | Manual | monolith | Ansible → monolith |
 | `deploy-synapse.yml` | Push to master | monolith | Ansible → monolith |
+| `deploy-k3s-manifests.yml` | Push to master (`kubernetes/manifests/**`) | monolith | kubectl → k3s manifests |
+| `deploy-navidrome.yml` | Manual | monolith | Ansible/kubectl → Navidrome |
+| `deploy-mirror.yml` | Push to master (`services/monolith/ansible/roles/mirror-hdd/**`) | monolith | Ansible → hdd-c/hdd-d mirror systemd timer |
+| `deploy-reolink-exporter.yml` | Push to master or manual (`services/watchtower/ansible/roles/reolink_exporter/**`) | watchtower | Ansible → reolink_exporter |
+| `deploy-tmobile-exporter.yml` | Push to master or manual (`services/watchtower/ansible/roles/tmobile_exporter/**`) | watchtower | Ansible → tmobile_exporter |
 | `bootstrap-argocd.yml` | Manual (once) | monolith | cert-manager + ArgoCD install |
+| `bootstrap-kubevirt.yml` | Manual (once, unrun) | monolith | KubeVirt + CDI install, provisions Obelisk as a KubeVirt VM |
+| `bootstrap-plane.yml` | Push to master (`kubernetes/apps/plane.yaml`) or manual | monolith | Generates Plane secrets; idempotent no-op if they already exist |
 | `provision-k3s.yml` | Manual | monolith | k3s cluster init |
 | `rotate-argocd-credentials.yml` | Manual + quarterly | monolith | PAT rotation |
 | `import-minecraft-world.yml` | Manual (`confirm: yes`) | monolith | Ansible + pod bounce |
@@ -203,19 +211,3 @@ ArgoCD repo secret (homelab-repo)
     └── Fine-grained GitHub PAT — managed out-of-band, never via ArgoCD sync
         Rotation: rotate-argocd-credentials.yml (quarterly + manual)
 ```
-
----
-
-## Planned Additions
-
-| Item | Target | Notes |
-|---|---|---|
-| Migrate Obelisk into KubeVirt | monolith | KubeVirt platform already bootstrapped (cdi + kubevirt namespaces active); Obelisk itself still runs as a bare QEMU/KVM process, not yet a KubeVirt VirtualMachine resource |
-| NUT | watchtower | UPS monitoring — role ready, UPS ordered, arriving this week |
-| SG2218P managed switch | network | Replaces unmanaged TL-SG1210P, enables per-port SNMP — ordered, arriving this week |
-| EAP225-Outdoor | network | Outdoor AP, Balcony mount — ordered, arriving this week |
-| VLAN migration | network | Design + cutover runbook complete (`docs/network-rebuild-plan.md`, `docs/network-migration-runbook.md`); cutover itself pending switch arrival |
-| AT&T Internet Air | network | Evaluating as a load-balanced WAN2 on a separate cellular network from T-Mobile |
-| ER605 → Promtail syslog | watchtower | Promtail's syslog listener (:1514) is deployed but the ER605 isn't yet configured to send to it — planned alongside AT&T WAN2 work |
-| Minecraft PVC backups | monolith | Nightly CronJob → /mnt/hdd-c |
-| Navidrome HTTPS | monolith | cert-manager annotation already understood — just needs applying |
