@@ -659,11 +659,12 @@ gh workflow run deploy-monolith.yml
 
 Bookcase-style closet with passive cooling from a 12-foot ceiling column into a full basement. Active cooling via AC supply/return tap available if needed in summer. House maintained at 68F in summer.
 
-| Shelf | What lives there |
+| Location | What lives there |
 |---|---|
-| Top | T-Mobile FAST 5688W and AT&T CGW450, raised on risers above power cords, 4 feet apart offset 90 degrees from each other |
-| Upper | ER605, SG2218P, OC200, patch panel |
-| Middle | Black wood shelf unit (monolith + watchtower), lowered from original position to sit just above monolith's physical footprint |
+| Top shelf | T-Mobile FAST 5688W and AT&T CGW450, raised on risers above power cords, 4 feet apart offset 90 degrees from each other |
+| Upper shelf | ER605, SG2218P, OC200 |
+| Middle shelf | Black wood shelf unit with monolith and watchtower, positioned to clear the quarter round molding that monolith sits against on the right side |
+| Left wall (inside closet) | Keystone patch panel, wall-mounted, terminates all riser runs |
 | Floor | UPS (CyberPower CP1000PFCLCD) on the opposite side of the tan brackets from the shelf unit |
 
 ### Cabling Standard
