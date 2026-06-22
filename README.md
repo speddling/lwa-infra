@@ -6,97 +6,96 @@ Self-managed infrastructure built with production-grade IaC discipline. Everythi
 
 | Node | Hostname | Specs | Role |
 |---|---|---|---|
-| MacBook Air M4 (2025) | `apex` | 16GB unified · 256GB | Primary workstation · control plane · all authoring originates here |
-| AMD Ryzen 7 5700G | `monolith` | 8c/16t · 64GB DDR4-3200 · 512GB NVMe + 500GB SSD + 256GB SSD + 3.6TB HDD + 1.8TB HDD | k3s single-node cluster · household services · Obelisk QEMU host |
-| Asus VM40B | `watchtower` | Celeron 1007U · 8GB DDR3-1600 · 1TB Crucial MX500 | Always-on DNS + monitoring — never runs workloads |
-| Dell Precision 5560 | `studio` | i9-11950H · 32GB DDR4 · 512GB NVMe | Personal DAW — Reaper + M-Audio Air 192\|14 |
+| MacBook Air M4 (2025) | `apex` | 16GB unified, 256GB | Primary workstation, control plane, all authoring originates here |
+| AMD Ryzen 7 5700G | `monolith` | 8c/16t, 64GB DDR4-3200, 512GB NVMe + 500GB SSD + 256GB SSD + 3.6TB HDD + 1.8TB HDD | k3s single-node cluster, household services, Obelisk QEMU host |
+| Asus VM40B | `watchtower` | Celeron 1007U, 8GB DDR3-1600, 1TB Crucial MX500 | Always-on DNS and monitoring, never runs workloads |
+| Dell Precision 5560 | `studio` | i9-11950H, 32GB DDR4, 512GB NVMe | Personal DAW: Reaper + M-Audio Air 192\|14 |
 
 ## Network
 
-TP-Link Omada ecosystem — fully managed, SNMP-monitored.
+TP-Link Omada ecosystem, fully managed, SNMP-monitored.
 
 | Device | Role |
 |---|---|
-| ER605 v2 | Multi-WAN VPN router · MAC-bound DHCP |
+| ER605 v2 | Multi-WAN VPN router, MAC-bound DHCP |
 | OC200 | Omada network controller |
 | SG2218P | Managed PoE+ switch |
-| 2× EAP245 | Access points — Foyer + Yarn Studio |
+| 2x EAP245 | Wireless access points |
+| EAP225-Outdoor | Outdoor wireless access point |
 
-**WAN:** T-Mobile Home Internet (Rely) — primary. AT&T Internet Air (CGW450) — WAN2, separate cellular network.
+**WAN:** T-Mobile FAST 5688W and AT&T CGW450, equal-weight load balanced across two independent cellular carriers.
 
-DNS chain: **AdGuard Home → Unbound → root** — recursive, no upstream forwarder dependency.
-Public DNS: **Cloudflare** — authoritative for `littlewolfacres.com`.
-Local domain: `littlewolfacres.com` — all hosts resolve as `hostname.littlewolfacres.com`.
+DNS chain: **AdGuard Home -> Unbound -> root**, recursive, no upstream forwarder dependency.
+Public DNS: **Cloudflare**, authoritative for `littlewolfacres.com`.
+Local domain: `littlewolfacres.com`, all hosts resolve as `hostname.littlewolfacres.com`.
 
 ## Stack
 
-- **Kubernetes** — k3s (single-node, expandable)
-- **GitOps** — ArgoCD v3.3.0 — all k3s workloads managed declaratively from this repo
-- **TLS** — cert-manager v1.20.2 — automatic Let's Encrypt certificates via Cloudflare DNS-01
-- **Ingress** — Traefik (k3s default) — terminates TLS, routes to cluster services
-- **IaC** — Terraform Cloud (multi-workspace: monolith, watchtower)
-- **Automation** — GitHub Actions + Ansible (modular role structure)
-- **Secrets** — Ansible Vault · consolidated at `ansible/vars/vault.yml`
-- **Variables** — Single source of truth at `ansible/vars/main.yml`
-- **Monitoring** — Prometheus · Grafana · Alertmanager · Loki · Promtail · Netdata · node_exporter · blackbox_exporter · snmp_exporter · adguard_exporter · tmobile_exporter (custom) · reolink_exporter (custom)
-- **OS** — Ubuntu Server 24.04 LTS (monolith + watchtower) · macOS Sequoia (apex)
+- **Kubernetes** -- k3s (single-node, expandable)
+- **GitOps** -- ArgoCD v3.3.0, manages all k3s workloads declaratively against this repo
+- **Project Management** -- Plane (self-hosted), tracks operational work items, client obligations, and incidents
+- **TLS** -- cert-manager v1.20.2, automatic Let's Encrypt certificates via Cloudflare DNS-01
+- **Ingress** -- Traefik (k3s default), terminates TLS and routes to cluster services
+- **IaC** -- Terraform Cloud (multi-workspace: monolith, watchtower)
+- **Automation** -- GitHub Actions + Ansible (modular role structure)
+- **Secrets** -- Ansible Vault
+- **Monitoring** -- Prometheus, Grafana, Alertmanager, Loki, Promtail, Netdata, node_exporter, blackbox_exporter, snmp_exporter, adguard_exporter, tmobile_exporter (custom), reolink_exporter (custom)
+- **OS** -- Ubuntu Server 24.04 LTS (monolith + watchtower), macOS Sequoia (apex)
 
 ## CI/CD
 
-GitHub Actions pipelines on self-hosted runners (monolith, watchtower). All changes go through **branch → PR → merge**. Direct pushes to `master` are disabled. Claude handles the full git workflow via **Scribe**.
+GitHub Actions pipelines on self-hosted runners (monolith, watchtower). All changes go through **branch -> PR -> merge**. Direct pushes to `master` are disabled. Claude handles the full git workflow via **Scribe**.
 
-Not in the table below, and not oversights: ArgoCD (a continuous GitOps controller, not a GitHub Actions workflow, no "trigger" in this sense, see Stack above and `docs/architecture.md` for where it's covered) and apex services like Scribe (see AI Tooling) and Zombatron Importer (a Slack bot that listens for a realm-import command and triggers `slack-minecraft-import.yml`), both deployed manually via Ansible from apex, no CI runner, no inbound SSH.
+ArgoCD is not a GitHub Actions workflow. It is a continuously-running GitOps controller that manages 8 services on the cluster, reconciling their live state against this repo on every push to master. It lives in the Stack section above.
 
-Most-used pipelines below — full list with exact triggers in `docs/architecture.md`.
+Services running locally on apex are deployed manually via Ansible since it is my Dev laptop and inbound SSH is blocked.
 
 | Workflow | Trigger | What it does |
 |---|---|---|
-| `deploy-watchtower.yml` | Push to master (`services/watchtower/**`) | DNS, monitoring, exporters, Loki/Promtail |
+| `deploy-watchtower.yml` | Push to master | DNS, monitoring, exporters, Loki/Promtail |
 | `deploy-monolith.yml` | Push to master | Firewall, monitoring agents |
 | `deploy-synapse.yml` | Push to master | Synapse MCP server |
 | `deploy-fileserver.yml` | Manual | Samba config |
 | `rotate-argocd-credentials.yml` | Manual + quarterly | PAT rotation |
-| `import-minecraft-world.yml` | Manual | Stage world via Ansible + bounce pod |
-| `slack-minecraft-import.yml` | Zombatron Importer bot | Clear import marker + bounce pod |
+| `import-minecraft-world.yml` | Manual | Stage world via Ansible and bounce pod |
+| `slack-minecraft-import.yml` | Zombatron Importer bot | Clear import marker and bounce pod |
 | `bootstrap-argocd.yml` | Manual (once) | cert-manager + ArgoCD install |
 | `provision-k3s.yml` | Manual | k3s cluster init |
 
 ## Services
 
-| Service | Host | URL / Endpoint | Status |
-|---|---|---|---|
-| ArgoCD | monolith | https://argocd.littlewolfacres.com | ✅ Online |
-| Navidrome | monolith | https://navidrome.littlewolfacres.com | ✅ Online |
-| Minecraft Bedrock | monolith | `zombatron.littlewolfacres.com:30132` (UDP) | ✅ Online |
-| Samba | monolith | — | ✅ Online |
-| Obelisk (Win11 VM) | monolith | `192.168.0.20:33389` (RDP) | ✅ Running |
-| Plane | monolith | https://plane.littlewolfacres.com | ✅ Online |
-| AdGuard Home + Unbound | watchtower | http://watchtower:3000 | ✅ Online |
-| Prometheus | watchtower | http://watchtower:9090 | ✅ Online |
-| Grafana | watchtower | http://grafana.littlewolfacres.com:3001 | ✅ Online |
-| Alertmanager | watchtower | http://watchtower:9093 | ✅ Online |
-| Loki | watchtower | http://watchtower:3100 | ✅ Online |
-| Promtail | watchtower | http://watchtower:9080 | ✅ Online |
-| Netdata | watchtower | http://watchtower:19999 | ✅ Online |
-| Synapse MCP | monolith | monolith:30800 | ✅ Online |
-| Scribe MCP | apex | apex:8765 | ✅ Online |
-| Argus MCP | watchtower | watchtower:9800 | ✅ Online |
-| Zombatron Importer | apex | Slack Socket Mode | ✅ Online |
+| Service | Host | Description |
+|---|---|---|
+| ArgoCD | monolith | GitOps controller, manages all k3s workloads |
+| Navidrome | monolith | Music streaming |
+| Minecraft Bedrock | monolith | Family Minecraft server |
+| Samba | monolith | Network file shares |
+| Obelisk (Win11 VM) | monolith | Client-facing Windows environment, RDP |
+| Plane | monolith | Project management and incident tracking |
+| AdGuard Home + Unbound | watchtower | Recursive DNS with ad and tracker blocking |
+| Prometheus | watchtower | Metrics collection |
+| Grafana | watchtower | Metrics dashboards |
+| Alertmanager | watchtower | Alert routing and notification |
+| Loki | watchtower | Log aggregation |
+| Promtail | watchtower | Log shipping agent |
+| Netdata | watchtower | Real-time system monitoring |
+| Synapse MCP | monolith | Claude infrastructure read access |
+| Scribe MCP | apex | Claude git control plane |
+| Argus MCP | watchtower | Claude monitoring read access |
+| Zombatron Importer | apex | Slack bot for Minecraft world imports |
 
 ## AI Tooling
 
 Four MCP servers give Claude structured, safe access to the infrastructure:
 
-**Synapse** (`monolith:30800`) — read-only k3s pod state, Prometheus metrics, Alertmanager alerts, and monolith filesystem.
+**Synapse** (`monolith:30800`) -- read-only k3s pod state, Prometheus metrics, Alertmanager alerts, and monolith filesystem.
 
-**Scribe** (`apex:8765`) — git control plane. Branch, commit, push, open PRs against `speddling/lwa-homelab` and `speddling/lwa-web`. Branch-protected, path-allowlisted, merged-PR guard built in.
+**Scribe** (`apex:8765`) -- git control plane. Branch, commit, push, open PRs. Branch-protected, path-allowlisted, merged-PR guard built in.
 
-**Argus** (`watchtower:9800`) — read-only live Alertmanager and Prometheus configs, systemd state, journald logs, monitoring HTTP APIs.
+**Argus** (`watchtower:9800`) -- read-only live Alertmanager and Prometheus configs, systemd state, journald logs, and monitoring HTTP APIs.
 
-**Atlas** (apex, local stdio subprocess) — Plane project management: work items, modules, cycles. Official upstream `makeplane/plane-mcp-server`. Unscoped — full account permissions, no branch-protection equivalent unlike the other three.
+**Atlas** (apex, local stdio subprocess) -- Plane project management: work items, modules, cycles. Official upstream `makeplane/plane-mcp-server`. Unscoped, full account permissions, no branch-protection equivalent unlike the other three.
 
-Plane itself (`plane.littlewolfacres.com`) is the accountability layer underneath all of this — every client obligation, upgrade, and piece of operational debt is a tracked ticket there. This repo describes what's running; Plane is the record of what's owed.
+Plane itself (`plane.littlewolfacres.com`) is the accountability layer underneath all of this. Every client obligation, upgrade, and piece of operational debt is a tracked ticket there. This repo describes what is running; Plane is the record of what is owed.
 
-See `docs/Claude MCPs.md` for full reference.
-
-**B-4** — local LLM inference via Ollama on apex (Metal backend).
+**B-4** -- local LLM inference via Ollama on apex (Metal backend).
