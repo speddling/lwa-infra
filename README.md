@@ -1,14 +1,12 @@
 # LWA Infra
 
-Self-managed infrastructure built with production-grade IaC discipline. Everything is code, nothing is clicked.
-
 ## Hardware
 
 | Node | Hostname | Specs | Role |
 |---|---|---|---|
 | MacBook Air M4 (2025) | `apex` | 16GB unified, 256GB | Primary workstation, control plane, all authoring originates here |
 | AMD Ryzen 7 5700G | `monolith` | 8c/16t, 64GB DDR4-3200, 512GB NVMe + 500GB SSD + 256GB SSD + 3.6TB HDD + 1.8TB HDD | k3s single-node cluster, household services, Obelisk QEMU host |
-| Asus VM40B | `watchtower` | Celeron 1007U, 8GB DDR3-1600, 1TB Crucial MX500 | Always-on DNS and monitoring, never runs workloads |
+| Asus VM40B | `watchtower` | Celeron 1007U, 8GB DDR3-1600, 1TB Crucial MX500 | DNS and monitoring, never runs workloads |
 | Dell Precision 5560 | `studio` | i9-11950H, 32GB DDR4, 512GB NVMe | Personal DAW: Reaper + M-Audio Air 192\|14 |
 
 ## Network
@@ -31,16 +29,16 @@ Local domain: `littlewolfacres.com`, all hosts resolve as `hostname.littlewolfac
 
 ## Stack
 
-- **Kubernetes** -- k3s (single-node, expandable)
-- **GitOps** -- ArgoCD v3.3.0, manages all k3s workloads declaratively against this repo
-- **Project Management** -- Plane (self-hosted), tracks operational work items, client obligations, and incidents
-- **TLS** -- cert-manager v1.20.2, automatic Let's Encrypt certificates via Cloudflare DNS-01
-- **Ingress** -- Traefik (k3s default), terminates TLS and routes to cluster services
-- **IaC** -- Terraform Cloud (multi-workspace: monolith, watchtower)
-- **Automation** -- GitHub Actions + Ansible (modular role structure)
-- **Secrets** -- Ansible Vault
-- **Monitoring** -- Prometheus, Grafana, Alertmanager, Loki, Promtail, Netdata, node_exporter, blackbox_exporter, snmp_exporter, adguard_exporter, tmobile_exporter (custom), reolink_exporter (custom)
-- **OS** -- Ubuntu Server 24.04 LTS (monolith + watchtower), macOS Sequoia (apex)
+- **Kubernetes** - k3s (single-node, expandable)
+- **GitOps** - ArgoCD v3.3.0, manages all k3s workloads declaratively against this repo
+- **Project Management** - Plane (self-hosted), tracks operational work items, client obligations, and incidents
+- **TLS** - cert-manager v1.20.2, automatic Let's Encrypt certificates via Cloudflare DNS-01
+- **Ingress** - Traefik (k3s default), terminates TLS and routes to cluster services
+- **IaC** - Terraform Cloud (multi-workspace: monolith, watchtower)
+- **Automation** - GitHub Actions + Ansible (modular role structure)
+- **Secrets** - Ansible Vault
+- **Monitoring** - Prometheus, Grafana, Alertmanager, Loki, Promtail, Netdata, node_exporter, blackbox_exporter, snmp_exporter, adguard_exporter, tmobile_exporter (custom), reolink_exporter (custom)
+- **OS** - Ubuntu Server 24.04 LTS (monolith + watchtower), macOS Sequoia (apex)
 
 ## CI/CD
 
@@ -88,14 +86,14 @@ Services running locally on apex are deployed manually via Ansible since it is m
 
 Four MCP servers give Claude structured, safe access to the infrastructure:
 
-**Synapse** (`monolith:30800`) -- read-only k3s pod state, Prometheus metrics, Alertmanager alerts, and monolith filesystem.
+**Synapse** (`monolith:30800`) - read-only k3s pod state, Prometheus metrics, Alertmanager alerts, and monolith filesystem.
 
-**Scribe** (`apex:8765`) -- git control plane. Branch, commit, push, open PRs. Branch-protected, path-allowlisted, merged-PR guard built in.
+**Scribe** (`apex:8765`) - git control plane. Branch, commit, push, open PRs. Branch-protected, path-allowlisted, merged-PR guard built in.
 
-**Argus** (`watchtower:9800`) -- read-only live Alertmanager and Prometheus configs, systemd state, journald logs, and monitoring HTTP APIs.
+**Argus** (`watchtower:9800`) - read-only live Alertmanager and Prometheus configs, systemd state, journald logs, and monitoring HTTP APIs.
 
-**Atlas** (apex, local stdio subprocess) -- Plane project management: work items, modules, cycles. Official upstream `makeplane/plane-mcp-server`. Unscoped, full account permissions, no branch-protection equivalent unlike the other three.
+**Atlas** (apex, local stdio subprocess) - Plane project management: work items, modules, cycles. Official upstream `makeplane/plane-mcp-server`. Unscoped, full account permissions, no branch-protection equivalent unlike the other three.
 
 Plane itself (`plane.littlewolfacres.com`) is the accountability layer underneath all of this. Every client obligation, upgrade, and piece of operational debt is a tracked ticket there. This repo describes what is running; Plane is the record of what is owed.
 
-**B-4** -- local LLM inference via Ollama on apex (Metal backend).
+**B-4** - local LLM inference via Ollama on apex (Metal backend).
