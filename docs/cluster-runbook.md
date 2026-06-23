@@ -686,14 +686,14 @@ All permanent structured runs use solid core Cat6 riser (CMR). Solid core termin
 
 | Port | Device | Color | Length | Path |
 |---|---|---|---|---|
-| 1 | Camera 1 (fixed, NVR) | Orange | 3ft | Behind rack, up to switch shelf |
-| 2 | Camera 2 (fixed, NVR) | Orange | 3ft | Behind rack, up to switch shelf |
-| 3 | Camera 3 (fixed, NVR) | Orange | 3ft | Behind rack, up to switch shelf |
-| 4 | Camera 4 (fixed, NVR) | Orange | 3ft | Behind rack, up to switch shelf |
-| 5 | Camera 5 (fixed, NVR) | Orange | 3ft | Behind rack, up to switch shelf |
-| 6 | Camera 6 (fixed, NVR) | Orange | 3ft | Behind rack, up to switch shelf |
-| 7 | Camera 7 (advanced, switch) | Orange | 3ft | Behind rack, up to switch shelf |
-| 8 | Camera 8 (advanced, switch) | Orange | 3ft | Behind rack, up to switch shelf |
+| 1 | Camera 1 (fixed) | Orange | 3ft | Behind rack, to NVR built-in PoE port 1 |
+| 2 | Camera 2 (fixed) | Orange | 3ft | Behind rack, to NVR built-in PoE port 2 |
+| 3 | Camera 3 (fixed) | Orange | 3ft | Behind rack, to NVR built-in PoE port 3 |
+| 4 | Camera 4 (fixed) | Orange | 3ft | Behind rack, to NVR built-in PoE port 4 |
+| 5 | Camera 5 (fixed) | Orange | 3ft | Behind rack, to NVR built-in PoE port 5 |
+| 6 | Camera 6 (fixed) | Orange | 3ft | Behind rack, to NVR built-in PoE port 6 |
+| 7 | Camera 7 (advanced, SG2218P) | Orange | 3ft | Behind rack, up to switch shelf |
+| 8 | Camera 8 (advanced, SG2218P) | Orange | 3ft | Behind rack, up to switch shelf |
 | 9 | -- gap -- | -- | -- | -- |
 | 10 | EAP245 Foyer | Orange | 3ft | Up to switch |
 | 11 | EAP245 Yarn Studio | Orange | 3ft | Up to switch |
@@ -709,6 +709,7 @@ All within the closet, stranded Cat6, device to SG2218P directly.
 | AT&T CGW450 to ER605 WAN2 | Red | 14ft | Top shelf down to router |
 | ER605 to SG2218P | Yellow | 1ft | Same shelf |
 | OC200 to SG2218P | Yellow | 1ft | Same shelf |
+| NVR uplink to SG2218P | Yellow | 1ft | Same shelf |
 | Watchtower to SG2218P | Yellow | 2ft | Watchtower positioned directly above switch port, over top of switch, shelf is under 10" deep |
 | Monolith to SG2218P | Yellow | 5ft | Up wall to panel height, across to switch |
 | Lore (future) to SG2218P | Yellow | 3ft | Next to watchtower |
