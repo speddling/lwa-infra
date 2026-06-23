@@ -1,4 +1,5 @@
-# Obelisk — Windows 11 VM Runbook
+# LWA Infra -- Obelisk Runbook
+> Last updated: 2026-05-29
 
 **Host:** monolith (`192.168.0.20`)
 **Guest:** Windows 11 Pro (Build 26200)

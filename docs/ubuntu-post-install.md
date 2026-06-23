@@ -1,6 +1,4 @@
-# Ubuntu Server — Post-Install Hardening Runbook
-> For headless Ubuntu Server 24.04 LTS nodes joining the Little Wolf Acres homelab.
-> Run through this checklist on first SSH session after OS install.
+# LWA Infra -- Ubuntu Server Post-Install Runbook
 > Last updated: 2026-05-20
 
 ---

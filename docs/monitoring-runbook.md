@@ -1,5 +1,4 @@
-# Monitoring Runbook — Little Wolf Acres
-> Reference for the full observability stack: Prometheus, Grafana, Alertmanager, Loki, Promtail, exporters, and the daily Slack summary.
+# LWA Infra -- Monitoring Runbook
 > Last updated: 2026-06-16
 
 ---

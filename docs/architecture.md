@@ -1,6 +1,5 @@
-# LWA Infra — Architecture Overview
-> Last verified: 2026-06-21 · Source of truth is README.md and homelab-state.md
-> This is a structure doc: what's deployed and how it connects. Roadmap and in-flight work live in Plane (`LWA Infra` project), not here.
+# LWA Infra -- Architecture Overview
+> Last updated: 2026-06-22
 
 ---
 
