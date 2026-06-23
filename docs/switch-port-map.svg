@@ -1,0 +1,264 @@
+<svg viewBox="0 0 920 480" xmlns="http://www.w3.org/2000/svg" font-family="monospace, sans-serif">
+
+  <!-- Background -->
+  <rect width="920" height="480" fill="#1a1a2e" rx="12"/>
+
+  <!-- Title -->
+  <text x="460" y="32" text-anchor="middle" font-size="16" font-weight="bold" fill="#e0e0e0">SG2218P — Switch Port Map</text>
+  <text x="460" y="50" text-anchor="middle" font-size="11" fill="#888">LWA Infra Network Rebuild</text>
+
+  <!-- Legend -->
+  <rect x="30" y="420" width="14" height="14" fill="#2d6a4f" rx="2"/>
+  <text x="50" y="432" font-size="11" fill="#ccc">Infra (VLAN 30)</text>
+  <rect x="150" y="420" width="14" height="14" fill="#1d3557" rx="2"/>
+  <text x="170" y="432" font-size="11" fill="#ccc">Mgmt (VLAN 10)</text>
+  <rect x="270" y="420" width="14" height="14" fill="#6a4c2d" rx="2"/>
+  <text x="290" y="432" font-size="11" fill="#ccc">IoT (VLAN 40)</text>
+  <rect x="390" y="420" width="14" height="14" fill="#4a1d6a" rx="2"/>
+  <text x="410" y="432" font-size="11" fill="#ccc">Users (VLAN 20)</text>
+  <rect x="530" y="420" width="14" height="14" fill="#555" rx="2"/>
+  <text x="550" y="432" font-size="11" fill="#ccc">Pit/Trunk (VLAN 999)</text>
+  <rect x="700" y="420" width="14" height="14" fill="#3a3a3a" rx="2"/>
+  <text x="720" y="432" font-size="11" fill="#ccc">Unused / Shutdown</text>
+
+  <!-- Switch body -->
+  <rect x="30" y="65" width="860" height="130" fill="#111122" rx="8" stroke="#444" stroke-width="1.5"/>
+  <text x="50" y="86" font-size="11" fill="#666">TP-Link Omada SG2218P  |  16× PoE+  |  2× SFP  |  150W budget</text>
+
+  <!-- Port definitions: x positions for 16 ports in top row -->
+  <!-- Ports 1-16, each ~50px wide, starting at x=45 -->
+
+  <!-- PORT COLOR HELPER: define groups -->
+  <!-- Port 1: Trunk/Pit -->
+  <!-- Ports 2: Trunk/Infra -->
+  <!-- Ports 3-6: Infra -->
+  <!-- Ports 7-10: IoT -->
+  <!-- Port 11: Mgmt -->
+  <!-- Ports 12-14: Trunk/Mgmt -->
+  <!-- Port 15: Users -->
+  <!-- Port 16: Shutdown -->
+
+  <!-- ROW 1: Ports 1-8 -->
+  <!-- Port 1 -->
+  <rect x="45" y="95" width="48" height="58" fill="#555" rx="4" stroke="#888" stroke-width="1"/>
+  <rect x="57" y="103" width="24" height="16" fill="#222" rx="2"/>
+  <text x="69" y="115" text-anchor="middle" font-size="9" fill="#aaa">LINK</text>
+  <text x="69" y="143" text-anchor="middle" font-size="10" font-weight="bold" fill="#fff">1</text>
+
+  <!-- Port 2 -->
+  <rect x="98" y="95" width="48" height="58" fill="#2d6a4f" rx="4" stroke="#888" stroke-width="1"/>
+  <rect x="110" y="103" width="24" height="16" fill="#222" rx="2"/>
+  <text x="122" y="115" text-anchor="middle" font-size="9" fill="#aaa">LINK</text>
+  <text x="122" y="143" text-anchor="middle" font-size="10" font-weight="bold" fill="#fff">2</text>
+
+  <!-- Port 3 -->
+  <rect x="151" y="95" width="48" height="58" fill="#2d6a4f" rx="4" stroke="#888" stroke-width="1"/>
+  <rect x="163" y="103" width="24" height="16" fill="#222" rx="2"/>
+  <text x="175" y="115" text-anchor="middle" font-size="9" fill="#aaa">LINK</text>
+  <text x="175" y="143" text-anchor="middle" font-size="10" font-weight="bold" fill="#fff">3</text>
+
+  <!-- Port 4 -->
+  <rect x="204" y="95" width="48" height="58" fill="#2d6a4f" rx="4" stroke="#888" stroke-width="1"/>
+  <rect x="216" y="103" width="24" height="16" fill="#222" rx="2"/>
+  <text x="228" y="115" text-anchor="middle" font-size="9" fill="#aaa">LINK</text>
+  <text x="228" y="143" text-anchor="middle" font-size="10" font-weight="bold" fill="#fff">4</text>
+
+  <!-- Port 5 -->
+  <rect x="257" y="95" width="48" height="58" fill="#2d6a4f" rx="4" stroke="#888" stroke-width="1"/>
+  <rect x="269" y="103" width="24" height="16" fill="#222" rx="2"/>
+  <text x="281" y="115" text-anchor="middle" font-size="9" fill="#aaa">LINK</text>
+  <text x="281" y="143" text-anchor="middle" font-size="10" font-weight="bold" fill="#fff">5</text>
+
+  <!-- Port 6 -->
+  <rect x="310" y="95" width="48" height="58" fill="#2d6a4f" rx="4" stroke="#888" stroke-width="1"/>
+  <rect x="322" y="103" width="24" height="16" fill="#222" rx="2"/>
+  <text x="334" y="115" text-anchor="middle" font-size="9" fill="#aaa">LINK</text>
+  <text x="334" y="143" text-anchor="middle" font-size="10" font-weight="bold" fill="#fff">6</text>
+
+  <!-- Port 7 -->
+  <rect x="363" y="95" width="48" height="58" fill="#6a4c2d" rx="4" stroke="#888" stroke-width="1"/>
+  <rect x="375" y="103" width="24" height="16" fill="#222" rx="2"/>
+  <text x="387" y="115" text-anchor="middle" font-size="9" fill="#aaa">LINK</text>
+  <text x="387" y="143" text-anchor="middle" font-size="10" font-weight="bold" fill="#fff">7</text>
+
+  <!-- Port 8 -->
+  <rect x="416" y="95" width="48" height="58" fill="#6a4c2d" rx="4" stroke="#888" stroke-width="1"/>
+  <rect x="428" y="103" width="24" height="16" fill="#222" rx="2"/>
+  <text x="440" y="115" text-anchor="middle" font-size="9" fill="#aaa">LINK</text>
+  <text x="440" y="143" text-anchor="middle" font-size="10" font-weight="bold" fill="#fff">8</text>
+
+  <!-- ROW 1: Ports 9-16 -->
+  <!-- Port 9 -->
+  <rect x="469" y="95" width="48" height="58" fill="#6a4c2d" rx="4" stroke="#888" stroke-width="1"/>
+  <rect x="481" y="103" width="24" height="16" fill="#222" rx="2"/>
+  <text x="493" y="115" text-anchor="middle" font-size="9" fill="#aaa">LINK</text>
+  <text x="493" y="143" text-anchor="middle" font-size="10" font-weight="bold" fill="#fff">9</text>
+
+  <!-- Port 10 -->
+  <rect x="522" y="95" width="48" height="58" fill="#6a4c2d" rx="4" stroke="#888" stroke-width="1" stroke-dasharray="4,2"/>
+  <rect x="534" y="103" width="24" height="16" fill="#222" rx="2"/>
+  <text x="546" y="115" text-anchor="middle" font-size="9" fill="#aaa">LINK</text>
+  <text x="546" y="143" text-anchor="middle" font-size="10" font-weight="bold" fill="#fff">10</text>
+
+  <!-- Port 11 -->
+  <rect x="575" y="95" width="48" height="58" fill="#1d3557" rx="4" stroke="#888" stroke-width="1"/>
+  <rect x="587" y="103" width="24" height="16" fill="#222" rx="2"/>
+  <text x="599" y="115" text-anchor="middle" font-size="9" fill="#aaa">LINK</text>
+  <text x="599" y="143" text-anchor="middle" font-size="10" font-weight="bold" fill="#fff">11</text>
+
+  <!-- Port 12 -->
+  <rect x="628" y="95" width="48" height="58" fill="#1d3557" rx="4" stroke="#888" stroke-width="1"/>
+  <rect x="640" y="103" width="24" height="16" fill="#222" rx="2"/>
+  <text x="652" y="115" text-anchor="middle" font-size="9" fill="#aaa">LINK</text>
+  <text x="652" y="143" text-anchor="middle" font-size="10" font-weight="bold" fill="#fff">12</text>
+
+  <!-- Port 13 -->
+  <rect x="681" y="95" width="48" height="58" fill="#1d3557" rx="4" stroke="#888" stroke-width="1"/>
+  <rect x="693" y="103" width="24" height="16" fill="#222" rx="2"/>
+  <text x="705" y="115" text-anchor="middle" font-size="9" fill="#aaa">LINK</text>
+  <text x="705" y="143" text-anchor="middle" font-size="10" font-weight="bold" fill="#fff">13</text>
+
+  <!-- Port 14 -->
+  <rect x="734" y="95" width="48" height="58" fill="#1d3557" rx="4" stroke="#888" stroke-width="1" stroke-dasharray="4,2"/>
+  <rect x="746" y="103" width="24" height="16" fill="#222" rx="2"/>
+  <text x="758" y="115" text-anchor="middle" font-size="9" fill="#aaa">LINK</text>
+  <text x="758" y="143" text-anchor="middle" font-size="10" font-weight="bold" fill="#fff">14</text>
+
+  <!-- Port 15 -->
+  <rect x="787" y="95" width="48" height="58" fill="#4a1d6a" rx="4" stroke="#888" stroke-width="1"/>
+  <rect x="799" y="103" width="24" height="16" fill="#222" rx="2"/>
+  <text x="811" y="115" text-anchor="middle" font-size="9" fill="#aaa">LINK</text>
+  <text x="811" y="143" text-anchor="middle" font-size="10" font-weight="bold" fill="#fff">15</text>
+
+  <!-- Port 16 -->
+  <rect x="840" y="95" width="48" height="58" fill="#3a3a3a" rx="4" stroke="#555" stroke-width="1"/>
+  <rect x="852" y="103" width="24" height="16" fill="#222" rx="2"/>
+  <text x="864" y="115" text-anchor="middle" font-size="9" fill="#666">LINK</text>
+  <text x="864" y="143" text-anchor="middle" font-size="10" font-weight="bold" fill="#888">16</text>
+
+  <!-- SFP ports -->
+  <rect x="45" y="172" width="30" height="18" fill="#3a3a3a" rx="3" stroke="#555" stroke-width="1"/>
+  <text x="60" y="184" text-anchor="middle" font-size="9" fill="#666">SFP1</text>
+  <rect x="80" y="172" width="30" height="18" fill="#3a3a3a" rx="3" stroke="#555" stroke-width="1"/>
+  <text x="95" y="184" text-anchor="middle" font-size="9" fill="#666">SFP2</text>
+
+  <!-- Port labels below switch -->
+  <!-- Col labels: each port center x values: 69, 122, 175, 228, 281, 334, 387, 440, 493, 546, 599, 652, 705, 758, 811, 864 -->
+
+  <!-- Port 1 label -->
+  <line x1="69" y1="200" x2="69" y2="218" stroke="#555" stroke-width="1"/>
+  <text x="69" y="230" text-anchor="middle" font-size="9" font-weight="bold" fill="#ccc">ER605</text>
+  <text x="69" y="242" text-anchor="middle" font-size="8" fill="#aaa">Trunk</text>
+  <text x="69" y="254" text-anchor="middle" font-size="8" fill="#888">native: Pit</text>
+  <text x="69" y="266" text-anchor="middle" font-size="8" fill="#888">tags: 10,20,</text>
+  <text x="69" y="278" text-anchor="middle" font-size="8" fill="#888">30,40,50</text>
+
+  <!-- Port 2 label -->
+  <line x1="122" y1="200" x2="122" y2="218" stroke="#555" stroke-width="1"/>
+  <text x="122" y="230" text-anchor="middle" font-size="9" font-weight="bold" fill="#ccc">monolith</text>
+  <text x="122" y="242" text-anchor="middle" font-size="8" fill="#aaa">Trunk</text>
+  <text x="122" y="254" text-anchor="middle" font-size="8" fill="#888">native: Infra</text>
+
+  <!-- Port 3 label -->
+  <line x1="175" y1="200" x2="175" y2="218" stroke="#555" stroke-width="1"/>
+  <text x="175" y="230" text-anchor="middle" font-size="9" font-weight="bold" fill="#ccc">watchtower</text>
+  <text x="175" y="242" text-anchor="middle" font-size="8" fill="#aaa">Access</text>
+  <text x="175" y="254" text-anchor="middle" font-size="8" fill="#888">VLAN 30</text>
+
+  <!-- Port 4 label -->
+  <line x1="228" y1="200" x2="228" y2="218" stroke="#555" stroke-width="1"/>
+  <text x="228" y="230" text-anchor="middle" font-size="9" font-weight="bold" fill="#ccc">Lore</text>
+  <text x="228" y="242" text-anchor="middle" font-size="8" fill="#aaa">Access</text>
+  <text x="228" y="254" text-anchor="middle" font-size="8" fill="#888">VLAN 30</text>
+  <text x="228" y="266" text-anchor="middle" font-size="8" fill="#666">(future)</text>
+
+  <!-- Port 5 label -->
+  <line x1="281" y1="200" x2="281" y2="218" stroke="#555" stroke-width="1"/>
+  <text x="281" y="230" text-anchor="middle" font-size="9" font-weight="bold" fill="#ccc">Data</text>
+  <text x="281" y="242" text-anchor="middle" font-size="8" fill="#aaa">Access</text>
+  <text x="281" y="254" text-anchor="middle" font-size="8" fill="#888">VLAN 30</text>
+  <text x="281" y="266" text-anchor="middle" font-size="8" fill="#666">(future)</text>
+
+  <!-- Port 6 label -->
+  <line x1="334" y1="200" x2="334" y2="218" stroke="#555" stroke-width="1"/>
+  <text x="334" y="230" text-anchor="middle" font-size="9" font-weight="bold" fill="#ccc">spare</text>
+  <text x="334" y="242" text-anchor="middle" font-size="8" fill="#aaa">Access</text>
+  <text x="334" y="254" text-anchor="middle" font-size="8" fill="#888">VLAN 30</text>
+
+  <!-- Port 7 label -->
+  <line x1="387" y1="200" x2="387" y2="218" stroke="#555" stroke-width="1"/>
+  <text x="387" y="230" text-anchor="middle" font-size="9" font-weight="bold" fill="#ccc">Big Brother</text>
+  <text x="387" y="242" text-anchor="middle" font-size="8" fill="#aaa">Access</text>
+  <text x="387" y="254" text-anchor="middle" font-size="8" fill="#888">VLAN 40</text>
+  <text x="387" y="266" text-anchor="middle" font-size="8" fill="#666">no PoE</text>
+
+  <!-- Port 8 label -->
+  <line x1="440" y1="200" x2="440" y2="218" stroke="#555" stroke-width="1"/>
+  <text x="440" y="230" text-anchor="middle" font-size="9" font-weight="bold" fill="#ccc">Reolink #1</text>
+  <text x="440" y="242" text-anchor="middle" font-size="8" fill="#aaa">Access</text>
+  <text x="440" y="254" text-anchor="middle" font-size="8" fill="#888">VLAN 40</text>
+  <text x="440" y="266" text-anchor="middle" font-size="8" fill="#5cb85c">PoE+</text>
+
+  <!-- Port 9 label -->
+  <line x1="493" y1="200" x2="493" y2="218" stroke="#555" stroke-width="1"/>
+  <text x="493" y="230" text-anchor="middle" font-size="9" font-weight="bold" fill="#ccc">Reolink #2</text>
+  <text x="493" y="242" text-anchor="middle" font-size="8" fill="#aaa">Access</text>
+  <text x="493" y="254" text-anchor="middle" font-size="8" fill="#888">VLAN 40</text>
+  <text x="493" y="266" text-anchor="middle" font-size="8" fill="#5cb85c">PoE+</text>
+
+  <!-- Port 10 label -->
+  <line x1="546" y1="200" x2="546" y2="218" stroke="#555" stroke-width="1"/>
+  <text x="546" y="230" text-anchor="middle" font-size="9" font-weight="bold" fill="#ccc">coop/run</text>
+  <text x="546" y="242" text-anchor="middle" font-size="8" fill="#aaa">Access</text>
+  <text x="546" y="254" text-anchor="middle" font-size="8" fill="#888">VLAN 40</text>
+  <text x="546" y="266" text-anchor="middle" font-size="8" fill="#f0ad4e">reserved</text>
+
+  <!-- Port 11 label -->
+  <line x1="599" y1="200" x2="599" y2="218" stroke="#555" stroke-width="1"/>
+  <text x="599" y="230" text-anchor="middle" font-size="9" font-weight="bold" fill="#ccc">OC200</text>
+  <text x="599" y="242" text-anchor="middle" font-size="8" fill="#aaa">Access</text>
+  <text x="599" y="254" text-anchor="middle" font-size="8" fill="#888">VLAN 10</text>
+  <text x="599" y="266" text-anchor="middle" font-size="8" fill="#5cb85c">PoE</text>
+
+  <!-- Port 12 label -->
+  <line x1="652" y1="200" x2="652" y2="218" stroke="#555" stroke-width="1"/>
+  <text x="652" y="230" text-anchor="middle" font-size="9" font-weight="bold" fill="#ccc">EAP245</text>
+  <text x="652" y="242" text-anchor="middle" font-size="9" fill="#ccc">Downstairs</text>
+  <text x="652" y="254" text-anchor="middle" font-size="8" fill="#aaa">Trunk</text>
+  <text x="652" y="266" text-anchor="middle" font-size="8" fill="#888">native: 10</text>
+  <text x="652" y="278" text-anchor="middle" font-size="8" fill="#888">tags: 20,40,50</text>
+  <text x="652" y="290" text-anchor="middle" font-size="8" fill="#5cb85c">PoE+</text>
+
+  <!-- Port 13 label -->
+  <line x1="705" y1="200" x2="705" y2="218" stroke="#555" stroke-width="1"/>
+  <text x="705" y="230" text-anchor="middle" font-size="9" font-weight="bold" fill="#ccc">EAP245</text>
+  <text x="705" y="242" text-anchor="middle" font-size="9" fill="#ccc">Upstairs</text>
+  <text x="705" y="254" text-anchor="middle" font-size="8" fill="#aaa">Trunk</text>
+  <text x="705" y="266" text-anchor="middle" font-size="8" fill="#888">native: 10</text>
+  <text x="705" y="278" text-anchor="middle" font-size="8" fill="#888">tags: 20,40,50</text>
+  <text x="705" y="290" text-anchor="middle" font-size="8" fill="#5cb85c">PoE+</text>
+
+  <!-- Port 14 label -->
+  <line x1="758" y1="200" x2="758" y2="218" stroke="#555" stroke-width="1"/>
+  <text x="758" y="230" text-anchor="middle" font-size="9" font-weight="bold" fill="#ccc">EAP225</text>
+  <text x="758" y="242" text-anchor="middle" font-size="9" fill="#ccc">Balcony</text>
+  <text x="758" y="254" text-anchor="middle" font-size="8" fill="#aaa">Trunk</text>
+  <text x="758" y="266" text-anchor="middle" font-size="8" fill="#888">native: 10</text>
+  <text x="758" y="278" text-anchor="middle" font-size="8" fill="#888">tags: 20,40,50</text>
+  <text x="758" y="290" text-anchor="middle" font-size="8" fill="#f0ad4e">future</text>
+
+  <!-- Port 15 label -->
+  <line x1="811" y1="200" x2="811" y2="218" stroke="#555" stroke-width="1"/>
+  <text x="811" y="230" text-anchor="middle" font-size="9" font-weight="bold" fill="#ccc">spare</text>
+  <text x="811" y="242" text-anchor="middle" font-size="8" fill="#aaa">Access</text>
+  <text x="811" y="254" text-anchor="middle" font-size="8" fill="#888">VLAN 20</text>
+
+  <!-- Port 16 label -->
+  <line x1="864" y1="200" x2="864" y2="218" stroke="#555" stroke-width="1"/>
+  <text x="864" y="230" text-anchor="middle" font-size="9" font-weight="bold" fill="#888">unused</text>
+  <text x="864" y="242" text-anchor="middle" font-size="8" fill="#666">shutdown</text>
+
+  <!-- PoE budget note -->
+  <text x="460" y="400" text-anchor="middle" font-size="11" fill="#888">PoE budget: ~59W active / 150W capacity  ·  Dashed border = future / reserved port</text>
+
+</svg>
