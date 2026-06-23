@@ -1,4 +1,5 @@
-# Minecraft Bedrock Server — K3s Homelab Reference
+# LWA Infra -- Minecraft Bedrock Server
+> Last updated: 2026-05-26
 
 ## Overview
 

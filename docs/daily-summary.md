@@ -1,4 +1,5 @@
-# Daily Summary — Design Notes & Roadmap
+# LWA Infra -- Daily Summary
+> Last updated: 2026-06-16
 
 Two reports per day, 8 AM and 8 PM (America/New_York), posted to `#sentinel` via Slack.
 Driven by a **systemd timer** on Watchtower — no Alertmanager involvement, no timing drift on deploys.

@@ -1,4 +1,5 @@
-# Claude MCPs — Little Wolf Acres AI Tooling
+# LWA Infra -- Claude MCPs
+> Last updated: 2026-06-22
 
 Four MCP servers give Claude structured access to the homelab. Three are in-house FastMCP servers deployed as dedicated services; the fourth (Atlas) is the official upstream Plane MCP server, run as a local subprocess. Together they cover the full operational surface: cluster state, git workflow, monitoring layer, and project management.
 

@@ -1,4 +1,5 @@
-# Network Migration Runbook
+# LWA Infra -- Network Migration Runbook
+> Last updated: 2026-06-16
 
 Operational sequence for moving from the flat `192.168.0.0/24` network to the 5-VLAN segmented design defined in the [Network Rebuild Plan](network-rebuild-plan.md).
 
