@@ -1,0 +1,37 @@
+---
+# Client Credentials grant — a single POST returns an access token.
+# Endpoint + payload validated against the Omada Open API (controller 5.x):
+#   POST /openapi/authorize/token?grant_type=client_credentials
+#   body: {omadacId, client_id, client_secret}
+#   resp: {errorCode:0, result:{accessToken, tokenType, expiresIn, refreshToken}}
+# Subsequent API calls send header  Authorization: AccessToken=<token>
+- name: Obtain Omada Open API access token (client_credentials)
+  ansible.builtin.uri:
+    url: "{{ omada_api_base }}/openapi/authorize/token?grant_type=client_credentials"
+    method: POST
+    body_format: json
+    body:
+      omadacId: "{{ omada_id }}"
+      client_id: "{{ omada_client_id }}"
+      client_secret: "{{ omada_client_secret }}"
+    headers:
+      Content-Type: application/json
+    validate_certs: "{{ omada_validate_certs }}"
+    return_content: true
+  register: omada_token_resp
+  no_log: true
+
+- name: Assert token request succeeded
+  ansible.builtin.assert:
+    that:
+      - omada_token_resp.json.errorCode == 0
+      - omada_token_resp.json.result.accessToken is defined
+    fail_msg: >-
+      Token request failed: {{ omada_token_resp.json.msg | default('no msg') }}
+      (errorCode {{ omada_token_resp.json.errorCode | default('?') }}).
+      Check omada_api_base, omada_id, and the client credentials in vault.
+
+- name: Set access token fact
+  ansible.builtin.set_fact:
+    omada_access_token: "{{ omada_token_resp.json.result.accessToken }}"
+  no_log: true

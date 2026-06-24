@@ -1,0 +1,15 @@
+---
+# Read-only Omada controller state export.
+# Phase 1 of the Omada GitOps rollout — proves auth + endpoint coverage,
+# produces config-as-backup. Makes NO changes to the controller.
+#
+# Run:  cd services/omada/ansible
+#       ansible-playbook -i inventory.ini playbooks/export.yml
+- name: Export Omada controller state (read-only)
+  hosts: omada_runner
+  gather_facts: false
+  vars_files:
+    - ../../../../ansible/vars/main.yml
+    - ../../../../ansible/vars/vault.yml
+  roles:
+    - omada_export

@@ -1,0 +1,14 @@
+---
+# Where exported state is written (repo-relative, committed for config-as-backup)
+omada_state_dir: "{{ playbook_dir }}/../../state"
+
+# TLS verification. OC200 ships a self-signed cert, so default is false.
+# Flip to true once a trusted cert is installed on the controller.
+omada_validate_certs: false
+
+# Read-only object groups to export in Phase 1. Each maps to an Open API
+# endpoint; see tasks/main.yml. Trimmed to what's confirmed GET-able —
+# expand once the first export proves endpoint coverage on this controller.
+omada_export_targets:
+  - sites
+  - devices

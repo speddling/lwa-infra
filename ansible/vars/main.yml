@@ -24,6 +24,17 @@ ip_watchtower:         "192.168.0.21"
 ip_studio:             "192.168.0.109"
 
 # -----------------------------------------------------------------------------
+# Omada Open API (Platform Integration, Client Credentials app)
+# Secrets live in vault.yml. Only omada_api_base changes at cutover
+# (OC200 .0.3 -> .10.3); credentials are stable.
+# -----------------------------------------------------------------------------
+omada_api_base:      "{{ vault_omada_api_base }}"
+omada_id:            "{{ vault_omada_id }}"
+omada_client_id:     "{{ vault_omada_client_id }}"
+omada_client_secret: "{{ vault_omada_client_secret }}"
+omada_validate_certs: false
+
+# -----------------------------------------------------------------------------
 # Network — Hostnames and FQDNs
 # -----------------------------------------------------------------------------
 homelab_domain:    "littlewolfacres.com"

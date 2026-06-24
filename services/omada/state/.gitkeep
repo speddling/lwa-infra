@@ -1,0 +1,3 @@
+# State exports land here (sites.json, devices-<siteId>.json), written by
+# the omada_export role. Committed intentionally as config-as-backup.
+# This keepfile ensures the directory exists before the first export run.
