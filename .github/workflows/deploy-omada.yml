@@ -73,12 +73,15 @@ jobs:
 
       # Commit refreshed state back to the repo so the controller config
       # is versioned (config-as-backup). No-op when nothing changed.
+      # NOTE: stage BEFORE diffing — newly-created state files are untracked,
+      # and `git diff` (unstaged) ignores untracked files, so checking before
+      # `git add` always reported "no changes" on first run. Check --cached.
       - name: Commit refreshed state
         run: |
           git config user.name  "omada-export-bot"
           git config user.email "omada-export-bot@littlewolfacres.com"
-          if ! git diff --quiet -- services/omada/state; then
-            git add services/omada/state
+          git add services/omada/state
+          if ! git diff --cached --quiet -- services/omada/state; then
             git commit -m "chore(omada): refresh controller state export [skip ci]"
             git push
           else
