@@ -1,21 +1,20 @@
 name: Deploy Omada Config
 
-# Phase 1: read-only state export. This workflow authenticates to the
-# Omada Open API and writes controller state to services/omada/state/.
-# It makes NO changes to the controller yet. The reconcile (write) phase
-# will be added once endpoint coverage is confirmed.
+# Read-only introspection of the Omada controller via the Open API.
+# This is NOT a backup and does NOT commit anything. It exists to show
+# the controller's current state (sites, devices) so that desired-state
+# declarations can be authored for the reconcile phase.
 #
-# Runs on the watchtower self-hosted runner because watchtower is the
-# network-management node and (post-cutover) the only host allowed to
-# reach the OC200 API per the Infra->OC200 TCP 443 ACL.
+# The repo itself is the source of truth and the recovery path: the
+# controller is rebuilt by declaring its config as code and reconciling
+# it onto the OC200 — there is nothing to "back up" separately.
+#
+# Runs on the watchtower self-hosted runner (the network-management node;
+# post-cutover the only host allowed to reach the OC200 API per the
+# Infra->OC200 TCP 443 ACL). State is written to the runner workspace for
+# inspection during a run; it is intentionally not persisted to the repo.
 
 on:
-  push:
-    branches: [master]
-    paths:
-      - 'services/omada/**'
-      - 'ansible/vars/**'
-      - '.github/workflows/deploy-omada.yml'
   pull_request:
     branches: [master]
     paths:
@@ -23,6 +22,9 @@ on:
       - 'ansible/vars/**'
       - '.github/workflows/deploy-omada.yml'
   workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   validate:
@@ -48,12 +50,10 @@ jobs:
         run: ansible-playbook -i inventory.ini playbooks/export.yml --syntax-check
 
   export:
-    name: Export controller state (read-only)
+    name: Export controller state (read-only introspection)
     needs: validate
-    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch'
     runs-on: [self-hosted, watchtower]
-    permissions:
-      contents: write   # allow the commit-back step to push state to master
     steps:
       - uses: actions/checkout@v4
 
@@ -69,20 +69,19 @@ jobs:
           sudo apt-get install -y nodejs
           pip3 install --break-system-packages 'ansible-core>=2.18'
 
-      - name: Run Ansible — Omada state export
+      - name: Run Ansible — Omada state export (read-only)
         working-directory: services/omada/ansible
         run: ansible-playbook -i inventory.ini playbooks/export.yml
 
-      # Commit refreshed state back to the repo so the controller config
-      # is versioned (config-as-backup). No-op when nothing changed.
-      - name: Commit refreshed state
+      # State is written to services/omada/state/ in the runner workspace
+      # for inspection in this run's log/artifacts. It is NOT committed —
+      # the repo holds authored desired-state, not machine-generated dumps.
+      - name: Show exported state
+        working-directory: services/omada
         run: |
-          git config user.name  "omada-export-bot"
-          git config user.email "omada-export-bot@littlewolfacres.com"
-          git add services/omada/state
-          if ! git diff --cached --quiet -- services/omada/state; then
-            git commit -m "chore(omada): refresh controller state export [skip ci]"
-            git push
-          else
-            echo "No state changes to commit."
-          fi
+          echo "=== Exported controller state (this run only) ==="
+          for f in state/sites.json state/devices-*.json; do
+            echo "----- $f -----"
+            cat "$f"
+            echo
+          done

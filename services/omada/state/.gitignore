@@ -1,0 +1,4 @@
+# Generated controller introspection output — never commit. Machine state,
+# not source. The repo holds authored desired-state; this dir is scratch.
+sites.json
+devices-*.json

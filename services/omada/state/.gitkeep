@@ -1,3 +1,5 @@
-# State exports land here (sites.json, devices-<siteId>.json), written by
-# the omada_export role. Committed intentionally as config-as-backup.
-# This keepfile ensures the directory exists before the first export run.
+# This directory receives the read-only introspection output
+# (sites.json, devices-<siteId>.json) when the export playbook runs on a
+# runner. Those files are GENERATED machine state, not source — they are
+# git-ignored (see .gitignore here) and must not be committed. This
+# keepfile only ensures the directory exists for the export to write into.
