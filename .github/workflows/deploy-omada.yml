@@ -52,6 +52,8 @@ jobs:
     needs: validate
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     runs-on: [self-hosted, watchtower]
+    permissions:
+      contents: write   # allow the commit-back step to push state to master
     steps:
       - uses: actions/checkout@v4
 
