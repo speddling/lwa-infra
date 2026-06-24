@@ -46,10 +46,12 @@ vault_snmp_community: "REPLACE_ME"
 # api_base uses the CURRENT controller address pre-cutover so the read-only export
 # can be proven before the network change. At cutover, change ONLY this line to the
 # new Mgmt-VLAN address (https://192.168.10.3:443). Credentials do not change.
+# NOTE: the controller's real current address is .0.7 (confirmed on SG2218P port 11);
+# the Open API "Interface Access Address" field misreported .0.3 during bring-up.
 vault_omada_client_id:     "REPLACE_ME"
 vault_omada_client_secret: "REPLACE_ME"
 vault_omada_id:            "REPLACE_ME"
-vault_omada_api_base:      "https://192.168.0.3:443"
+vault_omada_api_base:      "https://192.168.0.7:443"
 
 # ArgoCD — GitHub PAT for homelab repo access
 # Fine-grained PAT: single repo scope, Contents: Read, no expiration recommended.

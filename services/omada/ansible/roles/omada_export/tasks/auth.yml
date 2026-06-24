@@ -3,8 +3,16 @@
 # Endpoint + payload validated against the Omada Open API (controller 5.x):
 #   POST /openapi/authorize/token?grant_type=client_credentials
 #   body: {omadacId, client_id, client_secret}
-#   resp: {errorCode:0, result:{accessToken, tokenType, expiresIn, refreshToken}}
+#   resp: {errorCode:0, msg:..., result:{accessToken, tokenType, expiresIn, refreshToken}}
 # Subsequent API calls send header  Authorization: AccessToken=<token>
+#
+# Notes from first live bring-up:
+#   - OC200 serves the API on HTTPS with a self-signed cert, so
+#     validate_certs MUST be false (curl needed -k). Set explicitly here
+#     rather than via a variable so it can't silently resolve to true.
+#   - status_code accepts the 4xx auth-error range so a bad credential
+#     returns a readable JSON errorCode instead of making uri raise and
+#     hiding the cause. The assert below is what actually enforces success.
 - name: Obtain Omada Open API access token (client_credentials)
   ansible.builtin.uri:
     url: "{{ omada_api_base }}/openapi/authorize/token?grant_type=client_credentials"
@@ -16,20 +24,26 @@
       client_secret: "{{ omada_client_secret }}"
     headers:
       Content-Type: application/json
-    validate_certs: "{{ omada_validate_certs }}"
+    validate_certs: false
     return_content: true
+    status_code: [200, 201, 400, 401, 403, 404]
   register: omada_token_resp
   no_log: true
 
+# Surface ONLY the controller's errorCode + msg on failure — never the
+# token or the request body. Safe to show; contains no secret.
 - name: Assert token request succeeded
   ansible.builtin.assert:
     that:
+      - omada_token_resp.json is defined
       - omada_token_resp.json.errorCode == 0
       - omada_token_resp.json.result.accessToken is defined
     fail_msg: >-
-      Token request failed: {{ omada_token_resp.json.msg | default('no msg') }}
-      (errorCode {{ omada_token_resp.json.errorCode | default('?') }}).
-      Check omada_api_base, omada_id, and the client credentials in vault.
+      Token request failed — controller said:
+      errorCode={{ omada_token_resp.json.errorCode | default('?') }},
+      msg='{{ omada_token_resp.json.msg | default('no json returned; check api_base/port') }}'.
+      Verify omada_api_base, omada_id, and the client credentials in vault.
+    success_msg: "Access token obtained (errorCode 0)."
 
 - name: Set access token fact
   ansible.builtin.set_fact:
