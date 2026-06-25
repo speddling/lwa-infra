@@ -1,0 +1,122 @@
+---
+# =============================================================================
+# Reconcile static DHCP reservations on the LWA controller via the Web API.
+#
+# SAFETY:
+#  - Read-then-write: resolves VLAN netIds from current networks first.
+#  - Dry-run by default. -e omada_apply=true to PUT.
+#  - CUTOVER-MOMENT: see defaults/main.yml — reservations point hosts at
+#    target-VLAN addresses that aren't live until ports are tagged. Apply
+#    per-host during the window, not pre-cutover.
+# =============================================================================
+
+- name: Authenticate to the Web API
+  ansible.builtin.include_tasks: ../../omada_vlans/tasks/auth.yml
+
+# ---- Resolve site id -----------------------------------------------------
+- name: List sites (Web API)
+  ansible.builtin.uri:
+    url: "{{ omada_api_base }}/{{ omada_cid }}/api/v2/sites?currentPage=1&currentPageSize=100"
+    method: GET
+    headers: "{{ omada_auth_headers }}"
+    validate_certs: false
+    return_content: true
+    status_code: [200]
+  register: omada_sites_resp
+  no_log: true
+
+- name: Resolve site id for the LWA site
+  ansible.builtin.set_fact:
+    omada_site_id: >-
+      {{ (omada_sites_resp.json.result.data
+          | selectattr('name', 'equalto', 'LWA') | map(attribute='id') | first)
+         if (omada_sites_resp.json.result.data | selectattr('name','equalto','LWA') | list | length > 0)
+         else (omada_sites_resp.json.result.data | map(attribute='id') | first) }}
+
+- name: Show resolved site
+  ansible.builtin.debug:
+    msg: "Targeting site id: {{ omada_site_id }}"
+
+# ---- Read current LAN networks (to map vlan_name -> netId + subnet) -------
+- name: Get current LAN networks
+  ansible.builtin.uri:
+    url: "{{ omada_api_base }}/{{ omada_cid }}/api/v2/sites/{{ omada_site_id }}/setting/lan/networks?currentPage=1&currentPageSize=100"
+    method: GET
+    headers: "{{ omada_auth_headers }}"
+    validate_certs: false
+    return_content: true
+    status_code: [200]
+  register: omada_networks_resp
+  no_log: true
+
+- name: Index networks by name
+  ansible.builtin.set_fact:
+    omada_net_by_name: >-
+      {{ dict(omada_networks_resp.json.result.data
+              | map(attribute='name') | zip(omada_networks_resp.json.result.data)) }}
+  no_log: true
+
+# ---- Plan ----------------------------------------------------------------
+- name: Report reservation plan
+  ansible.builtin.debug:
+    msg: >-
+      {{ item.client_name }} ({{ item.mac }}) -> {{ item.ip }} on
+      {{ item.vlan_name }}{{ ' [CAREFUL: controller IP — apply last, by hand recommended]' if (item.careful | default(false)) else '' }}{{ ' | MISSING VLAN ' + item.vlan_name if item.vlan_name not in omada_net_by_name else '' }}
+  loop: "{{ omada_reservations }}"
+  loop_control:
+    label: "{{ item.client_name }}"
+
+# ---- Compute pool bounds as 32-bit ints ----------------------------------
+# The capture's ipStart/ipEnd were the VLAN /24's .0 and .255 as integers,
+# e.g. 192.168.20.0 = 3232240640, 192.168.20.255 = 3232240895.
+# Derive from each reservation's IP /24: base = first three octets + .0.
+- name: Apply reservations (PUT one per host)
+  ansible.builtin.uri:
+    url: "{{ omada_api_base }}/{{ omada_cid }}/api/v2/sites/{{ omada_site_id }}/setting/service/dhcp/{{ item.mac }}"
+    method: PUT
+    body_format: json
+    body:
+      netId: "{{ omada_net_by_name[item.vlan_name].id }}"
+      mac: "{{ item.mac }}"
+      clientName: "{{ item.client_name }}"
+      ip: "{{ item.ip }}"
+      ipStart: "{{ (item.ip.split('.')[0] | int) * 16777216
+                   + (item.ip.split('.')[1] | int) * 65536
+                   + (item.ip.split('.')[2] | int) * 256
+                   + 0 }}"
+      ipEnd: "{{ (item.ip.split('.')[0] | int) * 16777216
+                 + (item.ip.split('.')[1] | int) * 65536
+                 + (item.ip.split('.')[2] | int) * 256
+                 + 255 }}"
+      status: true
+    headers: "{{ omada_auth_headers }}"
+    validate_certs: false
+    return_content: true
+    status_code: [200]
+  register: omada_resv
+  when:
+    - omada_apply | default(false) | bool
+    - item.vlan_name in omada_net_by_name
+  loop: "{{ omada_reservations }}"
+  loop_control:
+    label: "{{ item.client_name }}"
+
+- name: Show each reservation response (errorCode + msg)
+  ansible.builtin.debug:
+    msg: >-
+      {{ item.item.client_name }} -> {{ item.item.ip }}
+      | errorCode={{ item.json.errorCode | default('?') }}
+      | msg='{{ item.json.msg | default('?') }}'
+  loop: "{{ omada_resv.results | default([]) }}"
+  loop_control:
+    label: "{{ item.item.client_name | default('?') }}"
+  when:
+    - omada_apply | default(false) | bool
+    - omada_resv.results is defined
+
+- name: Summary
+  ansible.builtin.debug:
+    msg: >-
+      {{ 'APPLIED — see per-host errorCodes above (0 = success).'
+         if (omada_apply | default(false) | bool)
+         else 'DRY-RUN — no changes made. Re-run with -e omada_apply=true to apply. CUTOVER-ONLY for target-VLAN IPs.' }}

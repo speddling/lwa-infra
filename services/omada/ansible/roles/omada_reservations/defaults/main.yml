@@ -1,0 +1,68 @@
+---
+# =============================================================================
+# LWA static DHCP reservations — declarative desired state.
+# MAC -> reserved IP on a target VLAN. The playbook resolves each VLAN's
+# netId live and PUTs one reservation per host.
+#
+# Schema captured from the controller's own PUT:
+#   PUT .../api/v2/sites/{siteId}/setting/service/dhcp/{MAC}
+#   body: {netId, mac, clientName, ip, ipStart, ipEnd, status}
+# The reservation's identity is the MAC (in the URL path).
+#
+# MACs are dash-separated uppercase, as the controller returns them.
+# MACs are not secret (broadcast on every frame) so they live here, not vault.
+#
+# *** CUTOVER-MOMENT ACTION ***
+# Each reservation points a host at an address on its TARGET VLAN, which is
+# NOT live on the wire until that host's switch port is tagged onto that VLAN.
+# Writing a reservation before its VLAN is active can strand the host (and
+# watchtower stranding = DNS down for the whole network). Apply per-host as
+# ports go tagged during the cutover window, NOT pre-cutover.
+# Default is dry-run; -e omada_apply=true to write.
+# =============================================================================
+
+omada_reservations:
+  - client_name: "studio"
+    mac: "10-51-07-46-DF-07"
+    ip: "192.168.20.3"
+    vlan_name: "Users"          # VLAN 20
+    # NOTE: already created manually this session — playbook PUT is idempotent
+    #       (same MAC = update in place), so re-applying is harmless.
+
+  - client_name: "apex"
+    mac: "32-00-EE-FB-23-0F"
+    ip: "192.168.20.2"
+    vlan_name: "Users"          # VLAN 20
+
+  - client_name: "monolith"
+    mac: "70-85-C2-66-D2-4D"
+    ip: "192.168.30.10"
+    vlan_name: "Infra"          # VLAN 30
+
+  - client_name: "watchtower"
+    mac: "10-C3-7B-9D-DA-BE"
+    ip: "192.168.30.11"
+    vlan_name: "Infra"          # VLAN 30 — DNS/AdGuard. Most critical; if this
+                                # lands on a dead VLAN, DNS is down. Apply only
+                                # when watchtower's port is live on VLAN 30.
+
+  - client_name: "Big Brother" # Reolink NVR
+    mac: "EC-71-DB-93-19-30"
+    ip: "192.168.40.10"
+    vlan_name: "IoT"            # VLAN 40
+
+  # --- OC200 controller: HANDLE LAST, MOST CAREFULLY ---
+  # The controller's own management IP. Changing it mid-migration can lock you
+  # out of the very tool doing the migration. Belongs on Mgmt (VLAN 10).
+  # Recommended: apply this LAST, after every other host is confirmed up on its
+  # VLAN, and have console/physical access ready before doing so. Consider
+  # doing this one by hand rather than via the playbook.
+  - client_name: "OC200"
+    mac: "CC-32-E5-70-85-6D"
+    ip: "192.168.10.2"
+    vlan_name: "Mgmt"          # VLAN 10
+    careful: true              # surfaced in the plan output as a warning
+
+# Reolink cameras (.40.11/.40.12) are not included — they appear to sit behind
+# the NVR rather than taking their own DHCP reservations. Add here if they turn
+# out to be directly addressed on the network.
