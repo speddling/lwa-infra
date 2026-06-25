@@ -32,27 +32,32 @@ dns:
   filters_update_interval: 24
 
 filtering:
+  # Rewrite answers reference the ip_* vars in ansible/vars/main.yml (single
+  # source of truth). At VLAN cutover, changing those vars migrates every
+  # rewrite automatically -- no per-line edits here. Each answer maps to the
+  # HOST the service runs on (e.g. grafana runs on watchtower; navidrome,
+  # argocd, zombatron, obelisk, plane run on monolith).
   rewrites:
     - domain: watchtower.littlewolfacres.com
-      answer: 192.168.0.21
+      answer: {{ ip_watchtower }}
     - domain: grafana.littlewolfacres.com
-      answer: 192.168.0.21
+      answer: {{ ip_watchtower }}
     - domain: monolith.littlewolfacres.com
-      answer: 192.168.0.20
+      answer: {{ ip_monolith }}
     - domain: navidrome.littlewolfacres.com
-      answer: 192.168.0.20
+      answer: {{ ip_monolith }}
     - domain: argocd.littlewolfacres.com
-      answer: 192.168.0.20
+      answer: {{ ip_monolith }}
     - domain: zombatron.littlewolfacres.com
-      answer: 192.168.0.20
+      answer: {{ ip_monolith }}
     - domain: apex.littlewolfacres.com
-      answer: 192.168.0.19
+      answer: {{ ip_apex }}
     - domain: studio.littlewolfacres.com
-      answer: 192.168.0.109
+      answer: {{ ip_studio }}
     - domain: obelisk.littlewolfacres.com
-      answer: 192.168.0.20
+      answer: {{ ip_monolith }}
     - domain: plane.littlewolfacres.com
-      answer: 192.168.0.20
+      answer: {{ ip_monolith }}
 
 filters:
   - enabled: true
