@@ -23,14 +23,14 @@
 # AdGuard rewrites). Do NOT flip until the cutover window.
 ip_er605:              "192.168.0.1"
 ip_eap245_foyer:       "192.168.0.2"
-ip_reolink_nvr:        "192.168.0.4"
+ip_reolink_nvr:         "192.168.40.10"
 ip_eap245_yarn_studio: "192.168.0.5"
 ip_eap225_outdoor:     ""          # assign when EAP225-Outdoor is installed
 ip_sg2218p:            ""          # assign when SG2218P switch is installed
-ip_apex:               "192.168.0.19"
-ip_monolith:           "192.168.0.20"
-ip_watchtower:         "192.168.0.21"
-ip_studio:             "192.168.0.109"
+ip_apex:               "192.168.20.2"
+ip_monolith:           "192.168.30.10"
+ip_watchtower:         "192.168.30.11"
+ip_studio:             "192.168.20.3"
 
 # -----------------------------------------------------------------------------
 # Omada Open API (Platform Integration, Client Credentials app)
