@@ -145,6 +145,7 @@
     return_content: true
     status_code: [200]
   register: omada_patch
+  no_log: true
   when:
     - omada_apply | default(false) | bool
     - item.purpose == "interface"
@@ -153,6 +154,9 @@
   loop_control:
     label: "{{ item.name }}"
 
+# Reports per-VLAN result without exposing the request body. Reads only
+# errorCode + msg from the registered result, so it stays safe with no_log
+# on the PATCH above. errorCode 0 = success; -1 = controller rejected body.
 - name: Show each PATCH response (errorCode + msg + network id)
   ansible.builtin.debug:
     msg: >-
