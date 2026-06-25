@@ -1,0 +1,20 @@
+---
+# Reconcile static DHCP reservations on the LWA controller via the Web API.
+#
+# DRY-RUN (default — reads + plans, no writes):
+#   cd services/omada/ansible
+#   ansible-playbook -i inventory.ini playbooks/reservations.yml
+#
+# APPLY (PUT reservations) — CUTOVER-MOMENT for target-VLAN IPs:
+#   ansible-playbook -i inventory.ini playbooks/reservations.yml -e omada_apply=true
+#
+# Desired state: roles/omada_reservations/defaults/main.yml
+# Auth: Local Admin Web API account (vault_omada_web_*).
+- name: Reconcile Omada static DHCP reservations
+  hosts: omada_runner
+  gather_facts: false
+  vars_files:
+    - ../../../../ansible/vars/main.yml
+    - ../../../../ansible/vars/vault.yml
+  roles:
+    - omada_reservations
