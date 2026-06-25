@@ -1,0 +1,21 @@
+---
+# Reconcile SG2218P switch port profiles and assignments via the Web API.
+#
+# DRY-RUN (default — reads + plans, no writes):
+#   cd services/omada/ansible
+#   ansible-playbook -i inventory.ini playbooks/switch_ports.yml
+#
+# APPLY (create profiles + assign ports) — CUTOVER-MOMENT:
+#   ansible-playbook -i inventory.ini playbooks/switch_ports.yml -e omada_apply=true
+#
+# Desired state: roles/omada_switch_ports/defaults/main.yml
+# Source of truth: docs/switch-port-map.svg
+# Auth: Local Admin Web API account (vault_omada_web_*).
+- name: Reconcile SG2218P switch port profiles and assignments
+  hosts: omada_runner
+  gather_facts: false
+  vars_files:
+    - ../../../../ansible/vars/main.yml
+    - ../../../../ansible/vars/vault.yml
+  roles:
+    - omada_switch_ports

@@ -1,0 +1,231 @@
+---
+# =============================================================================
+# Reconcile SG2218P switch port profiles and assignments.
+#
+# STEP 1: Auth + resolve site id
+# STEP 2: Read current LAN networks -> name->id map
+# STEP 3: Read current switch profiles -> name->id map
+# STEP 4: Create missing trunk profiles (POST)
+# STEP 5: Re-read profiles to get newly-created IDs
+# STEP 6: Assign every port its profile (PATCH per port)
+#
+# Dry-run by default; -e omada_apply=true to write.
+# CUTOVER-MOMENT: port changes take effect immediately on live ports.
+# =============================================================================
+
+- name: Authenticate to the Web API
+  ansible.builtin.include_tasks: ../../omada_vlans/tasks/auth.yml
+
+# ---- Site id ------------------------------------------------------------
+- name: List sites (Web API)
+  ansible.builtin.uri:
+    url: "{{ omada_api_base }}/{{ omada_cid }}/api/v2/sites?currentPage=1&currentPageSize=100"
+    method: GET
+    headers: "{{ omada_auth_headers }}"
+    validate_certs: false
+    return_content: true
+    status_code: [200]
+  register: omada_sites_resp
+  no_log: true
+
+- name: Resolve site id
+  ansible.builtin.set_fact:
+    omada_site_id: >-
+      {{ (omada_sites_resp.json.result.data
+          | selectattr('name', 'equalto', 'LWA') | map(attribute='id') | first)
+         if (omada_sites_resp.json.result.data | selectattr('name','equalto','LWA') | list | length > 0)
+         else (omada_sites_resp.json.result.data | map(attribute='id') | first) }}
+
+- name: Show resolved site
+  ansible.builtin.debug:
+    msg: "Targeting site id: {{ omada_site_id }}"
+
+# ---- LAN Networks -> name->id -------------------------------------------
+- name: Get current LAN networks
+  ansible.builtin.uri:
+    url: "{{ omada_api_base }}/{{ omada_cid }}/api/v2/sites/{{ omada_site_id }}/setting/lan/networks?currentPage=1&currentPageSize=100"
+    method: GET
+    headers: "{{ omada_auth_headers }}"
+    validate_certs: false
+    return_content: true
+    status_code: [200]
+  register: omada_networks_resp
+  no_log: true
+
+- name: Index networks by name
+  ansible.builtin.set_fact:
+    omada_net_by_name: >-
+      {{ dict(omada_networks_resp.json.result.data
+              | map(attribute='name') | zip(omada_networks_resp.json.result.data)) }}
+  no_log: true
+
+- name: Show known networks
+  ansible.builtin.debug:
+    msg: "Networks: {{ omada_net_by_name.keys() | list }}"
+
+# ---- Switch Profiles -> name->id ----------------------------------------
+- name: Get current switch profiles
+  ansible.builtin.uri:
+    url: "{{ omada_api_base }}/{{ omada_cid }}/api/v2/sites/{{ omada_site_id }}/setting/lan/profiles?currentPage=1&currentPageSize=100"
+    method: GET
+    headers: "{{ omada_auth_headers }}"
+    validate_certs: false
+    return_content: true
+    status_code: [200]
+  register: omada_profiles_resp
+  no_log: true
+
+- name: Index profiles by name
+  ansible.builtin.set_fact:
+    omada_profile_by_name: >-
+      {{ dict(omada_profiles_resp.json.result.data
+              | map(attribute='name') | zip(omada_profiles_resp.json.result.data)) }}
+  no_log: true
+
+- name: Show known profiles
+  ansible.builtin.debug:
+    msg: "Existing profiles: {{ omada_profile_by_name.keys() | list }}"
+
+# ---- Plan: which trunk profiles need creating ---------------------------
+- name: Report profile plan
+  ansible.builtin.debug:
+    msg: >-
+      Profile '{{ item.name }}':
+      {{ 'EXISTS (id=' + omada_profile_by_name[item.name].id + ')' if item.name in omada_profile_by_name
+         else 'MISSING - will CREATE' }}
+  loop: "{{ omada_switch_profiles }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+# ---- Plan: port assignments ---------------------------------------------
+- name: Report port assignment plan
+  ansible.builtin.debug:
+    msg: >-
+      Port {{ item.port }} ({{ item.device }}):
+      {{ 'SHUTDOWN' if (item.shutdown | default(false))
+         else ('-> profile \'' + item.profile_name + '\' '
+               + ('EXISTS' if item.profile_name in omada_profile_by_name else 'MISSING PROFILE')
+               + ' | ' + item.note) }}
+  loop: "{{ omada_switch_ports }}"
+  loop_control:
+    label: "Port {{ item.port }}"
+
+# ---- Apply: create missing trunk profiles -------------------------------
+- name: Create missing trunk profiles
+  ansible.builtin.uri:
+    url: "{{ omada_api_base }}/{{ omada_cid }}/api/v2/sites/{{ omada_site_id }}/setting/lan/profiles"
+    method: POST
+    body_format: json
+    body:
+      id: null
+      name: "{{ item.name }}"
+      poe: "{{ item.poe }}"
+      voiceNetworkId: null
+      nativeNetworkId: "{{ omada_net_by_name[item.native_vlan].id }}"
+      tagNetworkIds: "{{ item.tagged_vlans | map('extract', omada_net_by_name, 'id') | list }}"
+      untagNetworkIds: []
+      dot1x: 2
+      portIsolationEnable: false
+      spanningTreeEnable: false
+      loopbackDetectVlanBasedEnable: false
+      stormCtrl: null
+      loopbackDetectEnable: false
+      stormCtrlEnable: null
+      lldpMedEnable: true
+      bandCtrl: null
+      bandWidthCtrlType: 0
+      flowControlEnable: false
+      eeeEnable: false
+      stpBpduForward: true
+      supportESEnable: false
+      dhcpL2RelaySettings:
+        enable: false
+    headers: "{{ omada_auth_headers }}"
+    validate_certs: false
+    return_content: true
+    status_code: [200]
+  register: omada_profile_create
+  when:
+    - omada_apply | default(false) | bool
+    - item.name not in omada_profile_by_name
+  loop: "{{ omada_switch_profiles }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Show profile create responses
+  ansible.builtin.debug:
+    msg: >-
+      Profile '{{ item.item.name }}'
+      | errorCode={{ item.json.errorCode | default('?') }}
+      | msg='{{ item.json.msg | default('?') }}'
+  loop: "{{ omada_profile_create.results | default([]) }}"
+  loop_control:
+    label: "{{ item.item.name | default('?') }}"
+  when:
+    - omada_apply | default(false) | bool
+    - omada_profile_create.results is defined
+
+# ---- Re-read profiles to pick up newly-created IDs ----------------------
+- name: Re-read switch profiles (after creates)
+  ansible.builtin.uri:
+    url: "{{ omada_api_base }}/{{ omada_cid }}/api/v2/sites/{{ omada_site_id }}/setting/lan/profiles?currentPage=1&currentPageSize=100"
+    method: GET
+    headers: "{{ omada_auth_headers }}"
+    validate_certs: false
+    return_content: true
+    status_code: [200]
+  register: omada_profiles_resp2
+  no_log: true
+  when: omada_apply | default(false) | bool
+
+- name: Re-index profiles by name (post-create)
+  ansible.builtin.set_fact:
+    omada_profile_by_name: >-
+      {{ dict(omada_profiles_resp2.json.result.data
+              | map(attribute='name') | zip(omada_profiles_resp2.json.result.data)) }}
+  no_log: true
+  when: omada_apply | default(false) | bool
+
+# ---- Apply: assign every port its profile --------------------------------
+- name: Assign port profiles
+  ansible.builtin.uri:
+    url: "{{ omada_api_base }}/{{ omada_cid }}/api/v2/sites/{{ omada_site_id }}/switches/{{ omada_switch_mac }}/ports/{{ item.port }}"
+    method: PATCH
+    body_format: json
+    body:
+      name: "{{ item.name }}"
+      profileId: "{{ omada_profile_by_name[item.profile_name].id }}"
+      profileOverrideEnable: false
+    headers: "{{ omada_auth_headers }}"
+    validate_certs: false
+    return_content: true
+    status_code: [200]
+  register: omada_port_assign
+  when:
+    - omada_apply | default(false) | bool
+    - not (item.shutdown | default(false))
+    - item.profile_name is not none
+    - item.profile_name in omada_profile_by_name
+  loop: "{{ omada_switch_ports }}"
+  loop_control:
+    label: "Port {{ item.port }} ({{ item.device }})"
+
+- name: Show port assignment responses
+  ansible.builtin.debug:
+    msg: >-
+      Port {{ item.item.port }} ({{ item.item.device }})
+      | errorCode={{ item.json.errorCode | default('?') }}
+      | msg='{{ item.json.msg | default('?') }}'
+  loop: "{{ omada_port_assign.results | default([]) }}"
+  loop_control:
+    label: "Port {{ item.item.port | default('?') }}"
+  when:
+    - omada_apply | default(false) | bool
+    - omada_port_assign.results is defined
+
+- name: Summary
+  ansible.builtin.debug:
+    msg: >-
+      {{ 'APPLIED - check errorCodes above. Port changes are live immediately.'
+         if (omada_apply | default(false) | bool)
+         else 'DRY-RUN - no changes. Re-run with -e omada_apply=true to apply. CUTOVER-MOMENT only.' }}

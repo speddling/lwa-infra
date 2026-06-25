@@ -1,0 +1,162 @@
+---
+# =============================================================================
+# LWA SG2218P switch port configuration — declarative desired state.
+# Drives two operations:
+#   1. Create trunk profiles (POST .../setting/lan/profiles) that don't exist.
+#   2. Assign each port its profile (PATCH .../switches/{mac}/ports/{N}).
+#
+# Schema captured from the controller's own calls:
+#   Profile create: POST .../setting/lan/profiles
+#     {name, poe, nativeNetworkId, tagNetworkIds, untagNetworkIds, dot1x, ...}
+#   Port assign:   PATCH .../switches/{switchMac}/ports/{portNum}
+#     {name, profileId, profileOverrideEnable: false}
+#
+# Access profiles are auto-created per VLAN by Omada (profileId matches
+# the VLAN's networkId). Trunk profiles must be explicitly created.
+# The playbook resolves names -> IDs at runtime; nothing is hardcoded here.
+#
+# Source of truth: docs/switch-port-map.svg
+#
+# *** CUTOVER-MOMENT ACTION ***
+# Changing a live port's profile moves traffic immediately. Apply during
+# the maintenance window as each device is confirmed ready to move.
+# Dry-run by default; -e omada_apply=true to write.
+# =============================================================================
+
+# Switch hardware identity (SG2218P MAC from the port-assign capture)
+omada_switch_mac: "A8-29-48-EB-17-EB"
+
+# -----------------------------------------------------------------------------
+# Trunk profiles to create (POST if they don't exist yet)
+# Access profiles are auto-created per VLAN — only trunks need explicit creation.
+# native_vlan / tagged_vlans reference VLAN names from omada_vlans/defaults.
+# poe: 2=enabled, 0=disabled
+# -----------------------------------------------------------------------------
+omada_switch_profiles:
+  - name: "ER605-Trunk"
+    # Port 1: ER605 gateway uplink
+    # native: Pit (VLAN 999, blackhole — untagged frames from router die here)
+    # tags: all real VLANs
+    native_vlan: "Pit"
+    tagged_vlans: ["Mgmt", "Users", "Infra", "IoT", "Guest"]
+    poe: 0                    # ER605 is not PoE-powered from switch
+
+  - name: "Monolith-Trunk"
+    # Port 2: monolith — k8s host, runs VMs, needs all VLANs tagged
+    # native: Infra (its own management traffic untagged)
+    native_vlan: "Infra"
+    tagged_vlans: ["Mgmt", "Users", "IoT", "Guest"]
+    poe: 0                    # monolith is not PoE-powered
+
+  - name: "EAP"
+    # Ports 12, 13, 14: EAP245 downstairs/upstairs, EAP225 balcony (future)
+    # native: Mgmt (AP management traffic untagged on VLAN 10)
+    # tags: Users (20), IoT (40), Guest (50) — the SSID VLANs
+    # Note: this profile was captured from the controller directly
+    native_vlan: "Mgmt"
+    tagged_vlans: ["Users", "IoT", "Guest"]
+    poe: 2                    # APs are PoE+ powered
+
+# -----------------------------------------------------------------------------
+# Port assignments — every port on the SG2218P
+# profile_name references either an auto-created access profile (VLAN name)
+# or a trunk profile from omada_switch_profiles above.
+# shutdown: true = port disabled
+# -----------------------------------------------------------------------------
+omada_switch_ports:
+  - port: 1
+    name: "Port1"
+    device: "ER605"
+    profile_name: "ER605-Trunk"
+    note: "Gateway uplink — trunk, native Pit"
+
+  - port: 2
+    name: "Port2"
+    device: "monolith"
+    profile_name: "Monolith-Trunk"
+    note: "k8s host — trunk, native Infra"
+
+  - port: 3
+    name: "Port3"
+    device: "watchtower"
+    profile_name: "Infra"
+    note: "Access VLAN 30 — DNS/AdGuard, most critical"
+
+  - port: 4
+    name: "Port4"
+    device: "Lore"
+    profile_name: "Infra"
+    note: "Access VLAN 30 — future Mac inference host"
+
+  - port: 5
+    name: "Port5"
+    device: "Data"
+    profile_name: "Infra"
+    note: "Access VLAN 30 — future AI workstation"
+
+  - port: 6
+    name: "Port6"
+    device: "spare-infra"
+    profile_name: "Infra"
+    note: "Access VLAN 30 — spare"
+
+  - port: 7
+    name: "Port7"
+    device: "Big Brother"
+    profile_name: "IoT"
+    note: "Access VLAN 40 — Reolink NVR, no PoE"
+
+  - port: 8
+    name: "Port8"
+    device: "Reolink-1"
+    profile_name: "IoT"
+    note: "Access VLAN 40 — Reolink camera 1, PoE+"
+
+  - port: 9
+    name: "Port9"
+    device: "Reolink-2"
+    profile_name: "IoT"
+    note: "Access VLAN 40 — Reolink camera 2, PoE+"
+
+  - port: 10
+    name: "Port10"
+    device: "coop-run"
+    profile_name: "IoT"
+    note: "Access VLAN 40 — coop/run reserved, PoE+"
+
+  - port: 11
+    name: "Port11"
+    device: "OC200"
+    profile_name: "Mgmt"
+    note: "Access VLAN 10 — controller management, PoE"
+
+  - port: 12
+    name: "Port12"
+    device: "EAP245-Downstairs"
+    profile_name: "EAP"
+    note: "Trunk — native Mgmt, tags Users/IoT/Guest, PoE+"
+
+  - port: 13
+    name: "Port13"
+    device: "EAP245-Upstairs"
+    profile_name: "EAP"
+    note: "Trunk — native Mgmt, tags Users/IoT/Guest, PoE+"
+
+  - port: 14
+    name: "Port14"
+    device: "EAP225-Balcony"
+    profile_name: "EAP"
+    note: "Trunk — native Mgmt, tags Users/IoT/Guest (future)"
+
+  - port: 15
+    name: "Port15"
+    device: "spare-users"
+    profile_name: "Users"
+    note: "Access VLAN 20 — spare"
+
+  - port: 16
+    name: "Port16"
+    device: "unused"
+    profile_name: null
+    shutdown: true
+    note: "Disabled"
