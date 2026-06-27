@@ -1,0 +1,129 @@
+---
+# UFW firewall rules for Watchtower
+# Policy: default deny inbound, allow outbound.
+# All rules are idempotent — safe to re-run at any time.
+
+- name: Install UFW
+  ansible.builtin.apt:
+    name: ufw
+    state: present
+    update_cache: true
+
+- name: Set default inbound policy to deny
+  community.general.ufw:
+    default: deny
+    direction: incoming
+
+- name: Set default outbound policy to allow
+  community.general.ufw:
+    default: allow
+    direction: outgoing
+
+- name: Allow loopback
+  community.general.ufw:
+    rule: allow
+    interface: lo
+    direction: in
+
+- name: Allow SSH from Users VLAN
+  community.general.ufw:
+    rule: allow
+    port: "{{ port_ssh }}"
+    proto: tcp
+    src: "192.168.20.0/24"
+
+- name: Allow DNS from Mgmt VLAN
+  community.general.ufw:
+    rule: allow
+    port: "{{ port_dns }}"
+    src: "192.168.10.0/24"
+
+- name: Allow DNS from Users VLAN
+  community.general.ufw:
+    rule: allow
+    port: "{{ port_dns }}"
+    src: "192.168.20.0/24"
+
+- name: Allow DNS from Infra VLAN
+  community.general.ufw:
+    rule: allow
+    port: "{{ port_dns }}"
+    src: "192.168.30.0/24"
+
+- name: Allow DNS from IoT VLAN
+  community.general.ufw:
+    rule: allow
+    port: "{{ port_dns }}"
+    src: "192.168.40.0/24"
+
+- name: Allow DNS from Guest VLAN
+  community.general.ufw:
+    rule: allow
+    port: "{{ port_dns }}"
+    src: "192.168.50.0/24"
+
+- name: Allow AdGuard UI from Users VLAN
+  community.general.ufw:
+    rule: allow
+    port: "{{ port_adguard_ui }}"
+    proto: tcp
+    src: "192.168.20.0/24"
+
+- name: Allow Grafana from Users VLAN
+  community.general.ufw:
+    rule: allow
+    port: "{{ port_grafana }}"
+    proto: tcp
+    src: "192.168.20.0/24"
+
+- name: Allow Prometheus from Infra VLAN
+  community.general.ufw:
+    rule: allow
+    port: "{{ port_prometheus }}"
+    proto: tcp
+    src: "192.168.30.0/24"
+
+- name: Allow Netdata from Users VLAN
+  community.general.ufw:
+    rule: allow
+    port: "{{ port_netdata }}"
+    proto: tcp
+    src: "192.168.20.0/24"
+
+- name: Allow AdGuard exporter from Infra VLAN
+  community.general.ufw:
+    rule: allow
+    port: "{{ port_adguard_exporter }}"
+    proto: tcp
+    src: "192.168.30.0/24"
+
+- name: Allow SNMP exporter from Infra VLAN
+  community.general.ufw:
+    rule: allow
+    port: "{{ port_snmp_exporter }}"
+    proto: tcp
+    src: "192.168.30.0/24"
+
+- name: Allow Argus MCP from Users VLAN
+  community.general.ufw:
+    rule: allow
+    port: "{{ port_argus_mcp }}"
+    proto: tcp
+    src: "192.168.20.0/24"
+
+- name: Allow Promtail syslog from all VLANs
+  community.general.ufw:
+    rule: allow
+    port: "{{ port_promtail_syslog }}"
+    proto: udp
+    src: "{{ item }}"
+  loop:
+    - "192.168.10.0/24"
+    - "192.168.20.0/24"
+    - "192.168.30.0/24"
+    - "192.168.40.0/24"
+    - "192.168.50.0/24"
+
+- name: Enable UFW
+  community.general.ufw:
+    state: enabled

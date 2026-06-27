@@ -1,0 +1,19 @@
+---
+# Firewall configuration for Watchtower.
+# Manages UFW rules declaratively — all rules defined in roles/ufw/tasks/main.yml.
+#
+# Run after VLAN cutover is complete and watchtower is on 192.168.30.11:
+#   cd services/watchtower/ansible
+#   ansible-playbook -i inventory.ini playbooks/firewall.yml \
+#     --vault-password-file ~/lwa-homelab/.vault_pass
+
+- name: Configure Watchtower firewall
+  hosts: watchtower
+  become: true
+
+  vars_files:
+    - "{{ playbook_dir }}/../../../../ansible/vars/main.yml"
+    - "{{ playbook_dir }}/../../../../ansible/vars/vault.yml"
+
+  roles:
+    - ufw
