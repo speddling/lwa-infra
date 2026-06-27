@@ -97,6 +97,33 @@
   loop_control:
     label: "{{ item.name }}"
 
+# ---- Phase filter -------------------------------------------------------
+# When cutover_phase is set (1 or 2), only ports matching that phase are
+# included. 'manual' ports are always excluded from automation.
+# When cutover_phase is not set (dry-run default), all non-manual ports
+# are included in the plan report but no writes occur.
+- name: Build active port list for this run
+  ansible.builtin.set_fact:
+    omada_ports_active: >-
+      {%- if cutover_phase is defined and cutover_phase | string == '1' -%}
+        {{ omada_switch_ports | selectattr('cutover_phase', 'equalto', 1) | list }}
+      {%- elif cutover_phase is defined and cutover_phase | string == '2' -%}
+        {{ omada_switch_ports | selectattr('cutover_phase', 'equalto', 2) | list }}
+      {%- else -%}
+        {{ omada_switch_ports | rejectattr('cutover_phase', 'equalto', 'manual') | list }}
+      {%- endif -%}
+
+- name: Report active phase
+  ansible.builtin.debug:
+    msg: >-
+      {% if cutover_phase is defined %}
+      PHASE {{ cutover_phase }} — applying {{ omada_ports_active | length }} port(s):
+      {{ omada_ports_active | map(attribute='device') | list }}
+      {% else %}
+      DRY-RUN — showing all {{ omada_ports_active | length }} non-manual ports
+      (port 11 / OC200 always excluded from automation)
+      {% endif %}
+
 # ---- Plan: port assignments ---------------------------------------------
 - name: Report port assignment plan
   ansible.builtin.debug:
@@ -106,7 +133,7 @@
          else ('-> profile \'' + item.profile_name + '\' '
                + ('EXISTS' if item.profile_name in omada_profile_by_name else 'MISSING PROFILE')
                + ' | ' + item.note) }}
-  loop: "{{ omada_switch_ports }}"
+  loop: "{{ omada_ports_active }}"
   loop_control:
     label: "Port {{ item.port }}"
 
@@ -206,7 +233,7 @@
     - not (item.shutdown | default(false))
     - item.profile_name is not none
     - item.profile_name in omada_profile_by_name
-  loop: "{{ omada_switch_ports }}"
+  loop: "{{ omada_ports_active }}"
   loop_control:
     label: "Port {{ item.port }} ({{ item.device }})"
 

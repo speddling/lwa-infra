@@ -26,6 +26,24 @@
 # Switch hardware identity (SG2218P MAC from the port-assign capture)
 omada_switch_mac: "A8-29-48-EB-17-EB"
 
+# =============================================================================
+# Cutover phase control
+# =============================================================================
+# Each port has a cutover_phase field:
+#   1       → Phase 1: ER605 trunk only — flip first, wait for ER605 to
+#             initialize VLAN interfaces and DHCP to come up on all scopes.
+#   2       → Phase 2: servers, APs, access ports — flip after Phase 1 is
+#             verified and DHCP is confirmed serving on each VLAN.
+#   manual  → Never automated. Apply by hand in OC200 UI after Phase 2
+#             is stable. (OC200 itself — lose controller = lose everything.)
+#
+# Usage:
+#   Dry-run all:       ansible-playbook switch_ports.yml
+#   Phase 1 apply:     ansible-playbook switch_ports.yml -e omada_apply=true -e cutover_phase=1
+#   Phase 2 apply:     ansible-playbook switch_ports.yml -e omada_apply=true -e cutover_phase=2
+#   (Port 11/OC200 is always skipped by automation — flip it manually in OC200 UI)
+# =============================================================================
+
 # -----------------------------------------------------------------------------
 # Trunk profiles to create (POST if they don't exist yet)
 # Access profiles are auto-created per VLAN — only trunks need explicit creation.
@@ -68,95 +86,111 @@ omada_switch_ports:
     name: "Port1"
     device: "ER605"
     profile_name: "ER605-Trunk"
-    note: "Gateway uplink — trunk, native Pit"
+    cutover_phase: 1
+    note: "Gateway uplink — trunk, native Pit. PHASE 1: flip first, alone."
 
   - port: 2
     name: "Port2"
     device: "monolith"
     profile_name: "Monolith-Trunk"
+    cutover_phase: 2
     note: "k8s host — trunk, native Infra"
 
   - port: 3
     name: "Port3"
     device: "watchtower"
     profile_name: "Infra"
+    cutover_phase: 2
     note: "Access VLAN 30 — DNS/AdGuard, most critical"
 
   - port: 4
     name: "Port4"
     device: "Lore"
     profile_name: "Infra"
+    cutover_phase: 2
     note: "Access VLAN 30 — future Mac inference host"
 
   - port: 5
     name: "Port5"
     device: "Data"
     profile_name: "Infra"
+    cutover_phase: 2
     note: "Access VLAN 30 — future AI workstation"
 
   - port: 6
     name: "Port6"
     device: "spare-infra"
     profile_name: "Infra"
+    cutover_phase: 2
     note: "Access VLAN 30 — spare"
 
   - port: 7
     name: "Port7"
     device: "Big Brother"
     profile_name: "IoT"
+    cutover_phase: 2
     note: "Access VLAN 40 — Reolink NVR, no PoE"
 
   - port: 8
     name: "Port8"
     device: "Reolink-1"
     profile_name: "IoT"
+    cutover_phase: 2
     note: "Access VLAN 40 — Reolink camera 1, PoE+"
 
   - port: 9
     name: "Port9"
     device: "Reolink-2"
     profile_name: "IoT"
+    cutover_phase: 2
     note: "Access VLAN 40 — Reolink camera 2, PoE+"
 
   - port: 10
     name: "Port10"
     device: "coop-run"
     profile_name: "IoT"
+    cutover_phase: 2
     note: "Access VLAN 40 — coop/run reserved, PoE+"
 
   - port: 11
     name: "Port11"
     device: "OC200"
     profile_name: "Mgmt"
-    note: "Access VLAN 10 — controller management, PoE"
+    cutover_phase: "manual"
+    note: "MANUAL ONLY — flip in OC200 UI after Phase 2 is stable and verified."
 
   - port: 12
     name: "Port12"
     device: "EAP245-Downstairs"
     profile_name: "EAP"
+    cutover_phase: 2
     note: "Trunk — native Mgmt, tags Users/IoT/Guest, PoE+"
 
   - port: 13
     name: "Port13"
     device: "EAP245-Upstairs"
     profile_name: "EAP"
+    cutover_phase: 2
     note: "Trunk — native Mgmt, tags Users/IoT/Guest, PoE+"
 
   - port: 14
     name: "Port14"
     device: "EAP225-Balcony"
     profile_name: "EAP"
+    cutover_phase: 2
     note: "Trunk — native Mgmt, tags Users/IoT/Guest (future)"
 
   - port: 15
     name: "Port15"
     device: "spare-users"
     profile_name: "Users"
+    cutover_phase: 2
     note: "Access VLAN 20 — spare"
 
   - port: 16
     name: "Port16"
     device: "unused"
     profile_name: null
+    cutover_phase: 2
     shutdown: true
     note: "Disabled"

@@ -1,0 +1,197 @@
+---
+# =============================================================================
+# LWA VLAN Cutover — Pre-flight UFW hardening
+# =============================================================================
+# Run BEFORE switch_ports phase 1. Adds VLAN subnet rules alongside existing
+# flat-network rules so both servers remain accessible throughout cutover.
+#
+# Usage:
+#   cd services/omada/ansible
+#   ansible-playbook -i inventory.cutover.ini playbooks/cutover_preflight.yml \
+#     --vault-password-file ~/lwa-homelab/.vault_pass
+#
+# IMPORTANT: Update inventory.cutover.ini with current server IPs before running.
+# =============================================================================
+
+- name: Pre-flight UFW — watchtower
+  hosts: watchtower
+  become: true
+  vars_files:
+    - "{{ playbook_dir }}/../../../ansible/vars/main.yml"
+    - "{{ playbook_dir }}/../../../ansible/vars/vault.yml"
+
+  tasks:
+    - name: Allow SSH from Users VLAN
+      community.general.ufw:
+        rule: allow
+        port: "{{ port_ssh }}"
+        proto: tcp
+        src: "192.168.20.0/24"
+
+    - name: Allow DNS from all VLAN subnets
+      community.general.ufw:
+        rule: allow
+        port: "{{ port_dns }}"
+        src: "{{ item }}"
+      loop:
+        - "192.168.10.0/24"
+        - "192.168.20.0/24"
+        - "192.168.30.0/24"
+        - "192.168.40.0/24"
+        - "192.168.50.0/24"
+
+    - name: Allow AdGuard UI from Users VLAN
+      community.general.ufw:
+        rule: allow
+        port: "{{ port_adguard_ui }}"
+        proto: tcp
+        src: "192.168.20.0/24"
+
+    - name: Allow Grafana from Users VLAN
+      community.general.ufw:
+        rule: allow
+        port: "{{ port_grafana }}"
+        proto: tcp
+        src: "192.168.20.0/24"
+
+    - name: Allow Prometheus from Infra VLAN
+      community.general.ufw:
+        rule: allow
+        port: "{{ port_prometheus }}"
+        proto: tcp
+        src: "192.168.30.0/24"
+
+    - name: Allow Netdata from Users VLAN
+      community.general.ufw:
+        rule: allow
+        port: "{{ port_netdata }}"
+        proto: tcp
+        src: "192.168.20.0/24"
+
+    - name: Allow AdGuard exporter from Infra VLAN
+      community.general.ufw:
+        rule: allow
+        port: "{{ port_adguard_exporter }}"
+        proto: tcp
+        src: "192.168.30.0/24"
+
+    - name: Allow SNMP exporter from Infra VLAN
+      community.general.ufw:
+        rule: allow
+        port: "{{ port_snmp_exporter }}"
+        proto: tcp
+        src: "192.168.30.0/24"
+
+    - name: Allow Argus MCP from Users VLAN
+      community.general.ufw:
+        rule: allow
+        port: "{{ port_argus_mcp }}"
+        proto: tcp
+        src: "192.168.20.0/24"
+
+    - name: Preflight summary — watchtower
+      ansible.builtin.debug:
+        msg: "Watchtower UFW pre-flight complete."
+
+- name: Pre-flight UFW — monolith
+  hosts: monolith
+  become: true
+  vars_files:
+    - "{{ playbook_dir }}/../../../ansible/vars/main.yml"
+    - "{{ playbook_dir }}/../../../ansible/vars/vault.yml"
+
+  tasks:
+    - name: Allow SSH from Users VLAN
+      community.general.ufw:
+        rule: allow
+        port: "{{ port_ssh }}"
+        proto: tcp
+        src: "192.168.20.0/24"
+
+    - name: Allow HTTP from Users VLAN
+      community.general.ufw:
+        rule: allow
+        port: "80"
+        proto: tcp
+        src: "192.168.20.0/24"
+
+    - name: Allow HTTPS from Users VLAN
+      community.general.ufw:
+        rule: allow
+        port: "443"
+        proto: tcp
+        src: "192.168.20.0/24"
+
+    - name: Allow Samba from Users VLAN
+      community.general.ufw:
+        rule: allow
+        port: "{{ port_samba_netbios }}"
+        proto: tcp
+        src: "192.168.20.0/24"
+
+    - name: Allow Samba 445 from Users VLAN
+      community.general.ufw:
+        rule: allow
+        port: "{{ port_samba }}"
+        proto: tcp
+        src: "192.168.20.0/24"
+
+    - name: Allow node_exporter from Infra VLAN
+      community.general.ufw:
+        rule: allow
+        port: "{{ port_node_exporter }}"
+        proto: tcp
+        src: "192.168.30.0/24"
+
+    - name: Allow ArgoCD metrics (controller) from Infra VLAN
+      community.general.ufw:
+        rule: allow
+        port: "{{ port_argocd_metrics_controller }}"
+        proto: tcp
+        src: "192.168.30.0/24"
+
+    - name: Allow ArgoCD metrics (server) from Infra VLAN
+      community.general.ufw:
+        rule: allow
+        port: "{{ port_argocd_metrics_server }}"
+        proto: tcp
+        src: "192.168.30.0/24"
+
+    - name: Allow kube-state-metrics from Infra VLAN
+      community.general.ufw:
+        rule: allow
+        port: "{{ port_kube_state_metrics }}"
+        proto: tcp
+        src: "192.168.30.0/24"
+
+    - name: Allow Synapse MCP from Users VLAN
+      community.general.ufw:
+        rule: allow
+        port: "{{ port_synapse_mcp }}"
+        proto: tcp
+        src: "192.168.20.0/24"
+
+    - name: Allow ArgoCD NodePort from Users VLAN
+      community.general.ufw:
+        rule: allow
+        port: "{{ port_argocd_nodeport }}"
+        proto: tcp
+        src: "192.168.20.0/24"
+
+    - name: Allow Obelisk RDP from Users VLAN
+      community.general.ufw:
+        rule: allow
+        port: "{{ port_obelisk_rdp }}"
+        proto: tcp
+        src: "192.168.20.0/24"
+
+    - name: Allow Obelisk metrics from Infra VLAN
+      community.general.ufw:
+        rule: allow
+        port: "{{ port_obelisk_metrics }}"
+        proto: tcp
+        src: "192.168.30.0/24"
+
+    - name: Preflight summary — monolith
+      ansible.builtin.debug:
+        msg: "Monolith UFW pre-flight complete."
