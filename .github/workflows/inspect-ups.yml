@@ -1,0 +1,54 @@
+name: Inspect UPS and shutdown prerequisites
+
+on:
+  pull_request:
+    branches: [master]
+    paths:
+      - 'scripts/ups/**'
+      - '.github/workflows/inspect-ups.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check Python syntax without executing host inspection
+        run: python -m py_compile scripts/ups/discover.py
+
+  inspect:
+    needs: validate
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - host: monolith
+            address: 192.168.30.10
+            runner_user: gh-runner
+          - host: watchtower
+            address: 192.168.30.11
+            runner_user: speddling
+    runs-on: [self-hosted, '${{ matrix.host }}']
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify runner identity
+        env:
+          EXPECTED_HOST: ${{ matrix.host }}
+          EXPECTED_USER: ${{ matrix.runner_user }}
+        run: |
+          test "$(hostname -s)" = "$EXPECTED_HOST"
+          test "$(id -un)" = "$EXPECTED_USER"
+      - name: Inspect through the existing speddling SSH login
+        env:
+          TARGET_ADDRESS: ${{ matrix.address }}
+          TARGET_HOST: ${{ matrix.host }}
+        run: |
+          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes \
+            -o ConnectTimeout=10 -o IdentitiesOnly=yes \
+            -i "$HOME/.ssh/id_ed25519" "speddling@$TARGET_ADDRESS" \
+            "sudo -n /usr/bin/python3 - '$TARGET_HOST'" < scripts/ups/discover.py

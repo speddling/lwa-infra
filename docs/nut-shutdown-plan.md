@@ -32,6 +32,23 @@ Coordination semantics: [NUT upsmon.conf](https://networkupstools.org/docs/man/u
 Use directives supported by the installed Ubuntu package version, not newer
 directives merely because they appear in upstream documentation.
 
+## Read-only discovery
+
+After merging the inspection workflow, run **Inspect UPS and shutdown prerequisites**
+(`inspect-ups.yml`) from `master`. It runs on each host's existing runner:
+Monolith process user `gh-runner`, Watchtower process user `speddling`. Both use
+that runner's existing SSH key and strict host trust to log in remotely as
+`speddling`, then use noninteractive sudo for inspection.
+
+The workflow reports installed package versions, NUT service state, USB model/IDs,
+available UPS status/load/runtime telemetry, and Construct shutdown/control
+configuration. It installs nothing, reads no vault or NUT credential files, and
+sends no power-control commands. Missing tools or unavailable telemetry appear
+explicitly in the JSON report; a green workflow means inspection completed, not
+that shutdown protection is working. Review each command's exit status/error.
+The two inspection jobs can run independently; neither requires cross-host SSH
+from Construct. PR validation executes only Python compilation on a hosted runner.
+
 ## Gaps to resolve before activation
 
 1. Network battery coverage is owner-confirmed. Inspect USB detection and
