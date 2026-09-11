@@ -43,7 +43,11 @@ added firewall rules are not automatically removed by these additive rules.
    install, configure or remove it.
 4. The Monolith runner's `gh-runner` account needs its existing SSH key authorized
    for `speddling` on both Monolith and Construct, passwordless sudo on both,
-   and trusted known-host entries for `192.168.30.10` and `[127.0.0.1]:2222`.
+   and a trusted known-host entry for `192.168.30.10`.
+   Construct uses the ED25519 public host key pinned in
+   `services/construct/ansible/files/construct_known_hosts`, read directly from
+   the guest on 2026-09-11. The pin applies only to `[127.0.0.1]:2222`; a future
+   rebuild requires verifying and committing the replacement public key.
    Ansible must already be installed (the Monolith deploy installs it).
 5. Dispatch **Retire Tailscale and wmux** from `master`, checking
    `lan_ssh_verified` only after step 2. It runs

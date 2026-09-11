@@ -1,0 +1,2 @@
+# Construct host key read locally on 2026-09-11; update explicitly after a VM rebuild.
+[127.0.0.1]:2222 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFtgrcH9j7x1pyMTn4vqGiHcS7JzHgbEzTI8RR73ySyP
