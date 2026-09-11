@@ -1,5 +1,5 @@
 # LWA Infra -- Obelisk Runbook
-> Last updated: 2026-07-09
+> Status updated: 2026-09-11; setup details below are historical.
 
 **Host:** monolith (`192.168.30.10`)
 **Guest:** Windows 11 Pro (Build 26200)
@@ -11,11 +11,11 @@
 
 ## Current State
 
-Manually installed and configured. QEMU/KVM process on monolith, not managed by KubeVirt. Systemd service pending.
+Owner confirmed 2026-09-11: Obelisk still exists, is unused and is no longer needed. Decommissioning is pending a retention decision; no disk deletion is authorized by this status update. Historical setup was manual QEMU/KVM on Monolith, not KubeVirt.
 
 ---
 
-## How It's Running
+## Historical launch configuration (not a request to start it)
 
 Plain QEMU/KVM process on monolith. No Kubernetes involvement in VM lifecycle.
 
@@ -126,7 +126,7 @@ netsh advfirewall firewall add rule name="RDP" protocol=TCP dir=in localport=338
 
 ---
 
-## TODO
+## Historical TODO — superseded by decommission planning
 
 > **Client contract compliance items** (MFA, connection encryption, access logging, breach notification, certificate of destruction on termination) tracked in Plane → "Client Contract — Security & Compliance". The "inbound RDP from internet" item below should wait until those are done.
 

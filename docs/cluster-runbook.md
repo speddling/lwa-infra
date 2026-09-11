@@ -1,6 +1,6 @@
 # LWA Infra -- Cluster Runbook
 > Operational reference for k3s, ArgoCD, cert-manager, DNS, Ansible, Terraform, and supporting services.
-> Last updated: 2026-07-09
+> Documentation audit: 2026-09-11; verify executable configuration before applying historical commands.
 
 > Access update (2026-09-11): Construct uses SSH through Monolith TCP 2222.
 > Tailscale on Monolith/Construct and wmux on Construct are being retired via
@@ -26,7 +26,7 @@
 
 ### Rotating Repository Credentials
 
-ArgoCD pulls manifests from `speddling/lwa-homelab` using a GitHub fine-grained PAT
+ArgoCD pulls manifests from `speddling/lwa-infra` using a GitHub fine-grained PAT
 stored in `ansible/vars/vault.yml` as `vault_argocd_github_token`.
 
 **Normal rotation procedure:**
@@ -34,7 +34,7 @@ stored in `ansible/vars/vault.yml` as `vault_argocd_github_token`.
 ```bash
 # 1. Generate a new fine-grained PAT at:
 #    GitHub → Settings → Developer Settings → Fine-grained tokens → Generate new token
-#    Repository: speddling/lwa-homelab only
+#    Repository: speddling/lwa-infra only
 #    Permission: Contents → Read
 #    Expiration: No expiration (preferred)
 
@@ -100,7 +100,7 @@ host right now**, so check before assuming:
 | Host | Runner process user |
 |---|---|
 | monolith | `gh-runner` |
-| watchtower | `speddling` (inconsistent — should be `gh-runner` too; tracked in Plane) |
+| watchtower | `speddling` (owner confirmed 2026-09-11; do not assume `gh-runner`) |
 
 ```bash
 # Check which user actually owns it, don't assume:
@@ -118,6 +118,20 @@ ssh-keygen -R 192.168.30.11
 ssh -i ~/.ssh/id_ed25519 speddling@192.168.30.11 hostname   # accept new key, confirm "watchtower"
 gh workflow run deploy-watchtower.yml
 ```
+
+### Runner identity versus SSH identity
+
+The Monolith runner process is `gh-runner`; the Watchtower runner process is
+`speddling`. Main inventories log in remotely as `speddling`, then use sudo.
+Client key/trust failures concern the runner account; server-side authorization
+concerns the remote account's `authorized_keys`. Verify all three identities
+before changing files. Legacy fileserver inventory uses a different login and
+old address; inspect its actual configuration rather than extrapolating.
+
+For Construct retirement, the Monolith runner uses its key to log in as
+`speddling` through `[127.0.0.1]:2222`. The pinned host key solved host trust;
+the next run failed public-key authentication. Neither failed run changed hosts.
+See `construct-runbook.md` for prerequisites; do not disable host-key checking.
 
 ### Common Operations
 
@@ -668,12 +682,17 @@ dashboard not in the managed UID set. Add new dashboards to the Ansible grafana 
 
 ---
 
-## NUT — When UPS Arrives
+## NUT — Installed hardware, software review pending
 
-1. Connect CyberPower CP1000PFCLCD via USB to Watchtower
-2. Run monitoring playbook — NUT role activates automatically (`nut_enabled: true` in vars)
-3. Verify: `systemctl status nut-server nut-monitor`
-4. Check UPS status: `upsc cyberpower@localhost`
+The owner confirmed on 2026-09-11 that the UPS is installed and its USB cable is
+connected to Watchtower. `nut_enabled` is still false. Do not assume that plugging
+in USB activated monitoring or shutdown protection.
+
+Before enabling the role, confirm the actual model and USB detection, resolve
+`nut_monitor_password` versus `vault_nut_monitor_password`, validate the exporter,
+and agree the shutdown policy and which devices are battery-backed. The current
+role configures Watchtower shutdown and does not coordinate Monolith shutdown.
+
 
 ---
 

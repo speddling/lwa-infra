@@ -1,234 +1,156 @@
-# LWA Infra -- Architecture Overview
-> Last updated: 2026-07-07
+# LWA Infra — Architecture
 
-> Access update (2026-09-11): Construct uses SSH through Monolith TCP 2222.
-> Tailscale on Monolith/Construct and wmux on Construct are being retired via
-> the manual `retire-remote-access.yml` workflow after LAN SSH verification.
-> See `docs/construct-runbook.md` for the current procedure; older Tailscale
-> deployment references below are historical, not instructions to reinstall it.
+Documentation audit: 2026-09-11. This describes repository declarations and dated
+operator confirmations, not a new live survey. See `homelab-state.md` for addressing
+and migration status; verify addresses against fresh Omada evidence before changes.
 
----
+## Hosts and failure domains
 
-## Network Topology
+- **Monolith:** Ubuntu, Ryzen 5700G, 64 GB RAM. Single k3s node, Samba, Construct
+  and the unused Obelisk Windows VM. Its CI runner process runs as `gh-runner`.
+- **Watchtower:** Ubuntu, Celeron mini-PC, 8 GB RAM. DNS and monitoring remain
+  outside k3s. Its CI runner process runs as `speddling`.
+- **Apex:** M4 MacBook Air workstation and documented local Ollama/AI tooling.
+- **Studio:** Dell Precision workstation/DAW. WiFi on Users; wired dock on Mgmt
+  provides a separate emergency access path.
+- **Construct:** Debian 12 QEMU/KVM VM on Monolith, systemd lifecycle, 8 vCPUs,
+  16 GB RAM and 80 GB disk. Development authoring also happens here. Herdr is
+  installed separately from the retired-in-design wmux browser terminal.
+- **Obelisk:** QEMU/KVM Windows VM still present, unused and no longer needed
+  according to the owner (2026-09-11). Decommissioning awaits retention review.
 
-```
-Internet
-    │
-    ├── T-Mobile FAST 5688W (5G WAN1)
-    │
-    └── AT&T CGW450 (5G WAN2, separate cellular network — installed and running)
-            │
-            │   (both WAN1 and WAN2 terminate here — dual-WAN load-balanced.
-            │    WAN2 monitored via SNMP on the ER605 itself — ifIndex 1026 = AT&T/WAN2,
-            │    1027 = T-Mobile/WAN1, no separate exporter needed for either)
-            ▼
-        ER605 v2 (192.168.10.1 — Mgmt VLAN)
-        Multi-WAN VPN Router
-            │
-        SG2218P (192.168.10.102 — managed PoE+ switch)
-            │
-    ┌───────┼───────────────────────────┐
-    │       │                           │
-EAP245   EAP245                    Wired LAN
-(Upstairs (Downstairs
- Hall)     Hall)
-                    ┌───────────────────┼───────────────────┐
-                    │                   │                   │
-              apex (.20.2)       monolith (.30.10)   watchtower (.30.11)
-         MacBook Air M4        AMD Ryzen 7 5700G     Asus VM40B
-         16GB unified          64GB DDR4             8GB DDR3
-         Users VLAN, WiFi      k3s node, Infra       DNS + Monitoring, Infra
+The UPS is installed and USB-connected to Watchtower (owner confirmation,
+2026-09-11). NUT's role is disabled; working monitoring and shutdown behavior have
+not been established. Which equipment uses battery-backed outlets needs confirmation.
 
-                                                  studio (.20.3 WiFi / .10.7 wired dock)
-                                             Dell Precision 5560
-                                             DAW / KDE workstation, Users VLAN
+## Network and DNS
 
-            Big Brother NVR (.40.10, IoT VLAN, wired to SG2218P port 7)
-```
+T-Mobile FAST 5688W and AT&T CGW450 cellular WANs terminate on the Omada ER605.
+The SG2218P provides managed switching/PoE, OC200 control, and two EAP245s WiFi.
+Outdoor EAP225 installation is deferred. The old unmanaged switch is decommissioned.
 
-> TL-SG1210P (the old unmanaged switch) is decommissioned — disconnected, sitting in the spare-parts pile, not part of the live topology above.
+Documented VLAN state: Mgmt 10, Users 20 and wired Infra 30 are stable; IoT 40
+has the NVR; Guest 50 and blackhole/native 999 remain planned. Router policy is
+managed manually today: the Omada role only exports sites/device inventory.
 
----
+LAN DNS: AdGuard Home on Watchtower → Unbound → recursive root resolution.
+AdGuard rewrites are Ansible-managed. Cloudflare is authoritative for
+`littlewolfacres.com` and supplies DNS-01 challenges. Public DNS-only records
+for internal services may intentionally point to LAN addresses; records do not
+create network access. Do not assume every service is publicly exposed.
 
-## Control Plane Flow
+Construct's QEMU NAT network uses guest `10.0.2.15` with host port 2222 forwarded
+to guest SSH port 22. Apex/Studio access `monolith:2222`; a client SSH alias can
+name this `construct`. A dedicated guest LAN IP is deferred. Removal of Tailscale
+on both hosts and wmux on Construct is pending successful retirement workflow
+execution. ER605 WireGuard remains a separate deferred design.
 
-```
-apex (author)
-    │
-    ├── git push → GitHub (speddling/lwa-homelab)
-    │       │
-    │       ├── GitHub Actions (self-hosted runners on monolith + watchtower)
-    │       │       ├── deploy-watchtower.yml  → Ansible → watchtower
-    │       │       ├── deploy-monolith.yml    → Ansible → monolith
-    │       │       └── rotate-argocd-credentials.yml → monolith
-    │       │
-    │       └── ArgoCD (monolith) watches master
-    │               └── reconciles k8s workloads from repo
-    │
-    └── Ansible (manual, apex-local)
-            ├── services/apex/ansible/     → localhost (apex services)
-            └── services/monolith/ansible/ → monolith (via SSH)
+## Authoring through production
+
+```text
+Apex or Construct: inspect → branch → edit → validate → PR
+                                           │
+                                    human review/merge
+                                           │
+                                  GitHub master revision
+                                  /                    \
+              path-filtered Actions                 ArgoCD reconciliation
+              Ansible / kubectl                     root apps → children
+              host config / bootstrap               Kubernetes resources
+                                  \                    /
+                              verify deployed behavior
 ```
 
----
+No staging/promotion environment is declared. Merge can deploy to production
+immediately. Scribe is a documented git mechanism; the branch/PR/human-merge
+workflow is the requirement, not permanent use of that mechanism.
 
-## Monolith — k3s Cluster
+| Context | Local process | Remote login / privilege |
+|---|---|---|
+| Monolith runner | `gh-runner` | Main Ansible inventory: SSH `speddling`, then sudo |
+| Watchtower runner | `speddling` | Main Ansible inventory: SSH `speddling`, then sudo |
+| Retirement on Monolith runner | `gh-runner` | SSH `speddling` to Monolith LAN and Construct loopback forward, then sudo |
+| Synapse image build | GitHub-hosted runner | Builds/pushes GHCR image; Monolith handles deployment |
 
-```
-monolith (192.168.30.10)
-│
-├── Traefik (ingress, TLS termination)
-│       ├── argocd.littlewolfacres.com   → ArgoCD
-│       └── navidrome.littlewolfacres.com → Navidrome
-│
-├── cert-manager (Let's Encrypt via Cloudflare DNS-01)
-│
-├── ArgoCD (GitOps controller)
-│       Manages: navidrome · minecraft · synapse · plane · cert-manager · kube-state-metrics
-│
-├── KubeVirt + CDI (bootstrapped, not yet used — Obelisk still runs as a bare QEMU/KVM process below, not a KubeVirt VirtualMachine)
-│
-├── Navidrome (music streaming)          namespace: navidrome
-├── Minecraft Bedrock                    namespace: minecraft   NodePort :30132 UDP
-├── Synapse MCP                          namespace: synapse     NodePort :30800 TCP
-│
-├── kube-state-metrics                   → Prometheus on watchtower
-│
-└── Bare-metal (not k8s)
-        ├── Obelisk (Win11 VM)          QEMU/KVM process, RDP :33389, metrics :39182
-        └── Samba
-                ├── vault          → /mnt/ssd-b/vault
-                ├── studio-archive → /mnt/hdd-c/studio-archive
-                └── music-library  → /mnt/hdd-c/music-library  ← Navidrome source
-```
+Known-hosts files and client private keys belong to the local runner process
+user. `authorized_keys` belongs to the remote login account. Do not conflate
+these with root privileges used by individual tasks. Some PR validation jobs
+install packages and write vault-password files on the production runners.
 
-### Monolith Storage
+## Kubernetes and deployment ownership
 
-```
-/           512GB NVMe  (Samsung PM9A1)   OS + k3s
-/mnt/ssd-a  500GB SSD   (Crucial)         k8s local-path provisioner (PVCs)
-/mnt/ssd-b  256GB SSD   (Crucial)         Obelisk workspace (reserved) + vault share
-/mnt/hdd-c  3.6TB HDD   (Seagate)         Music library + bulk storage
-/mnt/hdd-d  1.8TB HDD   (Hitachi)         Mirror of hdd-c (nightly rsync 02:00)
-```
+The root ArgoCD Application watches `kubernetes/apps/` on `master`. Ten child
+Applications declare Navidrome, Jellyfin, Kavita, Minecraft, Synapse, Firecrawl,
+Plane, kube-state-metrics, cert-manager configuration and ArgoCD configuration.
+Automated pruning/self-healing and Application deletion finalizers are enabled.
+Deleting manifests can delete live resources; manual changes can be reverted.
 
----
+Traefik handles ingress/TLS. Bootstrap pins ArgoCD v3.3.0 and cert-manager
+v1.20.2 controller/CRD installations; the cert-manager Application owns local
+configuration such as ClusterIssuers, not the upstream installation itself.
 
-## Watchtower — DNS + Monitoring Stack
+Direct Actions applies remain for media applications, Synapse, Firecrawl and
+kube-state-metrics. Plane uses a remote Helm chart with generated secrets and
+a separately bootstrapped Certificate. That Certificate is also inside the root
+Application's watched directory, so bootstrap-only ownership is not established.
+Plane's `WEB_URL` and ArgoCD repo-secret data have deliberate ignore-difference
+exceptions; preserve those until their original causes are resolved.
 
-```
-watchtower (192.168.30.11)
-│
-├── DNS
-│       AdGuard Home (:53, :3000)
-│           └── Unbound (:5335) → Root DNS servers
-│
-└── Monitoring
-        Prometheus (:9090)
-            ├── scrapes: watchtower · monolith · argocd-app-controller · argocd-server · kube-state-metrics
-            ├── scrapes: snmp_exporter (ER605, SG2218P, EAP245×2)
-            ├── scrapes: blackbox_exporter (HTTP/ICMP probes)
-            ├── scrapes: adguard_exporter · tmobile_exporter · reolink_exporter
-            ├── scrapes: loki · promtail
-            └── fires alerts → Alertmanager (:9093) → Slack #sentinel + healthchecks.io watchdog
+Monolith Terraform declares a k3s-installing `null_resource` using `local-exec`.
+Watchtower Terraform has only its cloud backend. Verify Terraform execution
+placement and the existing datastore arguments before reusing provisioning.
 
-        Loki (:3100) + Promtail (:9080)
-            ├── sources: Watchtower systemd journal
-            └── sources: ER605 syslog on :1514 (not yet wired — pending ER605 config)
+## Storage and recovery
 
-        Grafana (:3001)  [display only — Alertmanager owns alerting]
-            Dashboards: Node Exporter Full · Blackbox Probes · k3s Cluster
-                        SNMP Interfaces · T-Mobile 5G Gateway · Reolink NVR
-            Loki datasource added manually (not Ansible-provisioned)
+- NVMe: host OS and Construct's `/vm/construct` LV (`ubuntu-vg`).
+- `/mnt/ssd-a`: k3s local-path PVCs, tied to Monolith.
+- `/mnt/ssd-b`: Obelisk artifacts and Samba vault share.
+- `/mnt/hdd-c`: music/media and bulk data.
+- `/mnt/hdd-d`: nightly rsync mirror with `--delete`, smaller than the source.
 
-        Netdata (:19999)  real-time host observability
-```
+Shared variables currently place the Studio archive at `/mnt/lab-backups`,
+while historical docs place it on HDD-C. Treat that discrepancy as unresolved.
+No complete off-host/versioned recovery chain for VMs, PVCs and Plane secrets is
+established here. The deleting mirror does not supply historical recovery.
 
----
+Construct provisioning is destructive even with the documented cloud-init tag.
+Use the separate retirement playbook for access changes; do not invoke bootstrap
+against a VM that must be preserved. Obelisk is not managed by KubeVirt/ArgoCD;
+the legacy KubeVirt workflow remains dispatchable but references deleted manifests.
 
-## DNS Resolution Chain
+## Observability
 
-```
-LAN client
-    │
-    └── AdGuard Home (watchtower :53)
-            ├── Local rewrites (*.littlewolfacres.com → LAN IPs)
-            ├── Ad/tracker blocking
-            └── Unbound (watchtower :5335)
-                    └── Root DNS servers (recursive, no upstream forwarder)
+Watchtower runs Prometheus, Alertmanager, Grafana, Loki, Promtail, Netdata and
+exporters as systemd services. Kubernetes object/ArgoCD metrics are exposed via
+NodePorts on Monolith. SNMP covers router, switch and AP interfaces; custom
+exporters cover T-Mobile and Reolink. Endpoint probes add reachability checks.
 
-Public DNS: Cloudflare
-    ├── Authoritative for littlewolfacres.com
-    ├── LAN fallback if AdGuard unreachable
-    └── DNS-01 challenge provider for cert-manager (Let's Encrypt)
-```
+Prometheus evaluates alerts; Alertmanager routes to Slack and an external
+healthchecks.io watchdog. A separate systemd timer sends morning/evening summaries
+and pings its own healthcheck. Grafana alerting is disabled and unmanaged dashboards
+are purged during deployment. The Loki datasource still requires manual provisioning.
+Promtail declares Watchtower journal collection and UDP network syslog on 1514;
+live device forwarding must be checked before claiming logs are arriving.
 
----
+## Secrets and AI boundaries
 
-## AI / MCP Layer
+Ansible Vault holds encrypted shared secrets; Actions injects its password into
+runner-local files. Other credentials come from GitHub secrets, generated cluster
+Secrets (Plane), and workstation-local MCP configuration. Firecrawl includes
+literal Secret `stringData` in git, so not all credential-shaped values are vaulted.
+Bootstrap logs and rendered secret-bearing files require separate review.
 
-```
-Claude (apex)
-    │
-    ├── Synapse MCP (monolith :30800)  ← read-only
-    │       k3s pod state · Prometheus metrics · Alertmanager alerts · monolith filesystem
-    │
-    ├── Scribe MCP (apex :8765)        ← write (git only)
-    │       branch · stage · commit · push · open PRs
-    │       branch protection + path allowlist enforced at server level
-    │
-    ├── Argus MCP (watchtower :9800)   ← read-only
-    │       Alertmanager config · Prometheus config · systemd state · journald logs
-    │
-    └── Atlas MCP (apex, local stdio subprocess — no port)  ← write, UNSCOPED
-            official makeplane/plane-mcp-server via uvx · 100+ tools, 20 modules
-            full account permissions of the token holder — no branch-protection equivalent
+Synapse has read-only Kubernetes RBAC, logs and mounted filesystem reads. Argus
+has read-only monitoring APIs, config/journal access and a dedicated service user.
+These read surfaces can expose sensitive data. Documentation's apex-only Argus
+boundary conflicts with the LAN-wide UFW source currently declared.
 
-B-4 (apex ~/B-4/)
-    └── Ollama (Metal backend, 16GB unified)
-            ├── gemma4     (~12GB)  Claude Code integration
-            └── llama3.2:3b (~2GB)  direct chat
-```
+Scribe guards git branches and paths but uses its process user's credentials.
+Its current location/use and Zombatron's location/use await operator confirmation:
+the repo contains Apex launchd deployment, not their asserted Construct migration.
+Atlas uses a Plane account token with broad mutation permissions. Plane records
+obligations and incidents; the repository declares infrastructure configuration.
 
----
-
-## CI/CD Pipelines
-
-This table is GitHub Actions workflows specifically (trigger → runner → target). ArgoCD isn't a workflow, it's a continuously-running GitOps controller with no "trigger" in this sense, it's covered separately: see **Control Plane Flow** above for how a git push reaches it, and **Monolith — k3s Cluster** above for what it manages.
-
-| Workflow | Trigger | Runner | Target |
-|---|---|---|---|
-| `deploy-watchtower.yml` | Push to master (`services/watchtower/**`, `terraform/watchtower/**`, `ansible/vars/**`) | watchtower | Ansible → watchtower |
-| `deploy-monolith.yml` | Push or PR to master (`services/monolith/ansible/**`, `ansible/vars/**`) | monolith | Ansible → monolith |
-| `deploy-fileserver.yml` | Manual | monolith | Ansible → monolith |
-| `deploy-synapse.yml` | Push to master | monolith | Ansible → monolith |
-| `deploy-k3s-manifests.yml` | Push to master (`kubernetes/manifests/**`) | monolith | kubectl → k3s manifests |
-| `deploy-navidrome.yml` | Manual | monolith | Ansible/kubectl → Navidrome |
-| `deploy-mirror.yml` | Push to master (`services/monolith/ansible/roles/mirror-hdd/**`) | monolith | Ansible → hdd-c/hdd-d mirror systemd timer |
-| `deploy-reolink-exporter.yml` | Push to master or manual (`services/watchtower/ansible/roles/reolink_exporter/**`) | watchtower | Ansible → reolink_exporter |
-| `deploy-tmobile-exporter.yml` | Push to master or manual (`services/watchtower/ansible/roles/tmobile_exporter/**`) | watchtower | Ansible → tmobile_exporter |
-| `bootstrap-argocd.yml` | Manual (once) | monolith | cert-manager + ArgoCD install |
-| `bootstrap-kubevirt.yml` | Manual (once, unrun) | monolith | KubeVirt + CDI install, provisions Obelisk as a KubeVirt VM |
-| `bootstrap-plane.yml` | Push to master (`kubernetes/apps/plane.yaml`) or manual | monolith | Generates Plane secrets; idempotent no-op if they already exist |
-| `provision-k3s.yml` | Manual | monolith | k3s cluster init |
-| `rotate-argocd-credentials.yml` | Manual + quarterly | monolith | PAT rotation |
-| `import-minecraft-world.yml` | Manual (`confirm: yes`) | monolith | Ansible + pod bounce |
-| `slack-minecraft-import.yml` | Zombatron Importer (GitHub API) | monolith | Clear marker + pod bounce |
-
-> Apex services (Scribe, Zombatron Importer) deploy manually from apex — no inbound SSH, no CI runner.
-
----
-
-## Secrets Management
-
-```
-ansible/vars/vault.yml          ← Ansible Vault (AES-256)
-    │   All IPs, ports, passwords, tokens, community strings
-    │
-    ├── .vault_pass             ← local file on apex (gitignored)
-    └── GitHub Actions secrets  ← VAULT_PASSWORD injected at runtime
-
-ArgoCD repo secret (homelab-repo)
-    └── Fine-grained GitHub PAT — managed out-of-band, never via ArgoCD sync
-        Rotation: rotate-argocd-credentials.yml (quarterly + manual)
-```
+B-4/Ollama on Apex is documented, but no reproducible local inference deployment
+or current model inventory is managed by this repo. Do not infer that all earlier
+model names or endpoints are still active.

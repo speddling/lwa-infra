@@ -1,5 +1,6 @@
 # LWA Infra -- Current State
-> Last updated: 2026-08-04
+> Documentation audit: 2026-09-11. Historical running/up tables below are not a fresh live survey.
+> New operator confirmations: UPS installed and USB-connected to Watchtower; Obelisk still exists but is unused and no longer needed.
 
 ---
 
@@ -38,7 +39,7 @@ The original plan was a single 60-minute cutover across all 5 VLANs at once. Thr
 | watchtower | 192.168.30.11 | Infra (30) | DNS / Monitoring |
 | Big Brother NVR | 192.168.40.10 | IoT (40) | NVR, wired to SG2218P port 7 |
 | Brother HL-L3290CWD printer | 192.168.20.103 | Users (20), temporary | Will move to IoT once its WiFi SSID exists |
-| CyberPower CP1000PFCLCD | -- | -- | UPS |
+| CyberPower CP1000PFCLCD (documented model) | USB to Watchtower | -- | Installed; USB connection confirmed by owner 2026-09-11 |
 
 > Note the final Mgmt addressing (.10.100-.102 for switch/APs) differs from the original migration plan (.10.2, .10.4, .10.5) -- it settled differently during the manual rebuild. Functionally equivalent, just don't cross-reference the old plan's specific numbers.
 
@@ -212,7 +213,7 @@ DNS resolution and infrastructure monitoring.
 | State | Terraform Cloud (`littlewolfacres` org, `watchtower` workspace) | app.terraform.io |
 | Config | Ansible | `services/watchtower/ansible/` |
 | Pipeline | GitHub Actions | `.github/workflows/deploy-watchtower.yml` |
-| Runner | Self-hosted, label: `watchtower` | Installed as systemd service. Runs as `speddling` currently -- should be `gh-runner` for consistency with monolith, tracked in Plane. |
+| Runner | Self-hosted, label: `watchtower` | Installed as systemd service; runs as `speddling` (owner confirmed 2026-09-11). Do not substitute Monolith's `gh-runner` account when troubleshooting this host; no account migration is part of this audit. |
 
 ---
 
@@ -256,7 +257,7 @@ k3s single-node cluster host. Runs all household and client services.
 | Name | Status | Description |
 |---|---|---|
 | Synapse | ✅ Active | MCP/AI tooling namespace |
-|| Obelisk | ⚠️ Deprecated (Windows 11 VM on `/mnt/ssd-b` -- QEMU/KVM. RDP: `192.168.30.10:33389`. Scheduled for decommission at end-of-month upgrades) |
+| Obelisk | ⚠️ Present but unused; owner confirms no longer needed (2026-09-11). QEMU/KVM on `/mnt/ssd-b`; decommission pending retention review |
 | Construct | ✅ Active | Debian 12 dev VM on NVMe `/vm/construct` -- QEMU/KVM. SSH: `monolith:2222` (client alias `construct`) |
 
 ### Services
@@ -271,7 +272,7 @@ k3s single-node cluster host. Runs all household and client services.
 | node_exporter | Host metrics | ✅ Running |
 | Synapse | MCP server | ✅ Running |
 | hdd-d mirror | Nightly rsync hdd-c -> hdd-d via systemd timer at 02:00 | ✅ Running |
-|| Obelisk | QEMU/KVM Win11 VM -- RDP `192.168.30.10:33389` | ⚠️ Deprecated (scheduled for decommission at end-of-month upgrades) |
+| Obelisk | QEMU/KVM Win11 VM -- RDP `192.168.30.10:33389` | ⚠️ Present but unused; decommission pending retention review |
 | Construct | QEMU/KVM Debian 12 dev VM -- SSH `monolith:2222` | ✅ Running |
 | Plane | Project management -- `plane.littlewolfacres.com` | ✅ Running (via ArgoCD) |
 
@@ -318,7 +319,7 @@ k3s single-node cluster host. Runs all household and client services.
 
 ## ArgoCD
 
-GitOps controller for k3s. Watches `speddling/lwa-infra` on `master` and reconciles all k8s workloads.
+GitOps controller for k3s. Watches `speddling/lwa-infra` on `master` and reconciles the declared Applications. Direct workflow applies overlap with several Applications; upstream controller installations and some secrets are bootstrapped separately.
 
 ### Access
 
@@ -340,6 +341,8 @@ GitOps controller for k3s. Watches `speddling/lwa-infra` on `master` and reconci
 | App | Source Path | Namespace |
 |---|---|---|
 | navidrome | `services/navidrome/kubernetes/` | navidrome |
+| jellyfin | `services/jellyfin/kubernetes/` | jellyfin |
+| kavita | `services/kavita/kubernetes/` | kavita |
 | firecrawl | `services/firecrawl/kubernetes/` | firecrawl |
 | minecraft | `services/minecraft/kubernetes/` | minecraft |
 | synapse | `services/synapse/kubernetes/` | synapse |
@@ -437,11 +440,11 @@ Automatic TLS via Cloudflare DNS-01. Issues and renews Let's Encrypt certificate
 | Hostname | `apex` |
 | IP | 192.168.20.2 (Users VLAN, WiFi) |
 
-Apex has transitioned to a pure workstation role — no longer runs self-hosted services. Scribe MCP and Zombatron Importer have migrated to the **Construct VM** under `services/construct/ansible/roles/`.
+Apex is the primary workstation. Earlier documentation claimed Scribe and Zombatron migrated to Construct, but only Apex launchd deployment code exists in this checkout. Current runtime location and continued use await owner confirmation.
 
 | Service | Port | Status |
 |---|---|---|
-| None | -- | Pure workstation (DAW, AI development) |
+| Scribe / Zombatron | 8765 / Socket Mode | Deployment code exists for Apex; live status unconfirmed |
 
 ---
 
@@ -452,14 +455,14 @@ Apex has transitioned to a pure workstation role — no longer runs self-hosted 
 | Hostname | `construct` |
 | Type | Debian 12 VM, QEMU/KVM on Monolith (NVMe `/vm/construct`) |
 | SSH | `monolith:2222` (port-forward), client alias `construct` |
-| Access transition | Tailscale and wmux retirement pending manual workflow; see `construct-runbook.md` |
+| Access transition | Workstation SSH verified; retirement blocked by runner-key authorization on Construct as of 2026-09-11. Neither host changed by the failed runs; see `construct-runbook.md` |
 
 | Service | Port | Status |
 |---|---|---|
-| Scribe MCP | 8765 | ✅ Running |
-| Zombatron Importer | Socket Mode | ✅ Running |
+| Scribe MCP | 8765 | Construct placement unconfirmed |
+| Zombatron Importer | Socket Mode | Construct placement unconfirmed |
 
-Scribe MCP and Zombatron Importer migrated here from Apex when Apex became a pure workstation.
+`services/construct/ansible/` contains the access-retirement workflow, not deployment roles for Scribe or Zombatron.
 
 ---
 
@@ -474,3 +477,32 @@ Scribe MCP and Zombatron Importer migrated here from Apex when Apex became a pur
 | Mount | Source |
 |---|---|
 | `/music-library` | `//monolith/music-library` (CIFS) |
+
+---
+
+## Audit boundaries and unresolved state (2026-09-11)
+
+- **Runner identities:** Monolith Actions runs as `gh-runner`; Watchtower Actions
+  runs as `speddling`. Main inventories SSH as `speddling`, then use sudo. Inspect
+  the runner user's key/trust files for client-side SSH failures, not the target
+  account's files. Construct trusts a separately pinned host key for the port forward.
+- **UPS:** hardware is installed and USB-connected. `nut_enabled` remains false.
+  Do not infer active monitoring or shutdown protection. The role's model text,
+  password variable mapping, exporter configuration and shutdown policy need review.
+- **Firewall:** UFW tables above include historical live rules. The current
+  Monolith role lacks the documented Studio dock, broad temporary SSH and Minecraft
+  rules; absence from an additive role does not prove absence from the host.
+  Watchtower's Argus rule is LAN-wide, contrary to the apex-only table. Its normal
+  deploy workflow does not invoke the firewall playbook. Verify before changing access.
+- **Storage:** `studio_share_path` in shared variables points to
+  `/mnt/lab-backups/studio-archive`, conflicting with the historical HDD-C table.
+  Resolve the actual mount and data location before a fileserver deployment.
+- **Recovery:** HDD-D is a deleting mirror of HDD-C, not versioned backup history.
+  Its capacity is smaller. Complete automated recovery of Construct, cluster PVCs
+  and Plane's generated secrets is not established in this repository.
+- **Omada:** current automation exports inventory only. Desired-state reconciliation
+  is not implemented; repository-only network recovery is not yet demonstrated.
+- **Legacy automation:** fileserver/Minecraft inventories retain `192.168.0.20`;
+  Synapse deploy adds a rule for old Apex `192.168.0.19`; ArgoCD bootstrap retains
+  the old repository URL. These are implementation follow-ups, not corrected by
+  this documentation audit. KubeVirt bootstrap references missing Obelisk manifests.
