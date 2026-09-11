@@ -57,6 +57,20 @@
     proto: tcp
     src: "{{ ip_apex }}"
 
+- name: Allow Construct SSH (port 2222) from apex
+  community.general.ufw:
+    rule: allow
+    port: "2222"
+    proto: tcp
+    src: "{{ ip_apex }}"
+
+- name: Allow Construct SSH (port 2222) from studio
+  community.general.ufw:
+    rule: allow
+    port: "2222"
+    proto: tcp
+    src: "{{ ip_studio }}"
+
 # ── Traefik ingress ────────────────────────────────────────────────────────
 
 - name: Allow HTTP from LAN (Traefik)

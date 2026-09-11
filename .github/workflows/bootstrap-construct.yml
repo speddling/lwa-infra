@@ -87,7 +87,4 @@ jobs:
           echo ""
           echo "Connect via:"
           echo "  ssh -p 2222 speddling@127.0.0.1  (port forward from monolith)"
-          echo "  ssh speddling@construct         (Tailscale, once authenticated)"
-          echo ""
-          echo "Check Tailscale status:"
-          echo "  ssh -p 2222 speddling@127.0.0.1 'sudo tailscale ip -4'  (Tailscale IP on construct)"
+          echo "  ssh -p 2222 speddling@monolith.littlewolfacres.com (from Apex or Studio)"

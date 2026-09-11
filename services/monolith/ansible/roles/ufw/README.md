@@ -17,7 +17,7 @@ Manages UFW firewall rules on Monolith (Ubuntu 24.04). Default deny inbound, all
 | 30885 | ArgoCD controller | watchtower |
 | 30883 | ArgoCD server   | watchtower |
 | 30900 | kube-state-metrics | watchtower |
-| 2222 | Construct SSH   | LAN + Tailscale |
+| 2222 | Construct SSH   | apex (192.168.20.2), studio (192.168.20.3) |
 | 33389 | Obelisk RDP    | LAN |
 | 39182 | Obelisk windows_exporter | watchtower |
 

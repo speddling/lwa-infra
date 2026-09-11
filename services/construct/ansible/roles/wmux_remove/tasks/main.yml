@@ -1,0 +1,76 @@
+---
+- name: Find the development user's UID
+  ansible.builtin.command: id -u speddling
+  register: dev_uid
+  changed_when: false
+
+- name: Check for a running user service manager
+  ansible.builtin.stat:
+    path: "/run/user/{{ dev_uid.stdout }}/bus"
+  register: dev_bus
+
+- name: Inspect wmux user unit
+  ansible.builtin.command: systemctl --user show wmux.service --property=LoadState --value
+  become_user: speddling
+  environment:
+    XDG_RUNTIME_DIR: "/run/user/{{ dev_uid.stdout }}"
+  register: wmux_unit
+  changed_when: false
+  when: dev_bus.stat.exists
+
+- name: Stop and disable wmux
+  ansible.builtin.systemd:
+    name: wmux.service
+    scope: user
+    state: stopped
+    enabled: false
+  become_user: speddling
+  environment:
+    XDG_RUNTIME_DIR: "/run/user/{{ dev_uid.stdout }}"
+  when:
+    - dev_bus.stat.exists
+    - wmux_unit.stdout == 'loaded'
+
+- name: Remove wmux application and service files
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /home/speddling/.config/systemd/user/default.target.wants/wmux.service
+    - /home/speddling/.config/systemd/user/wmux.service
+    - /home/speddling/.config/systemd/user/wmux.service.d
+    - /home/speddling/wmux
+    - /tmp/setup-wmux-service.sh
+    - /tmp/wmux-service.conf
+  # Preserve ~/.wmux session records and unrelated lingering/user services.
+
+- name: Reload the user service manager
+  ansible.builtin.systemd:
+    scope: user
+    daemon_reload: true
+  become_user: speddling
+  environment:
+    XDG_RUNTIME_DIR: "/run/user/{{ dev_uid.stdout }}"
+  when: dev_bus.stat.exists
+
+- name: Check for the old wmux redirect
+  ansible.builtin.command: iptables -t nat -C PREROUTING -i tailscale0 -p tcp --dport 80 -j REDIRECT --to-ports 3478
+  register: wmux_redirect
+  changed_when: false
+  failed_when: wmux_redirect.rc not in [0, 1]
+
+- name: Remove the old wmux redirect
+  ansible.builtin.command: iptables -t nat -D PREROUTING -i tailscale0 -p tcp --dport 80 -j REDIRECT --to-ports 3478
+  when: wmux_redirect.rc == 0
+
+- name: Check for persistent IPv4 rules
+  ansible.builtin.stat:
+    path: /etc/iptables/rules.v4
+  register: saved_rules
+
+- name: Remove only the persistent wmux redirect
+  ansible.builtin.lineinfile:
+    path: /etc/iptables/rules.v4
+    regexp: '^-A PREROUTING -i tailscale0 -p tcp(?: -m tcp)? --dport 80 -j REDIRECT --to-ports 3478$'
+    state: absent
+  when: saved_rules.stat.exists
