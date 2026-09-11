@@ -21,7 +21,7 @@ and migration status; verify addresses against fresh Omada evidence before chang
 
 The UPS is installed and USB-connected to Watchtower (owner confirmation,
 2026-09-11). NUT's role is disabled; working monitoring and shutdown behavior have
-not been established. Owner confirms CyberPower CP1000PFCLCD and requests Watchtower and Monolith shutdown after five minutes on battery. The inter-host network power path needs confirmation; see `nut-shutdown-plan.md`.
+not been established. Owner confirms CyberPower CP1000PFCLCD and requests Watchtower and Monolith shutdown after five minutes on battery. All data-connected equipment, including the inter-host network, is owner-confirmed battery-backed; see `nut-shutdown-plan.md`.
 
 ## Network and DNS
 

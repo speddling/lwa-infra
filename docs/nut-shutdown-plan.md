@@ -5,6 +5,13 @@ Watchtower. Watchtower and Monolith must begin orderly shutdown after five minut
 continuously on battery. This is desired behavior, not a deployed capability.
 `nut_enabled: false` remains in force.
 
+The owner confirms all data-connected equipment, including the network between
+both servers, is battery-backed. The five-minute grace period is deliberate:
+usual outages last only two to three minutes. Available runtime is an owner
+estimate, not a measured shutdown budget. Read UPS load/runtime telemetry and
+allow time for orderly shutdown; reassess this budget after Monolith's planned
+PSU replacement and GPU addition.
+
 ## Proposed behavior
 
 - Watchtower owns the USB driver, NUT server and primary monitor. Monolith runs
@@ -27,8 +34,8 @@ directives merely because they appear in upstream documentation.
 
 ## Gaps to resolve before activation
 
-1. Confirm the switch/network path between the hosts remains powered during an
-   outage. Inspect USB detection and `upsc` status/model/load/runtime read-only;
+1. Network battery coverage is owner-confirmed. Inspect USB detection and
+   `upsc` status/model/load/runtime read-only;
    do not unplug mains or invoke forced shutdown as an inspection step.
 2. Replace the incorrect CP1500PFCLCD template description. Establish vaulted
    credentials and the missing password mapping; separate the Monolith secondary
