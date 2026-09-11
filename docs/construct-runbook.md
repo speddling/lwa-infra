@@ -3,6 +3,11 @@
 Updated: 2026-09-11. Desired access is LAN SSH through Monolith. The retirement
 workflow must complete before Tailscale and wmux can be considered removed live.
 
+Workstation SSH was verified by the owner. The 2026-09-11 retirement retries stopped
+in preflight: first host-key trust (fixed by PR #249), then runner-key authorization
+for `speddling` on Construct. Neither run changed either host. Monolith's
+`gh-runner` public key must be authorized before the next attempt.
+
 ## Access
 
 From Apex or Studio:

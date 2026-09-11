@@ -1,13 +1,13 @@
 # LWA Infra
-|> Last updated: 2026-08-04
+> Documentation audit: 2026-09-11. Runtime status is qualified in `docs/homelab-state.md`.
 
 ## Hardware
 
 | Node | Hostname | Specs | Role |
 |---|---|---|---|
-| MacBook Air M4 (2025) | `apex` | 16GB unified, 256GB | Primary workstation, control plane, all authoring originates here |
+| MacBook Air M4 (2025) | `apex` | 16GB unified, 256GB | Primary workstation; authoring also occurs on Construct |
 | AMD Ryzen 7 5700G | `monolith` | 8c/16t, 64GB DDR4-3200, 512GB NVMe + 500GB SSD + 256GB SSD + 3.6TB HDD + 1.8TB HDD | k3s single-node cluster, household services, Obelisk & Construct QEMU host |
-| Asus VM40B | `watchtower` | Celeron 1007U, 8GB DDR3-1600, 1TB Crucial MX500 | DNS and monitoring, never runs workloads |
+| Asus VM40B | `watchtower` | Celeron 1007U, 8GB DDR3-1600, 1TB Crucial MX500 | DNS, monitoring and self-hosted CI runner; separate from k3s workloads |
 | Dell Precision 5560 | `studio` | i9-11950H, 32GB DDR4, 512GB NVMe | Personal DAW: Reaper + M-Audio Air 192\|14 |
 
 ## Network
@@ -20,7 +20,7 @@ TP-Link Omada ecosystem, fully managed, SNMP-monitored.
 | OC200 | Omada network controller |
 | SG2218P | Managed PoE+ switch |
 | 2x EAP245 | Wireless access points |
-| EAP225-Outdoor | Outdoor wireless access point |
+| EAP225-Outdoor | Planned outdoor access point; installation deferred |
 
 **WAN:** T-Mobile FAST 5688W and AT&T CGW450, equal-weight load balanced across two independent cellular carriers.
 
@@ -33,21 +33,34 @@ Local domain: `littlewolfacres.com`, all hosts resolve as `hostname.littlewolfac
 ## Stack
 
 - **Kubernetes** - k3s (single-node, expandable)
-- **GitOps** - ArgoCD v3.3.0, manages all k3s workloads declaratively against this repo
+- **GitOps** - ArgoCD v3.3.0 bootstrap pin; reconciles declared Applications, with some direct workflow applies still present
 - **Project Management** - Plane (self-hosted), tracks operational work items, client obligations, and incidents
 - **TLS** - cert-manager v1.20.2, automatic Let's Encrypt certificates via Cloudflare DNS-01
 - **Ingress** - Traefik (k3s default), terminates TLS and routes to cluster services
-- **IaC** - Ansible (Terraform Cloud used for state isolation only — monolith, watchtower workspaces track Terraform state, no resource declarations)
+- **IaC** - Ansible for host configuration; Terraform Cloud workspaces for each server. Monolith declares a k3s bootstrap `null_resource`; Watchtower declares only the backend
 - **Automation** - GitHub Actions + Ansible (modular role structure)
-- **Secrets** - Ansible Vault
-- **Monitoring** - Prometheus, Grafana, Alertmanager, Loki, Promtail, Netdata, node_exporter, blackbox_exporter, snmp_exporter, adguard_exporter, tmobile_exporter (custom), reolink_exporter (custom), NUT (planned)
+- **Secrets** - Ansible Vault, GitHub Actions secrets, generated Kubernetes secrets and workstation-local credentials; see `docs/architecture.md` for ownership exceptions
+- **Monitoring** - Prometheus, Grafana, Alertmanager, Loki, Promtail, Netdata, node_exporter, blackbox_exporter, snmp_exporter, adguard_exporter, tmobile_exporter (custom), reolink_exporter (custom), NUT (UPS installed and USB-connected; role disabled pending configuration review)
 - **OS** - Ubuntu Server 24.04 LTS (monolith + watchtower), macOS Sequoia (apex)
 
 ## CI/CD
 
-GitHub Actions pipelines on self-hosted runners (monolith, watchtower). All changes go through **branch -> PR -> merge**. Direct pushes to `master` are disabled. Claude handles the full git workflow via **Scribe**.
+Changes follow **branch → PR → human review and merge**. Scribe is one git mechanism;
+using it is not a permanent requirement. No separate staging/promotion environment is
+declared. Path-filtered push workflows can deploy immediately after merge to `master`.
 
-ArgoCD is not a GitHub Actions workflow. It is a continuously-running GitOps controller that manages 11 services on the cluster, reconciling their live state against this repo on every push to master. It lives in the Stack section above.
+| Runner host | Runner process user | Ansible SSH target user |
+|---|---|---|
+| Monolith | `gh-runner` | `speddling` in the main Monolith and retirement inventories |
+| Watchtower | `speddling` | `speddling` |
+
+The runner process owns its SSH key and known-hosts file. That identity is distinct
+from the remote login user and from `become`/sudo. Synapse image builds use a
+GitHub-hosted runner; deployment uses Monolith.
+
+ArgoCD continuously reconciles the root `apps` Application and ten child Applications.
+It is independent of Actions. Several workflows also apply the same Kubernetes
+resources directly; controller/CRD installation and secret bootstrap have separate owners.
 
 Construct access is moving to LAN SSH through `monolith:2222`. After merging the access changes and verifying workstation SSH, the manual `retire-remote-access.yml` workflow removes Tailscale from Monolith/Construct and wmux from Construct. See `docs/construct-runbook.md`. `deploy-synapse.yml` deploys the Kubernetes MCP service; Scribe/Zombatron deployment code remains under `services/apex/`.
 
@@ -60,7 +73,7 @@ Construct access is moving to LAN SSH through `monolith:2222`. After merging the
 | `deploy-navidrome.yml` | Manual | Storage config + k8s manifests (also via ArgoCD) |
 | `deploy-jellyfin.yml` | Manual | Storage config + k8s manifests (also via ArgoCD) |
 | `deploy-kavita.yml` | Manual | Storage config + k8s manifests (also via ArgoCD) |
-| `deploy-k3s-manifests.yml` | Push to master | kube-state-metrics (direct kubectl, not ArgoCD) |
+| `deploy-k3s-manifests.yml` | Push to master | kube-state-metrics direct apply; also managed by ArgoCD |
 | `deploy-mirror.yml` | Push to master | hdd-c -> hdd-d nightly rsync |
 | `deploy-omada.yml` | PR + manual | Omada controller state export (read-only introspection) |
 | `deploy-firecrawl.yml` | Push to services/firecrawl/** | Firecrawl web scraping API manifests |
@@ -72,7 +85,7 @@ Construct access is moving to LAN SSH through `monolith:2222`. After merging the
 | `bootstrap-argocd.yml` | Manual (once) | cert-manager + ArgoCD install |
 | `retire-remote-access.yml` | Manual after LAN SSH verification | Remove Tailscale from both hosts and wmux from Construct; preserve VM disk |
 | `bootstrap-construct.yml` | Manual (once) | Debian 12 dev VM provisioning |
-| `bootstrap-kubevirt.yml` | Manual (once) | KubeVirt + Obelisk VM bootstrap (archived) |
+| `bootstrap-kubevirt.yml` | Manual (once) | Legacy, still dispatchable; references removed manifests — do not use |
 | `bootstrap-plane.yml` | Push + manual | Plane secrets + TLS certificate |
 | `provision-k3s.yml` | Manual | k3s cluster init |
 
@@ -80,13 +93,13 @@ Construct access is moving to LAN SSH through `monolith:2222`. After merging the
 
 | Service | Host | Description |
 |---|---|---|
-| ArgoCD | monolith | GitOps controller, manages all k3s workloads |
+| ArgoCD | monolith | GitOps controller for declared Applications |
 | Navidrome | monolith | Music streaming |
 | Jellyfin | monolith | Media streaming |
 | Kavita | monolith | eBook/comic library |
 | Minecraft Bedrock | monolith | Family Minecraft server |
 | Samba | monolith | Network file shares |
-| Obelisk (Win11 VM) | monolith | Client-facing Windows environment, RDP |
+| Obelisk (Win11 VM) | monolith | Unused Windows VM; owner confirmed no longer needed, decommission pending |
 | Construct (Debian 12 VM) | monolith | Persistent development environment via SSH on monolith:2222 |
 | Plane | monolith | Project management and incident tracking |
 | Firecrawl | monolith | Web scraping and extraction API |
@@ -97,19 +110,19 @@ Construct access is moving to LAN SSH through `monolith:2222`. After merging the
 | Loki | watchtower | Log aggregation |
 | Promtail | watchtower | Log shipping agent |
 | Netdata | watchtower | Real-time system monitoring |
-| NUT | watchtower | UPS monitoring (CyberPower CP1000PFCLCD) |
+| NUT | watchtower | USB UPS installed; `nut_enabled: false`, software activation unverified |
 | Synapse MCP | monolith | Claude infrastructure read access |
-| Scribe MCP | monolith (Construct VM) | Claude git control plane |
+| Scribe MCP | Runtime location awaiting confirmation | Git control plane; deployment code under `services/apex/` |
 | Argus MCP | watchtower | Claude monitoring read access |
-| Zombatron Importer | monolith (Construct VM) | Slack bot for Minecraft world imports |
+| Zombatron Importer | Runtime location awaiting confirmation | Slack world-import bot; deployment code under `services/apex/` |
 
 ## AI Tooling
 
-Four MCP servers give Claude structured, safe access to the infrastructure:
+The repository describes four MCP integrations with different access boundaries:
 
 **Synapse** (`monolith:30800`) - read-only k3s pod state, Prometheus metrics, Alertmanager alerts, and monolith filesystem.
 
-**Scribe** (`construct:8765`, forwarded via `monolith:2222:8765`) - git control plane. Branch, commit, push, open PRs. Branch-protected, path-allowlisted, merged-PR guard built in.
+**Scribe** — git control plane with branch/path guards. Current endpoint and usage need confirmation; the repository only supplies Apex launchd deployment. Monolith port 2222 forwards SSH, not the MCP HTTP port.
 
 **Argus** (`watchtower:9800`) - read-only live Alertmanager and Prometheus configs, systemd state, journald logs, and monitoring HTTP APIs.
 

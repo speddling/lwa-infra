@@ -1,12 +1,12 @@
 # LWA Infra -- Monitoring Runbook
-> Last updated: 2026-07-09
+> Documentation audit: 2026-09-11. Target/status tables require live verification.
 
 ---
 
 ## Architecture Overview
 
-All monitoring services run as **systemd units on Watchtower** (`192.168.30.11`).
-There are no monitoring pods in k3s — Prometheus scrapes Monolith's node_exporter remotely over the LAN.
+The central monitoring services run as **systemd units on Watchtower** (`192.168.30.11`).
+The central monitoring stack is outside k3s. kube-state-metrics and ArgoCD metrics do run in the cluster and are scraped remotely, alongside Monolith's node_exporter.
 
 ```
 Watchtower (192.168.30.11)
@@ -62,10 +62,10 @@ Monolith (192.168.30.10 / monolith.littlewolfacres.com)
 | `loki` | `localhost:3100` → relabeled `instance=watchtower` | Loki ingestion rate, chunk store size, query performance |
 | `promtail` | `localhost:9080` → relabeled `instance=watchtower` | Promtail scrape lag, log line throughput |
 
-> **WAN2 placeholder:** a commented `snmp-att-cgw450` job exists in `prometheus.yml.j2` for when
-> AT&T Internet Air is installed. The CGW450 gateway has no unauthenticated local API like the
-> T-Mobile FAST 5688W does — SNMP via the ER605-side interface is the only practical option.
-> Uncomment and set `ip_att_gateway` in `ansible/vars/main.yml` when that WAN lands.
+The AT&T WAN2 link is documented as installed. Its ER605 interface is monitored
+through the existing router SNMP job. The commented `snmp-att-cgw450` block is a
+legacy placeholder, not evidence that WAN2 remains uninstalled; do not enable it
+without verifying a real supported target.
 
 > **Instance label convention:** Prometheus relabels both node_exporter scrapes so
 > `instance` is a clean hostname (`watchtower` / `monolith`) rather than `localhost:9100`
@@ -137,8 +137,8 @@ Use **Explore**, select the **Loki** datasource, and query with LogQL:
 # Filter by journal priority level
 {job="watchtower-journal", level="err"}
 
-# ER605 syslog (empty until the ER605 is configured to send syslog — see WAN2 / ER605 Syslog below)
-{job="er605-syslog"}
+# Network syslog; confirm device forwarding and filter by hostname as needed
+{job="network-syslog"}
 ```
 
 ### Adding a new community dashboard
@@ -159,19 +159,11 @@ Use **Explore**, select the **Loki** datasource, and query with LogQL:
 
 ## Alert Rules
 
-Alert rules live in two places, evaluated independently:
-
-| Location | File | Evaluated by |
-|----------|------|-------------|
-| Prometheus | `/etc/prometheus/alert_rules.yml` | Prometheus → fires to Alertmanager |
-| Grafana | `/etc/grafana/provisioning/alerting/alert_rules.yml` | Grafana unified alerting |
-
-Source templates in the repo:
-
-```
-services/watchtower/ansible/roles/prometheus/templates/alert_rules.yml.j2
-services/watchtower/ansible/roles/grafana/templates/alert_rules.yml.j2
-```
+Prometheus evaluates `/etc/prometheus/alert_rules.yml` and sends alerts to
+Alertmanager. The source is
+`services/watchtower/ansible/roles/prometheus/templates/alert_rules.yml.j2`.
+Grafana unified and legacy alerting are disabled in its managed configuration;
+the role deletes stale alert provisioning. Grafana is the dashboard layer.
 
 > **Jinja2 vs Go templates — escaping gotcha.** This file is rendered through Ansible's
 > Jinja2 engine before Prometheus ever sees it. Annotation text that needs Prometheus's
@@ -290,10 +282,10 @@ provide an event timeline that correlates with the metric graphs in Grafana.
 - **Promtail** ships logs from two sources:
   - Watchtower's systemd journal (all units — captures `tmobile_exporter` fetch errors,
     `daily-summary` runs, `alertmanager`/`prometheus` events, etc.)
-  - A syslog listener on UDP/TCP `1514` for the ER605 — **not yet wired up**. The ER605
-    needs to be manually configured (System → Logs → Remote Syslog →
-    `192.168.30.11:1514`) before any `{job="er605-syslog"}` data appears. This was
-    deferred to land alongside the AT&T Internet Air WAN2 work.
+  - A shared UDP syslog listener on port 1514 for ER605/Omada, labeled
+    `job="network-syslog"` and distinguished by `hostname`. The repository declares
+    the receiver; verify live sender configuration and recent logs to establish
+    ingestion. The prior `er605-syslog` job name and TCP instructions are stale.
 
 ### Service health checks
 
@@ -317,7 +309,23 @@ curl -s 'http://192.168.30.11:3100/loki/api/v1/query?query={job="watchtower-jour
 Or use Grafana Explore with the Loki datasource — see **Grafana Dashboards → Querying
 logs in Grafana** above.
 
-### Troubleshooting
+### UPS hardware and NUT activation
+
+The owner confirmed the UPS is installed and USB-connected to Watchtower on
+2026-09-11. The documented model is CP1000PFCLCD, but the role's device description
+says CP1500PFCLCD; confirm the actual device before updating configuration.
+`nut_enabled: false` remains the declared state. No successful NUT activation is
+established by this audit.
+
+The current role installs server/client/exporter components, listens on loopback,
+and configures upsmon to shut down Watchtower. It does not coordinate Monolith or
+VM shutdown. Review the `nut_monitor_password` mapping, exporter release/flags,
+Prometheus scrape/alert rules and intended power policy before enabling it.
+The role README's claim that hardware is still pending is stale.
+
+---
+
+## Troubleshooting
 
 **No logs appear in Grafana Explore at all:**
 1. Confirm the Loki datasource exists in Grafana (Connections → Data sources). It is
@@ -629,7 +637,10 @@ sudo systemctl restart prometheus
 
 ## Ansible Deployment
 
-All monitoring config is managed by Ansible, run from **Apex** (`192.168.20.2`).
+Monitoring configuration is managed by Ansible. Actions executes on Watchtower as
+`speddling` and SSHes to `speddling`, then uses sudo. Manual workstation invocation
+is also documented below. Monolith's runner is instead `gh-runner`; do not transfer
+that account assumption to Watchtower.
 
 ```bash
 cd ~/lwa-homelab/services/watchtower/ansible
@@ -642,13 +653,13 @@ ansible-playbook -i inventory.ini playbooks/monitoring.yml \
 ansible-playbook -i inventory.ini playbooks/monitoring.yml \
   --check --vault-password-file=~/lwa-homelab/.vault_pass
 
-# Deploy only exporters (node_exporter, blackbox, snmp, adguard, reolink, tmobile)
+# Deploy the bundled exporters role; Reolink/T-Mobile use separate playbooks
 ansible-playbook -i inventory.ini playbooks/exporters.yml \
   --vault-password-file=~/lwa-homelab/.vault_pass
 ```
 
 The `monitoring.yml` playbook applies roles **in order**:
-`prometheus → alertmanager → loki → promtail → netdata → grafana → daily_summary → argus → nut`
+`prometheus → snmp_exporter → alertmanager → loki → promtail → netdata → grafana → daily_summary → argus → nut`
 
 **Order matters more than it looks.** Ansible halts a play on the first task failure with
 no rescue block configured here. A failure in `prometheus` (most commonly a Jinja2
