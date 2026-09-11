@@ -12,6 +12,21 @@ estimate, not a measured shutdown budget. Read UPS load/runtime telemetry and
 allow time for orderly shutdown; reassess this budget after Monolith's planned
 PSU replacement and GPU addition.
 
+## Live discovery and next deployment
+
+[Inspection run 34629066497](https://github.com/speddling/lwa-infra/actions/runs/34629066497)
+completed successfully on both hosts, 2026-09-11. Watchtower reports USB product
+`CP1000PFCLCDa` (`0764:0601`). Neither host has NUT installed; load/runtime readings
+are unavailable. Monolith's live Construct unit uses `kill -9`, and its running
+QEMU has no QMP/monitor control arguments.
+
+The separate `deploy-ups-telemetry.yml` workflow prepares local telemetry only;
+see `../services/ups/README.md`. It does not activate the five-minute shutdown
+policy. Deployment and runtime verification are pending. Review measured telemetry
+before setting the graceful shutdown timeout; adding QMP to the current QEMU
+process will require a planned guest restart, unless a different control path is
+chosen. Do not restart Construct while active development depends on it.
+
 ## Proposed behavior
 
 - Watchtower owns the USB driver, NUT server and primary monitor. Monolith runs

@@ -1,0 +1,28 @@
+---
+- name: Establish local UPS telemetry without automatic shutdown
+  hosts: watchtower
+  become: true
+  any_errors_fatal: true
+  vars_files:
+    - ../../../../../ansible/vars/main.yml
+  pre_tasks:
+    - name: Check for an existing UPS configuration
+      ansible.builtin.stat:
+        path: /etc/nut/ups.conf
+      register: existing_config
+    - name: Check telemetry ownership marker
+      ansible.builtin.stat:
+        path: /etc/nut/lwa-telemetry-only
+      register: telemetry_marker
+    - name: Gather service state
+      ansible.builtin.service_facts:
+    - name: Require the intended host and no existing shutdown deployment
+      ansible.builtin.assert:
+        that:
+          - ansible_hostname == 'watchtower'
+          - not (nut_enabled | bool)
+          - not existing_config.stat.exists or telemetry_marker.stat.exists
+          - ansible_facts.services.get('nut-monitor.service', {}).get('state', 'stopped') != 'running'
+        fail_msg: Refusing to replace existing NUT management or an active shutdown monitor.
+  roles:
+    - telemetry
