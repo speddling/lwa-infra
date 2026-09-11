@@ -15,19 +15,19 @@ and migration status; verify addresses against fresh Omada evidence before chang
   provides a separate emergency access path.
 - **Construct:** Debian 12 QEMU/KVM VM on Monolith, systemd lifecycle, 8 vCPUs,
   16 GB RAM and 80 GB disk. All development authoring now happens here (owner confirmed 2026-09-11). Herdr is
-  installed separately from the retired-in-design wmux browser terminal.
+  installed separately from the removed wmux browser terminal.
 - **Obelisk:** QEMU/KVM Windows VM still present, unused and no longer needed
-  according to the owner (2026-09-11). Decommissioning awaits retention review.
+  according to the owner (2026-09-11). Files and redeployment artifacts must be retained; runtime retirement is unverified.
 
 The UPS is installed and USB-connected to Watchtower (owner confirmation,
 2026-09-11). NUT's role is disabled; working monitoring and shutdown behavior have
-not been established. Which equipment uses battery-backed outlets needs confirmation.
+not been established. Owner confirms CyberPower CP1000PFCLCD and requests Watchtower and Monolith shutdown after five minutes on battery. The inter-host network power path needs confirmation; see `nut-shutdown-plan.md`.
 
 ## Network and DNS
 
 T-Mobile FAST 5688W and AT&T CGW450 cellular WANs terminate on the Omada ER605.
 The SG2218P provides managed switching/PoE, OC200 control, and two EAP245s WiFi.
-EAP225-Outdoor is installed (owner confirmed 2026-09-11); its live address and monitoring remain unverified. The old unmanaged switch is decommissioned.
+EAP225-Outdoor is installed (owner confirmed 2026-09-11); owner reports Foyer at `192.168.10.102`; monitoring remains unverified. The old unmanaged switch is decommissioned.
 
 Documented VLAN state: Mgmt 10, Users 20 and wired Infra 30 are stable; IoT 40
 has the NVR; Guest 50 and blackhole/native 999 remain planned. Router policy is
@@ -41,9 +41,8 @@ create network access. Do not assume every service is publicly exposed.
 
 Construct's QEMU NAT network uses guest `10.0.2.15` with host port 2222 forwarded
 to guest SSH port 22. Apex/Studio access `monolith:2222`; a client SSH alias can
-name this `construct`. A dedicated guest LAN IP is deferred. Removal of Tailscale
-on both hosts and wmux on Construct is pending successful retirement workflow
-execution. ER605 WireGuard remains a separate deferred design.
+name this `construct`. A dedicated guest LAN IP is deferred. Tailscale on both hosts and wmux on Construct were removed successfully on
+2026-09-11 (retirement run 34625414651); fresh SSH, DNS and k3s API checks passed. ER605 WireGuard remains a separate deferred design.
 
 ## Authoring through production
 

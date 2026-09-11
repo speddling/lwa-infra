@@ -33,6 +33,8 @@ jobs:
         run: python services/construct/ansible/tests/check_config.py
       - name: Verify removal cannot bypass the prerequisites
         run: python services/construct/ansible/tests/test_retirement_gates.py
+      - name: Verify wmux stops without a session D-Bus socket
+        run: python services/construct/ansible/tests/test_wmux_stop.py
       - name: Syntax-check retirement playbook
         working-directory: services/construct/ansible
         run: ansible-playbook playbooks/retire-remote-access.yml --syntax-check

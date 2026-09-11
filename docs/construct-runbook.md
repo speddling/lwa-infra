@@ -1,12 +1,19 @@
 # Construct runbook
 
-Updated: 2026-09-11. Desired access is LAN SSH through Monolith. The retirement
-workflow must complete before Tailscale and wmux can be considered removed live.
+Updated: 2026-09-11. LAN SSH through Monolith TCP 2222 is active.
 
-Workstation SSH was verified by the owner. The 2026-09-11 retirement retries stopped
-in preflight: first host-key trust (fixed by PR #249), then runner-key authorization
-for `speddling` on Construct. Neither run changed either host. Monolith's
-`gh-runner` public key must be authorized before the next attempt.
+Tailscale was removed from Monolith and Construct, and wmux from Construct, by
+[retirement run 34625414651](https://github.com/speddling/lwa-infra/actions/runs/34625414651).
+Both hosts passed fresh SSH and DNS checks; Monolith's k3s API check passed.
+A subsequent local check found wmux still running: the workflow skipped stopping
+it because `/run/user/1000/bus` was absent despite an active user systemd manager.
+An explicit `systemctl --user stop wmux.service` and daemon reload completed
+removal; the unit now reports `not-found`, `inactive`, `dead`. The follow-up role
+checks systemd's private socket and verifies the final service state.
+Monolith runner `gh-runner`'s owner-supplied public key was added to Construct's
+`speddling` authorized_keys, preserving existing entries. The earlier preflight
+failures are resolved. The SSH port forward and VM disk were preserved.
+Herdr remains separately installed. External tailnet/account cleanup is not verified.
 
 ## Development location
 

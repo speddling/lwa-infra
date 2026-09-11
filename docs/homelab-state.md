@@ -30,9 +30,9 @@ The original plan was a single 60-minute cutover across all 5 VLANs at once. Thr
 | ER605 v2.0 | 192.168.10.1 | Mgmt (10) | Multi-WAN VPN Router |
 | SG2218P | 192.168.10.102 | Mgmt (10) | Managed PoE+ Switch |
 | OC200 | 192.168.10.3 | Mgmt (10) | Network Controller |
-| EAP245 -- Upstairs Hall | 192.168.10.100 | Mgmt (10) | Wireless AP |
+| EAP245 -- Master Bedroom | 192.168.10.100 | Mgmt (10) | Wireless AP |
 | EAP245 -- Downstairs Hall | 192.168.10.101 | Mgmt (10) | Wireless AP |
-| EAP225-Outdoor | Unverified | Unverified | Installed, owner confirmed 2026-09-11; verify live Omada inventory |
+| EAP225-Outdoor -- Foyer | 192.168.10.102 | Mgmt (10) | Owner-reported address/name, 2026-09-11; SNMP unverified |
 | apex | 192.168.20.2 | Users (20) | Primary Workstation, WiFi |
 | studio | 192.168.20.3 | Users (20) | DAW / KDE Workstation, WiFi |
 | studio (wired dock) | 192.168.10.7 | Mgmt (10) | Out-of-band emergency access -- occasional/physical, not always-on |
@@ -76,7 +76,7 @@ All three APs will broadcast all three SSIDs (`LittleWolfAcres` on Users already
 
 **Remote access (deferred, not started):** single entry point via WireGuard on the ER605, one inbound UDP port (51820), no per-service port forwards. Clients land in their own subnet with reach into Users/Infra/IoT. Subnet allocation, client keys, and policy all still TBD.
 
-**Outdoor AP:** EAP225-Outdoor is installed (owner confirmed 2026-09-11). Its IP, Omada name, VLAN and SNMP scrape health still need verification. `ip_eap_out` is blank and its scrape job commented in code; the old installation TODO is stale.
+**Outdoor AP:** EAP225-Outdoor is installed (owner confirmed 2026-09-11). Owner reports Foyer at `192.168.10.102`; Master Bedroom is `.100` and Downstairs Hall `.101` on the same management subnet. Addresses expand the owner’s shorthand using the existing subnet; controller/SNMP verification is pending. `ip_eap_out` is blank and its scrape job commented in code; the old installation TODO is stale.
 
 **Still deferred in prior documentation:** coop/run Ethernet drop and VLAN-aware Linux bridge configuration on Monolith. A dedicated LAN IP for Construct is not part of the current SSH-forward migration.
 
@@ -260,7 +260,7 @@ k3s single-node cluster host. Runs all household and client services.
 | Name | Status | Description |
 |---|---|---|
 | Synapse | ✅ Active | MCP/AI tooling namespace |
-| Obelisk | ⚠️ Present but unused; owner confirms no longer needed (2026-09-11). QEMU/KVM on `/mnt/ssd-b`; decommission pending retention review |
+| Obelisk | ⚠️ Present but unused; owner confirms no longer needed (2026-09-11). QEMU/KVM on `/mnt/ssd-b`; retain files and redeployment artifacts; runtime retirement unverified |
 | Construct | ✅ Active | Debian 12 dev VM on NVMe `/vm/construct` -- QEMU/KVM. SSH: `monolith:2222` (client alias `construct`) |
 
 ### Services
@@ -275,7 +275,7 @@ k3s single-node cluster host. Runs all household and client services.
 | node_exporter | Host metrics | ✅ Running |
 | Synapse | MCP server | ✅ Running |
 | hdd-d mirror | Nightly rsync hdd-c -> hdd-d via systemd timer at 02:00 | ✅ Running |
-| Obelisk | QEMU/KVM Win11 VM -- RDP `192.168.30.10:33389` | ⚠️ Present but unused; decommission pending retention review |
+| Obelisk | QEMU/KVM Win11 VM -- RDP `192.168.30.10:33389` | ⚠️ Present but unused; retain files and redeployment artifacts; runtime retirement unverified |
 | Construct | QEMU/KVM Debian 12 dev VM -- SSH `monolith:2222` | ✅ Running |
 | Plane | Project management -- `plane.littlewolfacres.com` | ✅ Running (via ArgoCD) |
 
@@ -486,13 +486,18 @@ Apex was the original development host. The owner confirms all development work 
 
 ## Audit boundaries and unresolved state (2026-09-11)
 
+- **Access retirement completed:** run 34625414651 removed Tailscale on both
+  Monolith and Construct and wmux on Construct. Fresh SSH, DNS and k3s API checks
+  passed. The Monolith TCP 2222 forward remains. External tailnet cleanup unverified.
+
 - **Runner identities:** Monolith Actions runs as `gh-runner`; Watchtower Actions
   runs as `speddling`. Main inventories SSH as `speddling`, then use sudo. Inspect
   the runner user's key/trust files for client-side SSH failures, not the target
   account's files. Construct trusts a separately pinned host key for the port forward.
 - **UPS:** hardware is installed and USB-connected. `nut_enabled` remains false.
-  Do not infer active monitoring or shutdown protection. The role's model text,
-  password variable mapping, exporter configuration and shutdown policy need review.
+  Do not infer active monitoring or shutdown protection. Owner confirms CyberPower CP1000PFCLCD and requests both Watchtower and Monolith
+  shut down after 300 seconds continuously on battery. Implementation is pending; see
+  `nut-shutdown-plan.md` for prerequisites and verification.
 - **Firewall:** UFW tables above include historical live rules. The current
   Monolith role lacks the documented Studio dock, broad temporary SSH and Minecraft
   rules; absence from an additive role does not prove absence from the host.

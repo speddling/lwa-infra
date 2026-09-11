@@ -6,8 +6,9 @@
 
 - name: Check for a running user service manager
   ansible.builtin.stat:
-    path: "/run/user/{{ dev_uid.stdout }}/bus"
-  register: dev_bus
+    # systemctl can reach the user manager without a session D-Bus daemon.
+    path: "/run/user/{{ dev_uid.stdout }}/systemd/private"
+  register: dev_manager
 
 - name: Inspect wmux user unit
   ansible.builtin.command: systemctl --user show wmux.service --property=LoadState --value
@@ -16,19 +17,36 @@
     XDG_RUNTIME_DIR: "/run/user/{{ dev_uid.stdout }}"
   register: wmux_unit
   changed_when: false
-  when: dev_bus.stat.exists
+  when: dev_manager.stat.exists
 
-- name: Stop and disable wmux
+- name: Inspect wmux activity independently of its unit file
+  ansible.builtin.command: systemctl --user show wmux.service --property=ActiveState --value
+  become_user: speddling
+  environment:
+    XDG_RUNTIME_DIR: "/run/user/{{ dev_uid.stdout }}"
+  register: wmux_activity
+  changed_when: false
+  when: dev_manager.stat.exists
+
+- name: Stop wmux even if its unit file has already been removed
+  ansible.builtin.command: systemctl --user stop wmux.service
+  become_user: speddling
+  environment:
+    XDG_RUNTIME_DIR: "/run/user/{{ dev_uid.stdout }}"
+  when:
+    - dev_manager.stat.exists
+    - wmux_activity.stdout not in ['inactive', 'failed']
+
+- name: Disable the installed wmux unit
   ansible.builtin.systemd:
     name: wmux.service
     scope: user
-    state: stopped
     enabled: false
   become_user: speddling
   environment:
     XDG_RUNTIME_DIR: "/run/user/{{ dev_uid.stdout }}"
   when:
-    - dev_bus.stat.exists
+    - dev_manager.stat.exists
     - wmux_unit.stdout == 'loaded'
 
 - name: Remove wmux application and service files
@@ -51,7 +69,17 @@
   become_user: speddling
   environment:
     XDG_RUNTIME_DIR: "/run/user/{{ dev_uid.stdout }}"
-  when: dev_bus.stat.exists
+  when: dev_manager.stat.exists
+
+- name: Verify wmux is no longer running
+  ansible.builtin.command: systemctl --user show wmux.service --property=ActiveState --value
+  become_user: speddling
+  environment:
+    XDG_RUNTIME_DIR: "/run/user/{{ dev_uid.stdout }}"
+  register: wmux_state
+  changed_when: false
+  failed_when: wmux_state.rc != 0 or wmux_state.stdout not in ['inactive', 'failed']
+  when: dev_manager.stat.exists
 
 - name: Check for the old wmux redirect
   ansible.builtin.command: iptables -t nat -C PREROUTING -i tailscale0 -p tcp --dport 80 -j REDIRECT --to-ports 3478
