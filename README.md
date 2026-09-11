@@ -19,8 +19,8 @@ TP-Link Omada ecosystem, fully managed, SNMP-monitored.
 | ER605 v2 | Multi-WAN VPN router, MAC-bound DHCP |
 | OC200 | Omada network controller |
 | SG2218P | Managed PoE+ switch |
-| 2x EAP245 | Wireless access points |
-| EAP225-Outdoor | Installed (owner confirmed 2026-09-11); address/monitoring verification pending |
+| 2x EAP245 | Master Bedroom (192.168.10.100), Downstairs Hall (192.168.10.101) |
+| EAP225-Outdoor | Installed in Foyer, owner reports 192.168.10.102; monitoring unverified |
 
 **WAN:** T-Mobile FAST 5688W and AT&T CGW450, equal-weight load balanced across two independent cellular carriers.
 
@@ -62,7 +62,7 @@ ArgoCD continuously reconciles the root `apps` Application and ten child Applica
 It is independent of Actions. Several workflows also apply the same Kubernetes
 resources directly; controller/CRD installation and secret bootstrap have separate owners.
 
-All development work has moved from Apex to Construct (owner confirmed 2026-09-11). Surviving Apex-hosted tooling still needs migration or retirement; see [the migration inventory](docs/construct-development-migration.md). Construct access is moving to LAN SSH through `monolith:2222`. After merging the access changes and verifying workstation SSH, the manual `retire-remote-access.yml` workflow removes Tailscale from Monolith/Construct and wmux from Construct. See `docs/construct-runbook.md`. `deploy-synapse.yml` deploys the Kubernetes MCP service; Scribe/Zombatron deployment code remains under `services/apex/`.
+All development work has moved from Apex to Construct (owner confirmed 2026-09-11). Surviving Apex-hosted tooling still needs migration or retirement; see [the migration inventory](docs/construct-development-migration.md). Construct uses LAN SSH through `monolith:2222`. Retirement run 34625414651 successfully removed Tailscale from Monolith/Construct and wmux from Construct on 2026-09-11, with fresh SSH, DNS and k3s API checks passing. See `docs/construct-runbook.md`. `deploy-synapse.yml` deploys the Kubernetes MCP service; Scribe/Zombatron deployment code remains under `services/apex/`.
 
 | Workflow | Trigger | What it does |
 |---|---|---|
@@ -99,7 +99,7 @@ All development work has moved from Apex to Construct (owner confirmed 2026-09-1
 | Kavita | monolith | eBook/comic library |
 | Minecraft Bedrock | monolith | Family Minecraft server |
 | Samba | monolith | Network file shares |
-| Obelisk (Win11 VM) | monolith | Unused Windows VM; owner confirmed no longer needed, decommission pending |
+| Obelisk (Win11 VM) | monolith | Unused Windows VM; retain files for possible redeployment, runtime retirement unverified |
 | Construct (Debian 12 VM) | monolith | Persistent development environment via SSH on monolith:2222 |
 | Plane | monolith | Project management and incident tracking |
 | Firecrawl | monolith | Web scraping and extraction API |

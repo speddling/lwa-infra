@@ -3,8 +3,8 @@
 > Documentation audit: 2026-09-11; verify executable configuration before applying historical commands.
 
 > Access update (2026-09-11): Construct uses SSH through Monolith TCP 2222.
-> Tailscale on Monolith/Construct and wmux on Construct are being retired via
-> the manual `retire-remote-access.yml` workflow after LAN SSH verification.
+> Tailscale on Monolith/Construct and wmux on Construct were removed successfully
+> by retirement run 34625414651; fresh SSH, DNS and k3s API checks passed.
 > See `docs/construct-runbook.md` for the current procedure; older Tailscale
 > deployment references below are historical, not instructions to reinstall it.
 
@@ -536,7 +536,7 @@ for a raw `http://192.168.30.10:<port>` with no hostname or TLS involved.
 ```bash
 snmpwalk -v2c -c littlewolfacres 192.168.10.1 1.3.6.1.2.1.1.1.0    # ER605
 snmpwalk -v2c -c littlewolfacres 192.168.10.102 1.3.6.1.2.1.1.1.0  # SG2218P
-snmpwalk -v2c -c littlewolfacres 192.168.10.100 1.3.6.1.2.1.1.1.0  # EAP245 Upstairs Hall
+snmpwalk -v2c -c littlewolfacres 192.168.10.100 1.3.6.1.2.1.1.1.0  # EAP245 Master Bedroom
 curl "http://localhost:9116/snmp?module=if_mib&auth=littlewolfacres_v2&target=192.168.10.1"
 ```
 
@@ -694,10 +694,11 @@ The owner confirmed on 2026-09-11 that the UPS is installed and its USB cable is
 connected to Watchtower. `nut_enabled` is still false. Do not assume that plugging
 in USB activated monitoring or shutdown protection.
 
-Before enabling the role, confirm the actual model and USB detection, resolve
-`nut_monitor_password` versus `vault_nut_monitor_password`, validate the exporter,
-and agree the shutdown policy and which devices are battery-backed. The current
-role configures Watchtower shutdown and does not coordinate Monolith shutdown.
+Owner confirms CyberPower CP1000PFCLCD and requests shutdown of Watchtower and
+Monolith after five minutes continuously on battery. USB detection, password
+mapping, exporter validation, Monolith client and graceful VM shutdown remain
+implementation prerequisites. See `nut-shutdown-plan.md`. The current role has
+no five-minute timer and does not coordinate Monolith shutdown.
 
 
 ---

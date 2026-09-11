@@ -312,8 +312,9 @@ logs in Grafana** above.
 ### UPS hardware and NUT activation
 
 The owner confirmed the UPS is installed and USB-connected to Watchtower on
-2026-09-11. The documented model is CP1000PFCLCD, but the role's device description
-says CP1500PFCLCD; confirm the actual device before updating configuration.
+2026-09-11. The owner confirms CyberPower CP1000PFCLCD; the role’s CP1500PFCLCD
+description is incorrect. Requested policy: shut down Watchtower and Monolith
+after five minutes continuously on battery. See `nut-shutdown-plan.md`.
 `nut_enabled: false` remains the declared state. No successful NUT activation is
 established by this audit.
 
@@ -447,8 +448,8 @@ Key metrics produced:
 
 The outdoor EAP225 is physically installed (owner confirmed 2026-09-11), but
 `ip_eap_out` remains empty and `snmp-eap-out` remains commented in the repository.
-Verify its current Omada identity/address and SNMP response before configuring
-the target. Do not infer active monitoring from physical installation alone.
+Owner reports Foyer at `192.168.10.102`; verify SNMP response before configuring
+the target. Master Bedroom is `192.168.10.100`, Downstairs Hall `192.168.10.101`. Do not infer active monitoring from physical installation alone.
 SG2218P is already declared under `snmp-sg2218p`.
 
 > **Naming note:** SNMP job/var names for the APs are location-based (`snmp-eap-up`,
@@ -460,8 +461,8 @@ SG2218P is already declared under `snmp-sg2218p`.
 ```bash
 # Verify SNMP reachability (run on watchtower)
 snmpwalk -v2c -c littlewolfacres 192.168.10.1 1.3.6.1.2.1.1.1.0   # ER605
-snmpwalk -v2c -c littlewolfacres 192.168.10.106 1.3.6.1.2.1.1.1.0   # EAP Upstairs Hall
-snmpwalk -v2c -c littlewolfacres 192.168.10.114 1.3.6.1.2.1.1.1.0   # EAP Downstairs Hall
+snmpwalk -v2c -c littlewolfacres 192.168.10.100 1.3.6.1.2.1.1.1.0   # EAP Master Bedroom
+snmpwalk -v2c -c littlewolfacres 192.168.10.101 1.3.6.1.2.1.1.1.0   # EAP Downstairs Hall
 
 # Query SNMP exporter directly for ER605
 curl "http://localhost:9116/snmp?module=if_mib&auth=littlewolfacres_v2&target=192.168.10.1"

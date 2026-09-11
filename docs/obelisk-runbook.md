@@ -11,7 +11,7 @@
 
 ## Current State
 
-Owner confirmed 2026-09-11: Obelisk still exists, is unused and is no longer needed. Decommissioning is pending a retention decision; no disk deletion is authorized by this status update. Historical setup was manual QEMU/KVM on Monolith, not KubeVirt.
+Owner confirmed 2026-09-11: Obelisk still exists, is unused and is no longer needed. Retain its disk images, installation artifacts and redeployment configuration for possible reuse (owner decision, 2026-09-11). No file deletion is authorized. Runtime shutdown/decommission has not been verified. Historical setup was manual QEMU/KVM on Monolith, not KubeVirt.
 
 ---
 
@@ -38,7 +38,7 @@ sudo qemu-system-x86_64 \
   -pidfile /tmp/obelisk.pid
 ```
 
-**TODO:** wrap in systemd service for clean lifecycle management.
+**Historical TODO (deferred):** wrap in systemd only if the VM is brought back into use.
 
 ---
 

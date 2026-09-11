@@ -43,8 +43,8 @@ development identity and outbound key are separate from both runner identities.
 
 ## Cutover boundaries
 
-1. Resolve the runner-to-Construct SSH authorization prerequisite and complete the
-   already-reviewed Tailscale/wmux removal through the ordinary SSH forward.
+1. Completed 2026-09-11: runner key authorized and Tailscale/wmux removal verified
+   through the ordinary SSH forward (run 34625414651).
 2. Choose which legacy integrations remain in use. Prepare separate reviewable
    changes for retained services, including Linux deployment and client setup.
 3. Establish each identity and secret's owner. A developer account, a CI runner,
@@ -63,13 +63,14 @@ No new inbound WAN ports or dedicated Construct LAN IP are part of this plan.
 
 ## Open decisions
 
-- Retain or retire Scribe and Zombatron; which agent client should consume retained MCPs?
+- Scribe and Zombatron: owner deferred this work on 2026-09-11. Preserve source and credentials; do not migrate, activate or retire either yet.
 - Keep B-4/Ollama on Apex as a reachable inference service, or retire it?
 - Use the existing GitHub account on Construct or create a separate identity?
 - Is local privileged Ansible/kubectl administration needed, or should production
   changes remain dispatched through the existing self-hosted runners?
 
-Separately, EAP225-Outdoor is installed, but its address/name and monitoring need
-controller verification. Obelisk retention and NUT activation/shutdown policy remain
-separate decisions; moving development does not authorize deleting client data or
-turning on an unverified power shutdown policy.
+Separately, the owner identifies EAP225-Outdoor as Foyer at `192.168.10.102`
+(SNMP verification pending). Retain Obelisk files for possible redeployment.
+The UPS is a CP1000PFCLCD; the requested policy is shutdown of Watchtower and
+Monolith after five minutes continuously on battery. NUT remains disabled pending
+implementation and validation; see `nut-shutdown-plan.md`.
