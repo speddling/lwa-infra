@@ -1,6 +1,6 @@
 # LWA Infra -- Current State
 > Documentation audit: 2026-09-11. Historical running/up tables below are not a fresh live survey.
-> New operator confirmations: UPS installed and USB-connected to Watchtower; Obelisk still exists but is unused and no longer needed.
+> New operator confirmations: UPS installed and USB-connected to Watchtower; EAP225-Outdoor installed; all development moved from Apex to Construct; Obelisk still exists but is unused and no longer needed.
 
 ---
 
@@ -32,6 +32,7 @@ The original plan was a single 60-minute cutover across all 5 VLANs at once. Thr
 | OC200 | 192.168.10.3 | Mgmt (10) | Network Controller |
 | EAP245 -- Upstairs Hall | 192.168.10.100 | Mgmt (10) | Wireless AP |
 | EAP245 -- Downstairs Hall | 192.168.10.101 | Mgmt (10) | Wireless AP |
+| EAP225-Outdoor | Unverified | Unverified | Installed, owner confirmed 2026-09-11; verify live Omada inventory |
 | apex | 192.168.20.2 | Users (20) | Primary Workstation, WiFi |
 | studio | 192.168.20.3 | Users (20) | DAW / KDE Workstation, WiFi |
 | studio (wired dock) | 192.168.10.7 | Mgmt (10) | Out-of-band emergency access -- occasional/physical, not always-on |
@@ -75,7 +76,9 @@ All three APs will broadcast all three SSIDs (`LittleWolfAcres` on Users already
 
 **Remote access (deferred, not started):** single entry point via WireGuard on the ER605, one inbound UDP port (51820), no per-service port forwards. Clients land in their own subnet with reach into Users/Infra/IoT. Subnet allocation, client keys, and policy all still TBD.
 
-**Also deferred:** EAP225-Outdoor (balcony AP, needs outdoor-rated cable run + inline surge protector), coop/run Ethernet drop (pulled when power-to-coop project happens), VLAN-aware Linux bridge config on monolith (needed before any VM lands on a non-Infra VLAN).
+**Outdoor AP:** EAP225-Outdoor is installed (owner confirmed 2026-09-11). Its IP, Omada name, VLAN and SNMP scrape health still need verification. `ip_eap_out` is blank and its scrape job commented in code; the old installation TODO is stale.
+
+**Still deferred in prior documentation:** coop/run Ethernet drop and VLAN-aware Linux bridge configuration on Monolith. A dedicated LAN IP for Construct is not part of the current SSH-forward migration.
 
 ### DNS
 
@@ -418,13 +421,13 @@ Automatic TLS via Cloudflare DNS-01. Issues and renews Let's Encrypt certificate
 
 ## AI Nodes
 
-### B-4 (apex)
+### B-4 (historical Apex deployment; current use unverified)
 
 | Detail | Value |
 |---|---|
 | Host | `apex` |
 | Software | Ollama |
-| Status | Active |
+| Status | Historical deployment; retention/access from Construct pending |
 
 | Model | Size | Use |
 |---|---|---|
@@ -440,7 +443,7 @@ Automatic TLS via Cloudflare DNS-01. Issues and renews Let's Encrypt certificate
 | Hostname | `apex` |
 | IP | 192.168.20.2 (Users VLAN, WiFi) |
 
-Apex is the primary workstation. Earlier documentation claimed Scribe and Zombatron migrated to Construct, but only Apex launchd deployment code exists in this checkout. Current runtime location and continued use await owner confirmation.
+Apex was the original development host. The owner confirms all development work has moved to Construct. Surviving Apex-hosted services must be migrated or retired; this is not proof they are already deployed on Construct. Only Apex launchd deployment exists for Scribe/Zombatron. See `construct-development-migration.md` for the dependency inventory.
 
 | Service | Port | Status |
 |---|---|---|
@@ -453,6 +456,7 @@ Apex is the primary workstation. Earlier documentation claimed Scribe and Zombat
 | Detail | Value |
 |---|---|
 | Hostname | `construct` |
+| Development role | All development work moved here from Apex (owner confirmed 2026-09-11) |
 | Type | Debian 12 VM, QEMU/KVM on Monolith (NVMe `/vm/construct`) |
 | SSH | `monolith:2222` (port-forward), client alias `construct` |
 | Access transition | Workstation SSH verified; retirement blocked by runner-key authorization on Construct as of 2026-09-11. Neither host changed by the failed runs; see `construct-runbook.md` |

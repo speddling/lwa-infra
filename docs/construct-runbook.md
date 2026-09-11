@@ -8,6 +8,12 @@ in preflight: first host-key trust (fixed by PR #249), then runner-key authoriza
 for `speddling` on Construct. Neither run changed either host. Monolith's
 `gh-runner` public key must be authorized before the next attempt.
 
+## Development location
+
+All development moved from Apex to Construct (owner confirmed 2026-09-11).
+See `construct-development-migration.md` for legacy service deployment, credentials
+and workstation-specific assumptions that still need migration.
+
 ## Access
 
 From Apex or Studio:

@@ -5,7 +5,7 @@
 
 | Node | Hostname | Specs | Role |
 |---|---|---|---|
-| MacBook Air M4 (2025) | `apex` | 16GB unified, 256GB | Primary workstation; authoring also occurs on Construct |
+| MacBook Air M4 (2025) | `apex` | 16GB unified, 256GB | Client workstation; former development host, all dev work now on Construct |
 | AMD Ryzen 7 5700G | `monolith` | 8c/16t, 64GB DDR4-3200, 512GB NVMe + 500GB SSD + 256GB SSD + 3.6TB HDD + 1.8TB HDD | k3s single-node cluster, household services, Obelisk & Construct QEMU host |
 | Asus VM40B | `watchtower` | Celeron 1007U, 8GB DDR3-1600, 1TB Crucial MX500 | DNS, monitoring and self-hosted CI runner; separate from k3s workloads |
 | Dell Precision 5560 | `studio` | i9-11950H, 32GB DDR4, 512GB NVMe | Personal DAW: Reaper + M-Audio Air 192\|14 |
@@ -20,7 +20,7 @@ TP-Link Omada ecosystem, fully managed, SNMP-monitored.
 | OC200 | Omada network controller |
 | SG2218P | Managed PoE+ switch |
 | 2x EAP245 | Wireless access points |
-| EAP225-Outdoor | Planned outdoor access point; installation deferred |
+| EAP225-Outdoor | Installed (owner confirmed 2026-09-11); address/monitoring verification pending |
 
 **WAN:** T-Mobile FAST 5688W and AT&T CGW450, equal-weight load balanced across two independent cellular carriers.
 
@@ -62,7 +62,7 @@ ArgoCD continuously reconciles the root `apps` Application and ten child Applica
 It is independent of Actions. Several workflows also apply the same Kubernetes
 resources directly; controller/CRD installation and secret bootstrap have separate owners.
 
-Construct access is moving to LAN SSH through `monolith:2222`. After merging the access changes and verifying workstation SSH, the manual `retire-remote-access.yml` workflow removes Tailscale from Monolith/Construct and wmux from Construct. See `docs/construct-runbook.md`. `deploy-synapse.yml` deploys the Kubernetes MCP service; Scribe/Zombatron deployment code remains under `services/apex/`.
+All development work has moved from Apex to Construct (owner confirmed 2026-09-11). Surviving Apex-hosted tooling still needs migration or retirement; see [the migration inventory](docs/construct-development-migration.md). Construct access is moving to LAN SSH through `monolith:2222`. After merging the access changes and verifying workstation SSH, the manual `retire-remote-access.yml` workflow removes Tailscale from Monolith/Construct and wmux from Construct. See `docs/construct-runbook.md`. `deploy-synapse.yml` deploys the Kubernetes MCP service; Scribe/Zombatron deployment code remains under `services/apex/`.
 
 | Workflow | Trigger | What it does |
 |---|---|---|
@@ -126,8 +126,8 @@ The repository describes four MCP integrations with different access boundaries:
 
 **Argus** (`watchtower:9800`) - read-only live Alertmanager and Prometheus configs, systemd state, journald logs, and monitoring HTTP APIs.
 
-**Atlas** (apex, local stdio subprocess) - Plane project management: work items, modules, cycles. Official upstream `makeplane/plane-mcp-server`. Unscoped, full account permissions, no branch-protection equivalent unlike the other three.
+**Atlas** (historically Apex-local; Construct client configuration pending) - Plane project management: work items, modules, cycles. Official upstream `makeplane/plane-mcp-server`. Unscoped, full account permissions, no branch-protection equivalent unlike the other three.
 
 Plane itself (`plane.littlewolfacres.com`) is the accountability layer underneath all of this. Every client obligation, upgrade, and piece of operational debt is a tracked ticket there. This repo describes what is running; Plane is the record of what is owed.
 
-**B-4** - local LLM inference via Ollama on apex (Metal backend).
+**B-4** — historically Ollama on Apex (Metal backend). Retention and access from Construct require a decision; moving development does not move inference automatically.

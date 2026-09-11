@@ -12,6 +12,12 @@ Four MCP servers give Claude structured access to the homelab. Three are in-hous
 
 Synapse, Scribe, and Argus follow the same security pattern: dedicated system user, no shell, UFW-restricted to apex (`{{ ip_apex }}` in `ansible/vars/main.yml`, currently `192.168.20.2`), no write surface except where explicitly scoped (Scribe — git only, branch-protected). **Atlas is architecturally different and unscoped — see its section below before assuming the same guardrails apply.**
 
+> Development migration (2026-09-11): all development now runs on Construct.
+> Apex/macOS commands below are historical and must not be executed as-is on
+> Construct. See `construct-development-migration.md` for the migration inventory.
+> SSH source rules, keys, vault access and service deployment need explicit review;
+> changing the hostname or replacing `/Users` with `/home` is not sufficient.
+
 ---
 
 ## Claude Desktop Configuration (apex)

@@ -445,10 +445,11 @@ Key metrics produced:
 
 ### Pending additions
 
-A commented scrape job stub already exists in `prometheus.yml.j2` for the outdoor AP
-(garage / future livestock area). SG2218P is now live (`snmp-sg2218p`). Once the
-outdoor AP is installed and assigned an IP, set `ip_eap_out` in `ansible/vars/main.yml`
-and uncomment the `snmp-eap-out` job. Track the full VLAN migration in Plane.
+The outdoor EAP225 is physically installed (owner confirmed 2026-09-11), but
+`ip_eap_out` remains empty and `snmp-eap-out` remains commented in the repository.
+Verify its current Omada identity/address and SNMP response before configuring
+the target. Do not infer active monitoring from physical installation alone.
+SG2218P is already declared under `snmp-sg2218p`.
 
 > **Naming note:** SNMP job/var names for the APs are location-based (`snmp-eap-up`,
 > `snmp-eap-down`, `ip_eap_up`, `ip_eap_down`) rather than tied to the current EAP245
