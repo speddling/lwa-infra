@@ -49,12 +49,12 @@ GitHub Actions pipelines on self-hosted runners (monolith, watchtower). All chan
 
 ArgoCD is not a GitHub Actions workflow. It is a continuously-running GitOps controller that manages 11 services on the cluster, reconciling their live state against this repo on every push to master. It lives in the Stack section above.
 
-Services running locally on Construct VM (Debian 12 on Monolith) are deployed via the `deploy-synapse.yml` workflow. Services formerly on apex (Scribe MCP, Zombatron Importer) have migrated to Construct and are now in `services/construct/ansible/`.
+Construct access is moving to LAN SSH through `monolith:2222`. After merging the access changes and verifying workstation SSH, the manual `retire-remote-access.yml` workflow removes Tailscale from Monolith/Construct and wmux from Construct. See `docs/construct-runbook.md`. `deploy-synapse.yml` deploys the Kubernetes MCP service; Scribe/Zombatron deployment code remains under `services/apex/`.
 
 | Workflow | Trigger | What it does |
 |---|---|---|
 | `deploy-watchtower.yml` | Push to master | DNS, monitoring, exporters, Loki/Promtail |
-| `deploy-monolith.yml` | Push to master | Firewall, monitoring agents, Tailscale |
+| `deploy-monolith.yml` | Push to master | Firewall, monitoring agents |
 | `deploy-synapse.yml` | Push to master | Build + push image, deploy to k3s |
 | `deploy-fileserver.yml` | Manual | Samba config |
 | `deploy-navidrome.yml` | Manual | Storage config + k8s manifests (also via ArgoCD) |
@@ -70,6 +70,7 @@ Services running locally on Construct VM (Debian 12 on Monolith) are deployed vi
 | `import-minecraft-world.yml` | Manual | Stage world via Ansible and bounce pod |
 | `slack-minecraft-import.yml` | Zombatron Importer bot | Clear import marker and bounce pod |
 | `bootstrap-argocd.yml` | Manual (once) | cert-manager + ArgoCD install |
+| `retire-remote-access.yml` | Manual after LAN SSH verification | Remove Tailscale from both hosts and wmux from Construct; preserve VM disk |
 | `bootstrap-construct.yml` | Manual (once) | Debian 12 dev VM provisioning |
 | `bootstrap-kubevirt.yml` | Manual (once) | KubeVirt + Obelisk VM bootstrap (archived) |
 | `bootstrap-plane.yml` | Push + manual | Plane secrets + TLS certificate |
@@ -86,7 +87,7 @@ Services running locally on Construct VM (Debian 12 on Monolith) are deployed vi
 | Minecraft Bedrock | monolith | Family Minecraft server |
 | Samba | monolith | Network file shares |
 | Obelisk (Win11 VM) | monolith | Client-facing Windows environment, RDP |
-| Construct (Debian 12 VM) | monolith | Persistent development environment via Tailscale + wmux |
+| Construct (Debian 12 VM) | monolith | Persistent development environment via SSH on monolith:2222 |
 | Plane | monolith | Project management and incident tracking |
 | Firecrawl | monolith | Web scraping and extraction API |
 | AdGuard Home + Unbound | watchtower | Recursive DNS with ad and tracker blocking |

@@ -1,6 +1,12 @@
 # LWA Infra -- Architecture Overview
 > Last updated: 2026-07-07
 
+> Access update (2026-09-11): Construct uses SSH through Monolith TCP 2222.
+> Tailscale on Monolith/Construct and wmux on Construct are being retired via
+> the manual `retire-remote-access.yml` workflow after LAN SSH verification.
+> See `docs/construct-runbook.md` for the current procedure; older Tailscale
+> deployment references below are historical, not instructions to reinstall it.
+
 ---
 
 ## Network Topology

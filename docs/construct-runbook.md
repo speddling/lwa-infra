@@ -1,476 +1,102 @@
-# LWA Infra -- Construct Runbook
-> Last updated: 2026-08-04
+# Construct runbook
 
-**Host:** Monolith (`100.127.193.14`, Tailscale)
-**Guest:** Debian 12 (Bookworm)
-**SSH (Tailscale):** `speddling@100.95.178.6` (Tailscale name: `construct`)
-**SSH (port forward):** `ssh -p 2222 speddling@100.127.193.14` → `construct:22`
-**User:** `speddling` (sudo)
+Updated: 2026-09-11. Desired access is LAN SSH through Monolith. The retirement
+workflow must complete before Tailscale and wmux can be considered removed live.
 
----
+## Access
 
-## Purpose
-
-Persistent development environment for AI-assisted coding, accessible from any laptop via Tailscale. Built to run Pi coding agent and wmux for seamless session continuity across locations.
-
----
-
-## Current State
-
-Fully automated provisioning via Ansible + cloud-init. VM lifecycle managed by systemd service.
-
----
-
-## How It's Running
-
-QEMU/KVM process managed by systemd service `construct.service`:
+From Apex or Studio:
 
 ```bash
-sudo systemctl status construct
-sudo systemctl start construct
-sudo systemctl stop construct
+ssh -p 2222 speddling@monolith.littlewolfacres.com
 ```
 
-**Underlying QEMU command** (from systemd unit):
-```bash
-/usr/bin/qemu-system-x86_64 \
-  -enable-kvm \
-  -m 16384 \
-  -smp 8 \
-  -machine q35 \
-  -cpu host \
-  -drive file=/vm/construct/disk.img,if=virtio,format=qcow2 \
-  -drive file=/vm/construct/cloud-init.iso,media=cdrom,readonly=on \
-  -netdev user,id=net0,hostfwd=tcp::2222-:22 \
-  -device virtio-net-pci,netdev=net0 \
-  -display none \
-  -serial file:/tmp/construct-console.log \
-  -daemonize \
-  -pidfile /run/construct.pid
-```
+Client SSH configuration (replace an older Tailscale-based `Host construct` entry):
 
----
-
-## Storage
-
-All on NVMe boot drive LVM (`/dev/ubuntu-vg` on `/dev/nvme0n1p3`):
-
-| Path | Size | Purpose |
-|---|---|---|
-| `/dev/ubuntu-vg/construct` | 80G LV | Mounted at `/vm/construct` |
-| `/vm/construct/disk.img` | 3.4G qcow2 | Guest OS disk (grows dynamically) |
-| `/vm/construct/debian-12-generic-amd64.qcow2` | 427M | Base cloud image (permanent artifact) |
-| `/vm/construct/cloud-init.iso` | ~50KB | Cloud-init data (regenerated on provision) |
-
-**Actual disk usage:** Check with `sudo qemu-img info /vm/construct/disk.img`
-
----
-
-## Initial Provisioning
-
-Fully automated via Ansible. Run once to create the VM:
-
-```bash
-# From your workstation
-cd services/monolith/ansible
-ansible-playbook -i inventory.ini playbooks/construct.yml \
-  --vault-password-file ~/.vault_pass
-```
-
-**What the playbook does:**
-1. Creates LVM logical volume (`/dev/vg-root/construct`)
-2. Mounts it at `/vm/construct`
-3. Downloads Debian 12 generic cloud image
-4. Creates 80G qcow2 disk from cloud image
-5. Generates cloud-init ISO with:
-   - User `speddling` + SSH key
-   - Hostname `construct`
-   - Tailscale auth key (from vault)
-   - Dev tool installation scripts
-6. Creates systemd service
-7. Starts the VM
-
-**First boot** (via cloud-init):
-- Creates user, installs SSH key
-- Sets hostname
-- Installs and authenticates Tailscale (`--accept-dns=false`, DNS managed manually)
-- Installs: git, gh, node, python, go, tmux, vim, curl, jq
-- Installs NVM + Node.js 22
-- Installs Pi coding agent (under Node 22)
-- Installs and builds wmux
-- Creates wmux systemd user service (auto-started)
-- Fixes DNS (resolv.conf → watchtower DNS, chattr +i)
-
----
-
-## Cloud-Init Details
-
-Cloud-init data is injected via ISO at `/vm/construct/cloud-init.iso`.
-
-**user-data.yml** (rendered from Ansible template):
-- SSH key from vault
-- Package list
-- Tailscale auth key
-- Post-boot scripts (runcmd)
-
-**meta-data.yml:**
-- instance-id: `construct-vm`
-- local-hostname: `construct`
-
-**To regenerate cloud-init ISO** (if you need to reset the VM):
-```bash
-cd services/monolith/ansible
-ansible-playbook -i inventory.ini playbooks/construct.yml \
-  --tags cloud-init \
-  --vault-password-file ~/.vault_pass
-```
-
-Then restart the VM:
-```bash
-sudo systemctl restart construct
-```
-
----
-
-## Network Access
-
-### Via Tailscale (Primary)
-```bash
-ssh speddling@100.95.178.6
-```
-
-**Recommended `~/.ssh/config` entry:**
-```text
+```sshconfig
 Host construct
-  HostName construct.tailea7d70.ts.net
-  User speddling
+    HostName monolith.littlewolfacres.com
+    Port 2222
+    User speddling
+    IdentitiesOnly yes
+    IdentityFile ~/.ssh/id_ed25519
 ```
 
-Then you can use:
-```bash
-ssh construct
-```
+Then use `ssh construct`. The alias names the guest; its connection goes to
+Monolith's LAN address, currently `192.168.30.10`, port 2222. Confirm addressing
+against current network state before changing it. No WAN port forward is intended.
+A separate LAN IP for Construct is deferred; it would require a separate networking change.
 
-> **Note:** After the latest rebuild (2026-08-04), the old Tailscale node
-> (`construct` at IP `100.67.178.34`) was deleted and the rebuilt VM was
-> renamed to `construct` (IP `100.95.178.6`). Tailscale assigns a new machine
-> identity on disk rebuild, so the node key changes each time.
+Monolith's UFW role allows this port from Apex (`192.168.20.2`) and Studio
+(`192.168.20.3`). QEMU forwards it to guest port 22. Existing broad or manually
+added firewall rules are not automatically removed by these additive rules.
 
+## Retire Tailscale and wmux on existing hosts
 
-### Via Port Forward (Fallback)
-If Tailscale is down or not yet authenticated:
-```bash
-ssh -p 2222 speddling@100.127.193.14
-```
+1. Review and merge the migration PR. Let **Deploy Monolith Config** complete;
+   it applies the SSH firewall rules and no longer installs Tailscale.
+2. From Apex or Studio, verify a fresh key-authenticated SSH login through
+   `monolith:2222`. Verify the host key against a trusted existing connection;
+   do not disable host-key checking. Confirm the guest hostname is `construct`.
+3. Move active work to an ordinary SSH session. Stopping wmux terminates its
+   terminal sessions. Herdr is separately installed; this migration does not
+   install, configure or remove it.
+4. The Monolith runner's `gh-runner` account needs its existing SSH key authorized
+   for `speddling` on both Monolith and Construct, passwordless sudo on both,
+   and trusted known-host entries for `192.168.30.10` and `[127.0.0.1]:2222`.
+   Ansible must already be installed (the Monolith deploy installs it).
+5. Dispatch **Retire Tailscale and wmux** from `master`, checking
+   `lan_ssh_verified` only after step 2. It runs
+   `services/construct/ansible/playbooks/retire-remote-access.yml` on Monolith.
+6. Verify a new `ssh construct` session from the workstation, DNS resolution,
+   and cluster/application health. The workflow checks fresh runner SSH
+   connections, internal/public DNS, and the k3s API after removal.
 
-Host port 2222 forwards to construct's port 22.
+The workflow preflights both hosts before mutation, retires Construct first,
+then Monolith only after Construct verifies successfully. It does not invoke
+`construct-vm`, restart QEMU, change disks, or reconfigure guest networking.
+It removes the Tailscale packages, apt sources, keyring and local node identity;
+wmux's user service/application; and its specific live/persisted iptables redirect.
+Unrelated iptables rules, development tools, user lingering, and `~/.wmux` session
+records are retained. Cloud-init on future VMs installs neither service.
 
----
+The live DNS check on 2026-09-11 found systemd-resolved using QEMU's DHCP resolver
+(`10.0.2.3`). The migration leaves that configuration intact. Older documentation
+about immutable `/etc/resolv.conf` does not describe this inspected VM.
 
-## Post-Boot Configuration
+Tailnet device records, reusable auth keys, old workstation SSH aliases and any
+Cloudflare/AdGuard records pointing to tailnet addresses are outside this workflow.
+Review/remove obsolete entries separately after successful migration; do not
+publish Construct's QEMU-private address as a LAN DNS record.
 
-### Start wmux
-```bash
-ssh speddling@construct
-wmux new dev    # or wmux attach dev if session exists
-```
+## Failure handling
 
-wmux is also running as a systemd user service (`wmux.service`) on construct,
-accessible via browser over Tailscale:
+If preflight fails, fix the SSH key, host trust, sudo or resolver problem before
+retrying. If a later check fails, stop and use Monolith's LAN SSH connection to
+inspect Construct through `127.0.0.1:2222`. The removal workflow can be rerun after
+the failure is resolved; it is not a VM rebuild or an automated rollback.
 
-```text
-http://construct.tailea7d70.ts.net:3478/?token=QatyoM5m45aVPvai6pNNk0UWSHQl487c
-```
+## VM and storage
 
-> **Tip:** You can also use `http://100.95.178.6:3478/...` (Tailscale IP) or
-> `http://construct.littlewolfacres.com:3478/...` if you configure a DNS record.
-> See [DNS Names](#dns-names) below.
-
-- **No SSH tunnel needed** — construct is directly reachable at its Tailscale IP
-- **Token** is stored in `~/.wmux/token` inside the VM
-- **Machine**: "construct" is configured as `kind: local` (spawns a bash PTY
-  on construct itself)
-- **Auth mode**: `shared-or-login` (shared token URL by default)
-- **Management**:
-  ```bash
-  systemctl --user status wmux.service
-  systemctl --user restart wmux.service
-  journalctl --user -u wmux.service -f
-  ```
-
-> **Dev mode**: The service runs `npm run dev` (tsx hot-reload). The pre-built
-> `dist/` is available via `npm start` for production mode if performance
-> becomes an issue.
-
-### wmux 403 Forbidden (wrong Host header)
-
-**Symptom**: Accessing wmux via a custom domain (`construct.littlewolfacres.com`)
-returns `403 Forbidden` with `{"error":"forbidden_host"}`.
-
-**Cause**: wmux validates the `Host` header against an allowlist. By default,
-only the bound IP, `localhost`, and `*.ts.net` names are accepted. Custom
-domains must be added via `WMUX_ALLOWED_HOSTS`.
-
-**Fix**: Add `construct.littlewolfacres.com` to `WMUX_ALLOWED_HOSTS` in the
-wmux service file:
-```bash
-# Edit the service file
-nano /home/speddling/.config/systemd/user/wmux.service
-# Add: Environment=WMUX_ALLOWED_HOSTS=construct.littlewolfacres.com
-
-# Restart the service
-systemctl --user daemon-reload
-systemctl --user restart wmux.service
-```
-
-This is already handled by the cloud-init template (variable:
-`construct_wmux_allowed_hosts`).
-
-### DNS Names
-
-wmux is reachable via several DNS names, all resolving to the same Tailscale IP
-(`100.95.178.6`):
-
-| URL | How it works | Setup |
-|-----|-------------|-------|
-| `construct.tailea7d70.ts.net:3478` | Tailscale MagicDNS (automatic) | None — auto-generated |
-| `100.95.178.6:3478` | Tailscale direct IP | None |
-| `construct.littlewolfacres.com:3478` | Your custom domain | Add A record → `100.95.178.6` |
-
-**For `construct.littlewolfacres.com`:**
-- Add an **A record** (gray-cloud / DNS-only) on Cloudflare pointing to
-  `100.95.178.6` (Tailscale IP). This is only reachable from inside the
-  tailnet — the `100.x.x.x` IP is CGNAT and not publicly routable.
-- Optionally add the same A record on your local DNS (watchtower at
-  `192.168.30.11`) so `littlewolfacres.com` resolves correctly for tailnet
-  devices via the Tailscale Split DNS route.
-- **Do not** proxy (orange-cloud) the Cloudflare record — Cloudflare cannot
-  reach Tailscale IPs.
-
-The cloud-init automatically detects the Tailscale DNS name and sets it as
-`WMUX_PUBLIC_URL` in the service file. This survives IP changes across rebuilds.
-
-### Portless Access (port 80 → 3478 redirect)
-
-wmux listens on port 3478, but for convenience a portless URL (`http://construct.littlewolfacres.com/`)
-is available via an iptables redirect installed by cloud-init:
+Debian 12, 8 vCPUs, 16 GB RAM, QEMU/KVM with user-mode NAT. Guest address is normally
+`10.0.2.15`; this is not directly reachable from LAN clients.
+`construct.service` on Monolith manages `/vm/construct/disk.img` (80 GB qcow2)
+backed by `/dev/ubuntu-vg/construct`. The base Debian qcow2 image is a backing-file
+dependency and must be preserved with the VM disk.
 
 ```bash
-# Redirects port 80 → 3478 on the Tailscale interface
-iptables -t nat -C PREROUTING -i tailscale0 -p tcp --dport 80 -j REDIRECT --to-port 3478
+# Read-only inspection on Monolith
+systemctl status construct
+journalctl -u construct -n 50
+sudo qemu-img info /vm/construct/disk.img
 ```
 
-This rule is idempotent (skips if already present) and persists across reboots via
-`iptables-persistent` (installed as an apt package in cloud-init). It only applies
-to traffic arriving via the Tailscale interface — localhost traffic is unaffected.
+**Do not run Bootstrap Construct or the construct-vm provisioning role to apply
+this migration.** That role unconditionally deletes the VM disk, including with
+`--tags cloud-init` because deletion tasks use `always`. The bootstrap workflow's
+`rebuild=false` does not protect an existing disk; `rebuild=true` also kills other
+QEMU processes. Use provisioning only as an explicitly reviewed rebuild operation.
 
-**Browser URL**: `http://construct.littlewolfacres.com/?token=QatyoM5m45aVPvai6pNNk0UWSHQl487c`
-
-### Install Additional Tools
-```bash
-# Inside construct
-sudo apt update
-sudo apt install <package>
-```
-
-### Update Pi
-```bash
-npm update -g @earendil-works/pi-coding-agent
-```
-
----
-
-## Maintenance
-
-### Expand Disk (if needed)
-1. Grow the LV on monolith:
-   ```bash
-   sudo lvextend -L +20G /dev/ubuntu-vg/construct
-   ```
-
-2. Grow the qcow2 image:
-   ```bash
-   sudo qemu-img resize /vm/construct/disk.img +20G
-   ```
-
-3. Inside construct, grow the filesystem:
-   ```bash
-   sudo growpart /dev/vda 1
-   sudo resize2fs /dev/vda1
-   ```
-
-### Backup
-```bash
-# On monolith
-sudo qemu-img convert -O qcow2 -c /vm/construct/disk.img \
-  /mnt/hdd-c/backups/construct-$(date +%Y%m%d).qcow2
-```
-
-### Rebuild from Scratch
-```bash
-# On monolith
-sudo systemctl stop construct
-sudo rm -rf /vm/construct/*
-
-# From your workstation
-cd services/monolith/ansible
-ansible-playbook -i inventory.ini playbooks/construct.yml \
-  --vault-password-file ~/.vault_pass
-```
-
----
-
-## Troubleshooting
-
-### VM won't boot
-Check systemd service logs:
-```bash
-sudo journalctl -u construct -f
-```
-
-### Can't SSH via Tailscale
-1. Check Tailscale status inside the VM (via port forward):
-   ```bash
-   ssh -p 2222 speddling@100.127.193.14
-   sudo tailscale status
-   ```
-
-2. Check auth key in vault is valid:
-   ```bash
-   ansible-vault view ansible/vars/vault.yml | grep tailscale_auth_key
-   ```
-
-3. Check Tailscale admin console for construct node
-
-### DNS Resolution Failure (Tailscale upstream DNS missing)
-
-**Symptom**: Pi reports "Connection error" / "Retry failed after 3 attempts"
-when trying to reach model provider APIs (api.github.com, api.kilo.ai, etc.).
-DNS lookups return empty.
-
-**Root cause**: The Tailscale tailnet has no upstream DNS resolvers configured
-in the admin console. Tailscale's managed stub resolver (100.100.100.100) can
-only resolve internal `.ts.net` domains, not public internet domains.
-
-**Fix applied** (in cloud-init):
-- `--accept-dns=false` passed to `tailscale up` (prevents Tailscale from
-  managing `/etc/resolv.conf`)
-- `/etc/resolv.conf` written with the local DNS server (watchtower at
-  `192.168.30.11`)
-- `chattr +i /etc/resolv.conf` prevents overwrites
-
-**Permanent fix** (to do once in [Tailscale admin console](https://login.tailscale.com/admin/dns)):
-1. Go to **DNS → Nameservers**
-2. Add `192.168.30.11` (or `1.1.1.1`, `8.8.8.8`) as upstream DNS servers
-3. After applying, revert the cloud-init local fix (remove `--accept-dns=false`
-   and the manual resolv.conf writes) — Tailscale will manage DNS properly
-   tailnet-wide
-
-### Node.js Version Mismatch (crypto.hash / regex v flag)
-
-**Symptom**: `SyntaxError: Invalid regular expression flags` when running pi,
-or `crypto.hash is not a function` when running wmux.
-
-**Cause**: Debian 12 ships Node.js 18. Both pi-coding-agent and wmux require
-Node.js 22+ (they use `crypto.hash()` and regex `v` flag).
-
-**Fix**: Node.js 22 is installed via [nvm](https://github.com/nvm-sh/nvm)
-and set as the default. The wmux systemd service sets `PATH` to use
-`~/.nvm/versions/node/v22.x/bin`. nvm init is sourced in both `.bashrc`
-and `.profile` so non-interactive shells (SSH commands, systemd) also pick up
-Node 22.
-
-> **Note:** Debian 12's system npm sets `npm_config_prefix=/usr/local`, which
-> breaks nvm ("nvm is not compatible with npm_config_prefix"). The cloud-init
-> template unsets this in the nvm init snippets written to `.bashrc`/`.profile`.
-
-**For automation**: The cloud-init installs nvm, installs Node 22, and writes
-nvm init to `.bashrc`/`.profile`. If rebuilding, verify with:
-```bash
-bash -lc 'node --version'   # should be v22.x
-```
-
-### wmux Service Crash Loop (durable endpoint parent directory must be owner-only)
-
-**Symptom**: wmux service crashes on startup with
-`durable endpoint parent directory must be owner-only` and restarts in a loop
-(restart counter climbs rapidly).
-
-**Root cause**: wmux's `DurableEndpointStore` checks that the `~/.wmux/`
-directory has mode `0700` (owner-only). If the directory was pre-created by
-another process with `0755` permissions (the default under umask 022), wmux
-refuses to start. The `ensureSecureParent()` check creates the directory if
-it doesn't exist, but does **not** chmod it if it already exists with wrong
-permissions.
-
-**Fix** (on construct VM):
-```bash
-chmod 700 ~/.wmux
-systemctl --user restart wmux.service
-```
-
-**Permanent fix**: The cloud-init template (`cloud-init-user-data.j2`) now
-includes `mkdir -p + chmod 700 ~/.wmux` in the `setup-wmux-service.sh` script
-before starting the service. This ensures correct permissions even if the
-directory was pre-created by an earlier process.
-
-### Cloud-init didn't run
-Check cloud-init logs inside construct:
-```bash
-ssh -p 2222 speddling@100.127.193.14
-sudo cloud-init status
-sudo cat /var/log/cloud-init.log
-sudo cat /var/log/cloud-init-output.log
-```
-
-### High CPU usage
-Check QEMU process:
-```bash
-ps aux | grep qemu | grep construct
-top -p $(cat /var/run/construct.pid)
-```
-
----
-
-## Connect
-
-```bash
-# SSH via Tailscale (primary)
-ssh speddling@construct.tailea7d70.ts.net
-# or, with ~/.ssh config entry above:
-ssh construct
-
-# SSH via port forward (fallback)
-ssh -p 2222 speddling@100.127.193.14
-
-# Start wmux session
-wmux attach dev
-
-# Access wmux in browser
-#   http://construct.tailea7d70.ts.net:3478/?token=$(cat ~/.wmux/token)
-
-# Check VM status
-sudo systemctl status construct
-
-# Restart VM
-sudo systemctl restart construct
-
-# Stop VM
-sudo systemctl stop construct
-
-# View console output (if running in foreground for debugging)
-sudo journalctl -u construct -f
-```
-
----
-
-## TODO
-
-- [ ] Configure Tailscale upstream DNS in admin console (192.168.30.11) — eliminates need for local resolv.conf fix
-- [ ] Add `construct.littlewolfacres.com` A record → `100.95.178.6` on Cloudflare (DNS-only/gray-cloud) and watchtower local DNS
-- [ ] Evaluate switching wmux from dev mode (`npm run dev`) to production mode (`npm start`) for better performance
-- [ ] Automated backup cron job (daily qcow2 snapshot to hdd-c)
-- [ ] Prometheus node_exporter inside construct
-- [ ] UFW rules on Monolith (SSH port 2222 restricted to LAN + Tailscale)
-- [ ] Test disaster recovery (full rebuild from playbook)
-- [ ] Evaluate serial console access (`/tmp/construct-console.log`) for better debugging vs -nographic
+Git, GitHub CLI, Node 22, Python, Go, tmux and Pi remain in first-boot provisioning.
+Fresh provisioning uses SSH keys and disables password authentication. Existing
+SSH authentication settings are not altered during retirement.

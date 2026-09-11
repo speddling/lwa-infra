@@ -11,23 +11,3 @@ construct_hostname: construct
 construct_user: speddling
 construct_debian_version: "12"
 construct_cloud_image_url: "https://cloud.debian.org/images/cloud/bookworm/latest/debian-12-generic-amd64.qcow2"
-
-# wmux browser terminal multiplexer settings
-construct_wmux_port: 3478
-
-# Additional hostnames wmux accepts in the Host header (beyond the Tailscale IP
-# and *.ts.net names which are auto-allowed). Use this to enable vanity domains
-# like construct.littlewolfacres.com.
-construct_wmux_allowed_hosts: "construct.littlewolfacres.com"
-
-# DNS server for the construct VM. Tailscale tailnet has no upstream DNS
-# resolvers configured, so --accept-dns=false is used and resolv.conf is
-# managed manually. 192.168.30.11 = watchtower local DNS.
-# To fix at the tailnet level, add upstream DNS resolvers in the Tailscale
-# admin console (https://login.tailscale.com/admin/dns) and remove the
-# --accept-dns=false flag from setup-tailscale.sh.
-construct_dns_server: "192.168.30.11"
-
-# Node.js version installed via nvm (Debian 12 ships Node 18, but
-# pi-coding-agent and wmux require Node 22+ for regex v flag / crypto.hash API)
-construct_node_version: "22"

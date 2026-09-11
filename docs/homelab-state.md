@@ -257,7 +257,7 @@ k3s single-node cluster host. Runs all household and client services.
 |---|---|---|
 | Synapse | ✅ Active | MCP/AI tooling namespace |
 || Obelisk | ⚠️ Deprecated (Windows 11 VM on `/mnt/ssd-b` -- QEMU/KVM. RDP: `192.168.30.10:33389`. Scheduled for decommission at end-of-month upgrades) |
-| Construct | ✅ Active | Debian 12 dev VM on NVMe `/vm/construct` -- QEMU/KVM. SSH: `construct` (Tailscale) or `monolith:2222` |
+| Construct | ✅ Active | Debian 12 dev VM on NVMe `/vm/construct` -- QEMU/KVM. SSH: `monolith:2222` (client alias `construct`) |
 
 ### Services
 
@@ -272,7 +272,7 @@ k3s single-node cluster host. Runs all household and client services.
 | Synapse | MCP server | ✅ Running |
 | hdd-d mirror | Nightly rsync hdd-c -> hdd-d via systemd timer at 02:00 | ✅ Running |
 || Obelisk | QEMU/KVM Win11 VM -- RDP `192.168.30.10:33389` | ⚠️ Deprecated (scheduled for decommission at end-of-month upgrades) |
-| Construct | QEMU/KVM Debian 12 dev VM -- SSH `monolith:2222` or Tailscale | ✅ Running |
+| Construct | QEMU/KVM Debian 12 dev VM -- SSH `monolith:2222` | ✅ Running |
 | Plane | Project management -- `plane.littlewolfacres.com` | ✅ Running (via ArgoCD) |
 
 ### Samba Shares
@@ -308,7 +308,7 @@ k3s single-node cluster host. Runs all household and client services.
 | 30885 | TCP | ArgoCD app-controller metrics | watchtower |
 | 30883 | TCP | ArgoCD server metrics | watchtower |
 | 30900 | TCP | kube-state-metrics | watchtower |
-| 2222 | TCP | Construct SSH (port forward) | LAN + Tailscale |
+| 2222 | TCP | Construct SSH (port forward) | Apex + Studio (WiFi); verify live rules after deploy |
 | 33389 | TCP | Obelisk RDP (NodePort) | LAN |
 | 39182 | TCP | Obelisk windows_exporter | watchtower |
 
@@ -451,8 +451,8 @@ Apex has transitioned to a pure workstation role — no longer runs self-hosted 
 |---|---|
 | Hostname | `construct` |
 | Type | Debian 12 VM, QEMU/KVM on Monolith (NVMe `/vm/construct`) |
-| SSH | `monolith:2222` (port-forward) or Tailscale |
-| Tailscale IP | 100.67.178.34 (Infra VLAN) |
+| SSH | `monolith:2222` (port-forward), client alias `construct` |
+| Access transition | Tailscale and wmux retirement pending manual workflow; see `construct-runbook.md` |
 
 | Service | Port | Status |
 |---|---|---|

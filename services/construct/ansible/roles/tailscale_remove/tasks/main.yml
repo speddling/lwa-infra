@@ -1,0 +1,45 @@
+---
+- name: Collect service state
+  ansible.builtin.service_facts:
+
+- name: Disconnect Tailscale and restore settings it managed
+  ansible.builtin.command: tailscale down
+  when:
+    - "'tailscaled.service' in ansible_facts.services"
+    - ansible_facts.services['tailscaled.service'].state == 'running'
+
+- name: Stop and disable Tailscale
+  ansible.builtin.systemd:
+    name: tailscaled
+    state: stopped
+    enabled: false
+  when: "'tailscaled.service' in ansible_facts.services"
+
+- name: Collect installed packages
+  ansible.builtin.package_facts:
+    manager: auto
+
+- name: Remove installed Tailscale packages
+  ansible.builtin.apt:
+    name: "{{ ['tailscale', 'tailscale-archive-keyring'] | intersect(ansible_facts.packages.keys() | list) }}"
+    state: absent
+    purge: true
+  when: "'tailscale' in ansible_facts.packages or 'tailscale-archive-keyring' in ansible_facts.packages"
+
+- name: Remove Tailscale repository, keys and local identity
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /etc/apt/sources.list.d/tailscale.list
+    - /etc/apt/sources.list.d/tailscale.sources
+    - /usr/share/keyrings/tailscale-archive-keyring.gpg
+    - /usr/share/keyrings/tailscale-archive-keyring.asc
+    - /var/lib/tailscale
+    - /tmp/setup-tailscale.sh
+
+- name: Verify the overlay interface is gone
+  ansible.builtin.command: ip link show tailscale0
+  register: tailscale_interface
+  changed_when: false
+  failed_when: tailscale_interface.rc == 0

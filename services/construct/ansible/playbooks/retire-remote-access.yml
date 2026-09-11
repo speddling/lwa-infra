@@ -1,0 +1,97 @@
+---
+# Deliberately separate from construct-vm: that provisioning role deletes disks.
+- name: Verify both hosts over ordinary SSH before changing either
+  hosts: retirement
+  become: true
+  any_errors_fatal: true
+  tasks:
+    - name: Require an operator-verified LAN login
+      ansible.builtin.assert:
+        that:
+          - lan_ssh_verified | default(false) | bool
+          - ansible_hostname == inventory_hostname
+        fail_msg: Verify a fresh key-authenticated login from Apex or Studio to Monolith port 2222 first.
+    - name: Verify name resolution before removal
+      ansible.builtin.command: "getent ahostsv4 {{ item }}"
+      loop:
+        - github.com
+        - watchtower.littlewolfacres.com
+      changed_when: false
+    - name: Check whether the wmux checkout exists
+      ansible.builtin.stat:
+        path: /home/speddling/wmux/.git
+      register: wmux_git
+      when: inventory_hostname == 'construct'
+    - name: Check for local wmux source changes before deleting the application
+      ansible.builtin.command: git -C /home/speddling/wmux status --porcelain --untracked-files=all
+      become_user: speddling
+      register: wmux_changes
+      changed_when: false
+      when:
+        - inventory_hostname == 'construct'
+        - wmux_git.stat.exists
+    - name: Preserve any unfinished work in the wmux checkout
+      ansible.builtin.assert:
+        that: wmux_changes.stdout | default('') == ''
+        fail_msg: Save local wmux source changes outside its checkout before retirement.
+      when: inventory_hostname == 'construct'
+
+    - name: Record successful preflight
+      ansible.builtin.set_fact:
+        retirement_preflight_passed: true
+
+- name: Retire Construct browser terminal and overlay network
+  hosts: construct
+  become: true
+  any_errors_fatal: true
+  pre_tasks:
+    - name: Require successful preflight on both hosts
+      ansible.builtin.assert:
+        that:
+          - hostvars['construct'].retirement_preflight_passed | default(false) | bool
+          - hostvars['monolith'].retirement_preflight_passed | default(false) | bool
+  roles:
+    - wmux_remove
+    - tailscale_remove
+  post_tasks:
+    - name: Discard the old SSH connection
+      ansible.builtin.meta: reset_connection
+    - name: Verify a fresh connection through the SSH forward
+      ansible.builtin.wait_for_connection:
+        timeout: 60
+    - name: Verify Construct DNS after removal
+      ansible.builtin.command: "getent ahostsv4 {{ item }}"
+      loop:
+        - github.com
+        - watchtower.littlewolfacres.com
+      changed_when: false
+    - name: Record successful Construct retirement
+      ansible.builtin.set_fact:
+        construct_retirement_verified: true
+
+- name: Retire Monolith overlay after Construct verification succeeds
+  hosts: monolith
+  become: true
+  any_errors_fatal: true
+  pre_tasks:
+    - name: Require verified Construct retirement before touching Monolith
+      ansible.builtin.assert:
+        that:
+          - hostvars['construct'].construct_retirement_verified | default(false) | bool
+  roles:
+    - tailscale_remove
+  post_tasks:
+    - name: Discard the old SSH connection
+      ansible.builtin.meta: reset_connection
+    - name: Verify a fresh connection over the LAN
+      ansible.builtin.wait_for_connection:
+        timeout: 60
+    - name: Verify Monolith DNS after removal
+      ansible.builtin.command: "getent ahostsv4 {{ item }}"
+      loop:
+        - github.com
+        - watchtower.littlewolfacres.com
+      changed_when: false
+    - name: Verify the k3s API still responds
+      ansible.builtin.command: k3s kubectl get nodes
+      changed_when: false

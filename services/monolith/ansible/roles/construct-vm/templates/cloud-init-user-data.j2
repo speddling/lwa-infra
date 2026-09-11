@@ -11,14 +11,11 @@ users:
     groups: sudo
     shell: /bin/bash
     sudo: ['ALL=(ALL) NOPASSWD:ALL']
-    lock_passwd: false
+    lock_passwd: true
     ssh_authorized_keys:
       - {{ ssh_public_key_construct }}
 
-chpasswd:
-  list: |
-    {{ construct_user }}:tempDebug123
-  expire: false
+ssh_pwauth: false
 
 # Package installation moved to runcmd with retry logic
 # to avoid race conditions with network initialization
@@ -40,73 +37,6 @@ write_files:
       export NVM_DIR="$HOME/.nvm"
       [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
 
-  - path: /tmp/wmux-service.conf
-    content: |
-      [Unit]
-      Description=wmux browser terminal multiplexer
-      After=network-online.target tailscaled.service
-      Wants=network-online.target
-
-      [Service]
-      Type=simple
-      WorkingDirectory=/home/{{ construct_user }}/wmux
-      Environment=NODE_ENV=development
-      Environment=PATH=__NVM_BIN_PATH__:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-      Environment=WMUX_HOST=__TS_IP__
-      Environment=WMUX_PORT={{ construct_wmux_port }}
-      Environment=WMUX_PUBLIC_URL=__WMUX_BASE__
-      Environment=WMUX_ALLOWED_BIND_RANGES=
-      Environment=WMUX_ALLOWED_HOSTS={{ construct_wmux_allowed_hosts | default("") }}
-      Environment=WMUX_BROWSER_AUTH_MODE=shared-or-login
-      Environment=WMUX_AUTOMATION_TOKEN_PATH=
-      Environment=WMUX_HELPER_TOKEN_PATH=
-      Environment=WMUX_SCOPED_CREDENTIAL_TTL_MS=
-      ExecStartPre=/usr/bin/env node scripts/wmux-wait-bind ${WMUX_HOST}
-      ExecStart=/usr/bin/npm run dev -- --host ${WMUX_HOST} --port ${WMUX_PORT}
-      Restart=on-failure
-      RestartSec=2
-
-      [Install]
-      WantedBy=default.target
-
-  # --- Shell scripts ---
-  - path: /tmp/setup-tailscale.sh
-    permissions: '0755'
-    content: |
-      #!/bin/bash
-      set -e
-
-      # Add Tailscale repository
-      curl -fsSL https://pkgs.tailscale.com/stable/debian/bookworm.noarmor.gpg | \
-        sudo tee /usr/share/keyrings/tailscale-archive-keyring.gpg >/dev/null
-
-      echo "deb [signed-by=/usr/share/keyrings/tailscale-archive-keyring.gpg] \
-        https://pkgs.tailscale.com/stable/debian bookworm main" | \
-        sudo tee /etc/apt/sources.list.d/tailscale.list
-
-      sudo apt-get update -qq
-      sudo apt-get install -y tailscale
-
-      # --accept-routes is intentionally OMITTED: the construct VM also runs k3s,
-      # which uses 10.42.0.0/16 (pods) and 10.43.0.0/16 (services) for its internal
-      # network. Accepting route announcements from other Tailscale nodes can
-      # install conflicting routes, making k3s ClusterIPs (e.g. ArgoCD repo-server
-      # at 10.43.x.x) unreachable. Root cause of the 18-day ArgoCD outage.
-      sudo tailscale up --authkey={{ tailscale_auth_key }} \
-        --accept-dns=false
-
-  - path: /tmp/setup-dns.sh
-    permissions: '0755'
-    content: |
-      #!/bin/bash
-      set -e
-      # Tailscale tailnet has no upstream DNS resolvers configured.
-      # Use the local DNS server (watchtower) for resolution.
-      # See: https://github.com/tailscale/tailscale — admin console DNS settings.
-      echo "nameserver {{ construct_dns_server }}" > /etc/resolv.conf
-      # Prevent Tailscale or anything else from overwriting resolv.conf
-      chattr +i /etc/resolv.conf
-
   - path: /tmp/setup-dev-tools.sh
     permissions: '0755'
     content: |
@@ -124,7 +54,7 @@ write_files:
       sudo apt-get install -y gh
 
       # Install NVM for user and Node.js 22
-      # Debian 12 ships Node 18, but pi-coding-agent and wmux require Node 20+
+      # Debian 12 ships Node 18, but pi-coding-agent requires Node 22+
       # (they use the regex 'v' flag / crypto.hash API only available in Node 22+).
       sudo -u {{ construct_user }} bash -c 'curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash'
 
@@ -160,82 +90,11 @@ write_files:
         npm install -g @earendil-works/pi-coding-agent
       '
 
-      # Install wmux — browser terminal multiplexer
-      sudo -u {{ construct_user }} bash -c '
-        export NVM_DIR="$HOME/.nvm"
-        [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
-        nvm use 22
-        git clone https://github.com/gisenberg/wmux.git ~/wmux
-        cd ~/wmux
-        npm install
-        npm run build
-      '
-
       # Git config
       sudo -u {{ construct_user }} bash -c '
         git config --global user.name "James Hart"
         git config --global user.email "speddling@gmail.com"
       '
-
-  - path: /tmp/setup-wmux-service.sh
-    permissions: '0755'
-    content: |
-      #!/bin/bash
-      set -e
-
-      # Enable lingering so systemd user services work without an active login session
-      sudo loginctl enable-linger {{ construct_user }}
-
-      # Get the Tailscale IPv4 address and DNS name of this host
-      # The IP changes after rebuild, but the DNS name is stable for the machine.
-      TS_IP=$(tailscale ip -4 2>/dev/null | head -1)
-      if [ -z "$TS_IP" ]; then
-        echo "WARNING: no Tailscale IP found; wmux service not created."
-        exit 0
-      fi
-      echo "Tailscale IP: $TS_IP"
-
-      # Try to get the Tailscale MagicDNS name (e.g. construct.tailea7d70.ts.net)
-      TS_DNS=$(tailscale status --json 2>/dev/null | python3 -c \
-        "import sys,json; print(json.load(sys.stdin).get('Self',{}).get('DNSName',''))" 2>/dev/null)
-      if [ -n "$TS_DNS" ]; then
-        WMUX_BASE="http://${TS_DNS}:{{ construct_wmux_port }}"
-        echo "Tailscale DNS name: $TS_DNS"
-      else
-        WMUX_BASE="http://${TS_IP}:{{ construct_wmux_port }}"
-        echo "No DNS name found, using IP for URL"
-      fi
-
-      # Determine nvm Node 22 bin path
-      NVM_BIN_PATH=$(sudo -u {{ construct_user }} bash -lc 'echo $NVM_BIN' 2>/dev/null)
-      if [ -z "$NVM_BIN_PATH" ]; then
-        # Fallback: find the node v22 bin under .nvm
-        NVM_BIN_PATH=$(ls -d /home/{{ construct_user }}/.nvm/versions/node/v22*/bin 2>/dev/null | head -1)
-      fi
-      echo "nvm bin path: $NVM_BIN_PATH"
-
-      # Create systemd user service directory
-      sudo -u {{ construct_user }} mkdir -p /home/{{ construct_user }}/.config/systemd/user
-
-      # Generate wmux.service from template, replacing placeholders
-      sudo -u {{ construct_user }} sed \
-        -e "s|__TS_IP__|$TS_IP|g" \
-        -e "s|__WMUX_BASE__|$WMUX_BASE|g" \
-        -e "s|__NVM_BIN_PATH__|$NVM_BIN_PATH|g" \
-        /tmp/wmux-service.conf > /home/{{ construct_user }}/.config/systemd/user/wmux.service
-
-      # wmux requires ~/.wmux/ to be 0700 — its DurableEndpointStore checks
-      # parent directory permissions and crashes if group/world bits are set.
-      # The directory may have been pre-created with 0755 by other processes.
-      sudo -u {{ construct_user }} mkdir -p /home/{{ construct_user }}/.wmux
-      sudo -u {{ construct_user }} chmod 700 /home/{{ construct_user }}/.wmux
-
-      # Reload user systemd and enable + start wmux
-      sudo -u {{ construct_user }} systemctl --user daemon-reload
-      sudo -u {{ construct_user }} systemctl --user enable --now wmux.service
-
-      echo "wmux service created and started on ${WMUX_BASE}"
-      echo "Token: $(cat /home/{{ construct_user }}/.wmux/token 2>/dev/null)"
 
 runcmd:
   # Wait for network to be fully ready
@@ -255,23 +114,13 @@ runcmd:
       DEBIAN_FRONTEND=noninteractive apt-get install -y \
         curl wget git vim tmux jq build-essential \
         python3 python3-pip nodejs npm golang \
-        htop net-tools ca-certificates gnupg lsb-release iptables-persistent \
+        htop net-tools ca-certificates gnupg lsb-release \
         && break
       echo "Package installation failed, retry $i/3"
       sleep 10
     done
 
-  - /tmp/setup-tailscale.sh
-  - /tmp/setup-dns.sh
   - /tmp/setup-dev-tools.sh
-  - /tmp/setup-wmux-service.sh
-  # Redirect port 80 → 3478 on Tailscale interface for portless browser access
-  # (e.g. http://construct.littlewolfacres.com instead of :3478)
-  # Idempotent: skips if rule already exists.
-  - iptables -t nat -C PREROUTING -i tailscale0 -p tcp --dport 80 -j REDIRECT --to-port 3478 2>/dev/null || iptables -t nat -A PREROUTING -i tailscale0 -p tcp --dport 80 -j REDIRECT --to-port 3478
-  # Temporarily enable password authentication for debugging
-  - sed -i 's/^#\?PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config
-  - sed -i 's/^#\?PermitRootLogin.*/PermitRootLogin no/' /etc/ssh/sshd_config
   - systemctl enable ssh
   - systemctl restart ssh
 
@@ -279,7 +128,5 @@ timezone: UTC
 
 final_message: |
   Construct VM is ready!
-  SSH: ssh {{ construct_user }}@{{ construct_hostname }}
-  Tailscale should be authenticated and connected.
-  wmux should be running on port {{ construct_wmux_port }} (accessible via Tailscale IP).
-  Browser access: http://construct.littlewolfacres.com/?token=$(cat ~/.wmux/token)
+  SSH from the LAN: ssh -p {{ construct_ssh_port }} {{ construct_user }}@monolith.littlewolfacres.com
+  DNS uses the QEMU DHCP resolver. No overlay network or browser terminal is installed.
