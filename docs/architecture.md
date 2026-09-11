@@ -10,11 +10,11 @@ and migration status; verify addresses against fresh Omada evidence before chang
   and the unused Obelisk Windows VM. Its CI runner process runs as `gh-runner`.
 - **Watchtower:** Ubuntu, Celeron mini-PC, 8 GB RAM. DNS and monitoring remain
   outside k3s. Its CI runner process runs as `speddling`.
-- **Apex:** M4 MacBook Air workstation and documented local Ollama/AI tooling.
+- **Apex:** M4 MacBook Air client workstation; former host for development and local AI tooling. All development work has moved to Construct.
 - **Studio:** Dell Precision workstation/DAW. WiFi on Users; wired dock on Mgmt
   provides a separate emergency access path.
 - **Construct:** Debian 12 QEMU/KVM VM on Monolith, systemd lifecycle, 8 vCPUs,
-  16 GB RAM and 80 GB disk. Development authoring also happens here. Herdr is
+  16 GB RAM and 80 GB disk. All development authoring now happens here (owner confirmed 2026-09-11). Herdr is
   installed separately from the retired-in-design wmux browser terminal.
 - **Obelisk:** QEMU/KVM Windows VM still present, unused and no longer needed
   according to the owner (2026-09-11). Decommissioning awaits retention review.
@@ -27,7 +27,7 @@ not been established. Which equipment uses battery-backed outlets needs confirma
 
 T-Mobile FAST 5688W and AT&T CGW450 cellular WANs terminate on the Omada ER605.
 The SG2218P provides managed switching/PoE, OC200 control, and two EAP245s WiFi.
-Outdoor EAP225 installation is deferred. The old unmanaged switch is decommissioned.
+EAP225-Outdoor is installed (owner confirmed 2026-09-11); its live address and monitoring remain unverified. The old unmanaged switch is decommissioned.
 
 Documented VLAN state: Mgmt 10, Users 20 and wired Infra 30 are stable; IoT 40
 has the NVR; Guest 50 and blackhole/native 999 remain planned. Router policy is
@@ -48,7 +48,7 @@ execution. ER605 WireGuard remains a separate deferred design.
 ## Authoring through production
 
 ```text
-Apex or Construct: inspect → branch → edit → validate → PR
+Construct: inspect → branch → edit → validate → PR
                                            │
                                     human review/merge
                                            │
@@ -154,3 +154,6 @@ obligations and incidents; the repository declares infrastructure configuration.
 B-4/Ollama on Apex is documented, but no reproducible local inference deployment
 or current model inventory is managed by this repo. Do not infer that all earlier
 model names or endpoints are still active.
+
+See `construct-development-migration.md` for surviving Apex tooling and the
+Construct paths, identities and access dependencies that still need migration.

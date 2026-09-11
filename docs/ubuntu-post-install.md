@@ -1,6 +1,12 @@
 # LWA Infra -- Ubuntu Server Post-Install Runbook
 > Last updated: 2026-07-09
 
+> Development migration (2026-09-11): all development now runs on Construct.
+> Apex/macOS commands below are historical and must not be executed as-is on
+> Construct. See `construct-development-migration.md` for the migration inventory.
+> SSH source rules, keys, vault access and service deployment need explicit review;
+> changing the hostname or replacing `/Users` with `/home` is not sufficient.
+
 ---
 
 ## 0. Before You Begin
