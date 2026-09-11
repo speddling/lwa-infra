@@ -1,0 +1,132 @@
+---
+- name: Mask automatic shutdown monitoring before package installation
+  ansible.builtin.systemd_service:
+    name: nut-monitor.service
+    masked: true
+    daemon_reload: true
+
+- name: Create the NUT configuration directory
+  ansible.builtin.file:
+    path: /etc/nut
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Mark this configuration as telemetry-only
+  ansible.builtin.copy:
+    dest: /etc/nut/lwa-telemetry-only
+    content: "Remove this marker when deploying coordinated shutdown.\n"
+    owner: root
+    group: root
+    mode: '0600'
+
+- name: Install distribution NUT packages without starting services
+  ansible.builtin.apt:
+    name: [nut-server, nut-client]
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+    policy_rc_d: 101
+
+- name: Ensure the shutdown monitor remains stopped and disabled
+  ansible.builtin.systemd_service:
+    name: nut-monitor.service
+    state: stopped
+    enabled: false
+    masked: true
+    daemon_reload: true
+
+- name: Configure server mode without starting a monitor
+  ansible.builtin.copy:
+    dest: /etc/nut/nut.conf
+    content: "MODE=netserver\n"
+    owner: root
+    group: nut
+    mode: '0640'
+  register: nut_mode
+
+- name: Install local-only driver and server configuration
+  ansible.builtin.copy:
+    src: "{{ item }}"
+    dest: "/etc/nut/{{ item }}"
+    owner: root
+    group: nut
+    mode: '0640'
+  loop: [ups.conf, upsd.conf]
+  register: nut_configuration
+
+- name: Configure no authenticated control users
+  ansible.builtin.copy:
+    dest: /etc/nut/upsd.users
+    content: "# Telemetry only: no control or monitor accounts.\n"
+    owner: root
+    group: nut
+    mode: '0640'
+  register: nut_users
+
+- name: Load packaged USB permissions
+  ansible.builtin.command: udevadm control --reload-rules
+  changed_when: false
+
+- name: Apply permissions only to the identified UPS
+  ansible.builtin.command:
+    argv:
+      - udevadm
+      - trigger
+      - --action=change
+      - --subsystem-match=usb
+      - --attr-match=idVendor=0764
+      - --attr-match=idProduct=0601
+  changed_when: false
+
+- name: Wait for USB rule processing
+  ansible.builtin.command: udevadm settle --timeout=15
+  changed_when: false
+
+- name: Enable distribution driver enumeration
+  ansible.builtin.systemd_service:
+    name: nut-driver-enumerator.service
+    enabled: true
+    state: "{{ 'restarted' if nut_configuration.changed or nut_mode.changed else 'started' }}"
+    daemon_reload: true
+
+- name: Enable the local NUT server
+  ansible.builtin.systemd_service:
+    name: nut-server.service
+    enabled: true
+    state: "{{ 'restarted' if nut_configuration.changed or nut_mode.changed or nut_users.changed else 'started' }}"
+
+- name: Wait for readable UPS status
+  ansible.builtin.command: upsc cyberpower@127.0.0.1 ups.status
+  register: ups_status
+  changed_when: false
+  retries: 12
+  delay: 5
+  until: ups_status.rc == 0
+
+- name: Read selected UPS telemetry
+  ansible.builtin.command:
+    argv: [upsc, cyberpower@127.0.0.1, "{{ item }}"]
+  loop: [ups.model, ups.load, battery.charge, battery.runtime]
+  register: ups_telemetry
+  changed_when: false
+  # Some HID models do not supply every field. Report unavailable values explicitly.
+  failed_when: false
+
+- name: Verify automatic shutdown monitoring is masked and inactive
+  ansible.builtin.command: systemctl show nut-monitor.service --property=LoadState --property=ActiveState
+  register: monitor_state
+  changed_when: false
+  failed_when: >-
+    monitor_state.rc != 0 or
+    'LoadState=masked' not in monitor_state.stdout_lines or
+    'ActiveState=inactive' not in monitor_state.stdout_lines
+
+- name: Report telemetry and its limits
+  ansible.builtin.debug:
+    msg:
+      status: "{{ ups_status.stdout }}"
+      readings: "{{ ups_telemetry.results | map(attribute='stdout') | list }}"
+      unavailable_fields: "{{ ups_telemetry.results | rejectattr('rc', 'equalto', 0) | map(attribute='item') | list }}"
+      automatic_shutdown: "DISABLED; the five-minute policy is not active"

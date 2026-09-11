@@ -495,7 +495,9 @@ Apex was the original development host. The owner confirms all development work 
   the runner user's key/trust files for client-side SSH failures, not the target
   account's files. Construct trusts a separately pinned host key for the port forward.
 - **UPS:** hardware is installed and USB-connected. `nut_enabled` remains false.
-  Do not infer active monitoring or shutdown protection. Owner confirms CyberPower CP1000PFCLCD and requests both Watchtower and Monolith
+  Inspection run 34629066497 confirms USB CP1000PFCLCDa (`0764:0601`) on
+  Watchtower and no NUT packages on either host. Telemetry commissioning is prepared
+  under `services/ups/` but not deployed. Do not infer active shutdown protection. Owner confirms CyberPower CP1000PFCLCD and requests both Watchtower and Monolith
   shut down after 300 seconds continuously on battery. All data-connected equipment
   is owner-confirmed battery-backed. Typical outages last 2–3 minutes; runtime must
   be measured and reassessed after Monolith’s PSU/GPU upgrade. Implementation is pending; see
