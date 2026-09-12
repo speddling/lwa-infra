@@ -4,7 +4,7 @@
   become: true
   any_errors_fatal: true
   vars_files:
-    - ../../../../../ansible/vars/main.yml
+    - "{{ playbook_dir }}/../../../../ansible/vars/main.yml"
   pre_tasks:
     - name: Check for an existing UPS configuration
       ansible.builtin.stat:

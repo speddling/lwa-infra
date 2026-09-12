@@ -5,7 +5,18 @@ import subprocess
 import tempfile
 import yaml
 
-play = yaml.safe_load((Path(__file__).resolve().parents[1] / 'playbooks/telemetry.yml').read_text())[0]
+playbook = Path(__file__).resolve().parents[1] / 'playbooks/telemetry.yml'
+play = yaml.safe_load(playbook.read_text())[0]
+# Resolve the actual vars_files declaration, not a duplicate test-only path.
+from jinja2 import Environment, StrictUndefined
+for entry in play['vars_files']:
+    resolved = Environment(undefined=StrictUndefined).from_string(entry).render(playbook_dir=str(playbook.parent))
+    variables_file = Path(resolved)
+    if not variables_file.is_absolute():
+        variables_file = playbook.parent / variables_file
+    shared = yaml.safe_load(variables_file.read_text())
+    assert 'nut_enabled' in shared, 'Shared shutdown gate must be defined'
+
 gate = play['pre_tasks'][-1]
 cases = [
     # hostname, legacy enabled, config exists, marker exists, monitor state, allowed
