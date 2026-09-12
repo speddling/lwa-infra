@@ -1,0 +1,18 @@
+#!/usr/bin/python3
+"""Read-only: refuse to arm host shutdown over unmanaged QEMU guests."""
+from pathlib import Path
+import os
+import subprocess
+import sys
+
+main = subprocess.check_output(['systemctl', 'show', 'construct.service', '--property=MainPID', '--value'], text=True).strip()
+extra = []
+for path in Path('/proc').glob('[0-9]*/exe'):
+    try:
+        if os.path.basename(os.readlink(path)).startswith('qemu-system-') and path.parent.name != main:
+            extra.append(path.parent.name)
+    except FileNotFoundError:
+        pass
+if extra:
+    sys.exit('Unmanaged QEMU processes require shutdown/retirement review before activation: ' + ', '.join(extra))
+print('No unmanaged QEMU guests found; Obelisk files are not modified.')

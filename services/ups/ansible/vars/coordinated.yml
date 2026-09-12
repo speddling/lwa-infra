@@ -1,0 +1,6 @@
+---
+nut_primary_password: "{{ ('lwa-nut-watchtower-primary-v1:' ~ vault_nut_monitor_password) | hash('sha256') }}"
+nut_secondary_password: "{{ ('lwa-nut-monolith-secondary-v1:' ~ vault_nut_monitor_password) | hash('sha256') }}"
+nut_server_address: "{{ '127.0.0.1' if inventory_hostname == 'watchtower' else '192.168.30.11' }}"
+nut_login: "{{ 'watchtower-primary' if inventory_hostname == 'watchtower' else 'monolith-secondary' }}"
+nut_login_password: "{{ nut_primary_password if inventory_hostname == 'watchtower' else nut_secondary_password }}"

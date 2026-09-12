@@ -1,0 +1,23 @@
+[Unit]
+Description=Five-minute UPS battery policy (observation until armed)
+After=nut-server.service
+Wants=nut-server.service
+
+[Service]
+Type=simple
+ExecStart=/usr/local/sbin/lwa-ups-policy
+Restart=on-failure
+RestartSec=5
+RuntimeDirectory=lwa-ups-policy
+RuntimeDirectoryMode=0700
+RuntimeDirectoryPreserve=yes
+User=root
+UMask=0077
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/run/lwa-ups-policy
+
+[Install]
+WantedBy=multi-user.target

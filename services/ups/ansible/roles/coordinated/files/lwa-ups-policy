@@ -1,0 +1,87 @@
+#!/usr/bin/python3
+"""Poll-only timer; upsmon remains responsible for native emergency/FSD handling."""
+import json
+from pathlib import Path
+import subprocess
+import time
+
+STATE = Path('/run/lwa-ups-policy/state.json')
+ARMED = Path('/etc/nut/lwa-shutdown-armed')
+
+
+def decide(state, status, now, runtime=None):
+    """Unknown communication preserves the timer but cannot initiate FSD."""
+    state = dict(state)
+    if status is None:
+        return state, False
+    flags = set(status.split())
+    if 'OL' in flags and 'OB' not in flags:
+        return {}, False
+    if 'OB' not in flags:
+        return state, False
+    start = state.setdefault('on_battery_since', now)
+    return state, ('LB' in flags or (runtime is not None and runtime <= 600) or now - start >= 300)
+
+
+def read_status():
+    try:
+        p = subprocess.run(['/usr/bin/upsc', 'cyberpower@127.0.0.1', 'ups.status'],
+                           capture_output=True, text=True, timeout=5)
+        return p.stdout.strip() if p.returncode == 0 else None
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+
+
+def read_runtime():
+    try:
+        p = subprocess.run(['/usr/bin/upsc', 'cyberpower@127.0.0.1', 'battery.runtime'],
+                           capture_output=True, text=True, timeout=5)
+        value = float(p.stdout.strip())
+        return value if p.returncode == 0 and value >= 0 else None
+    except (OSError, ValueError, subprocess.TimeoutExpired):
+        return None
+
+
+def request_shutdown():
+    # This signal uses the local primary monitor; it does not bypass NUT coordination.
+    subprocess.run(['/usr/sbin/upsmon', '-c', 'fsd'], check=True, timeout=5,
+                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+
+def tick(state, status, now, armed, trigger=request_shutdown, runtime=None):
+    updated, due = decide(state, status, now, runtime)
+    if due and armed and not updated.get('fsd_sent'):
+        trigger()  # A failed signal leaves state retryable on the next poll.
+        updated['fsd_sent'] = True
+    return updated, due
+
+
+def main():
+    boot = Path('/proc/sys/kernel/random/boot_id').read_text().strip()
+    try:
+        saved = json.loads(STATE.read_text())
+        state = saved['state'] if saved['boot'] == boot else {}
+    except (FileNotFoundError, KeyError, ValueError):
+        state = {}
+    last_report = None
+    while True:
+        status = read_status()
+        armed = ARMED.exists()
+        try:
+            state, due = tick(state, status, time.monotonic(), armed, runtime=read_runtime())
+        except (OSError, subprocess.SubprocessError):
+            print('NUT FSD signal failed; will retry. Native upsmon protection remains independent.', flush=True)
+            time.sleep(5)
+            continue
+        report = (status, armed, due, state.get('fsd_sent', False))
+        if report != last_report:
+            print(f'UPS status={status!r} armed={armed} shutdown_due={due} fsd_sent={report[3]}', flush=True)
+            last_report = report
+        temporary = STATE.with_suffix('.tmp')
+        temporary.write_text(json.dumps({'boot': boot, 'state': state}))
+        temporary.replace(STATE)
+        time.sleep(5)
+
+
+if __name__ == '__main__':
+    main()

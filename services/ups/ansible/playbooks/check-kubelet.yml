@@ -1,0 +1,33 @@
+---
+# Imported tasks: query live settings, never assume files prove loaded configuration.
+- name: Query effective kubelet settings
+  ansible.builtin.command: k3s kubectl --request-timeout=15s get --raw /api/v1/nodes/monolith/proxy/configz
+  register: kubelet_config
+  changed_when: false
+  no_log: true
+  retries: 12
+  delay: 5
+  until: kubelet_config.rc == 0
+- name: Verify graceful node shutdown is configured in the running kubelet
+  ansible.builtin.assert:
+    that:
+      - (kubelet_config.stdout | from_json).kubeletconfig.shutdownGracePeriod == '2m0s'
+      - (kubelet_config.stdout | from_json).kubeletconfig.shutdownGracePeriodCriticalPods == '30s'
+      - (kubelet_config.stdout | from_json).kubeletconfig.featureGates.GracefulNodeShutdown | default(true) | bool
+      - (kubelet_config.stdout | from_json).kubeletconfig.shutdownGracePeriodByPodPriority | default([]) | length == 0
+    fail_msg: Running kubelet does not have the required shutdown grace periods.
+  no_log: true
+- name: Query live logind inhibitor limit
+  ansible.builtin.command: busctl get-property org.freedesktop.login1 /org/freedesktop/login1 org.freedesktop.login1.Manager InhibitDelayMaxUSec
+  register: inhibitor_limit
+  changed_when: false
+- name: Require sufficient inhibitor time for Kubernetes
+  ansible.builtin.assert:
+    that: (inhibitor_limit.stdout.split() | last | int) >= 120000000
+- name: Verify kubelet holds a shutdown-delay inhibitor
+  ansible.builtin.command: systemd-inhibit --list --no-pager --no-legend
+  register: inhibitors
+  changed_when: false
+- name: Require the kubelet shutdown inhibitor
+  ansible.builtin.assert:
+    that: "inhibitors.stdout is search('(?im)^.*kubelet.*shutdown.*delay.*$')"

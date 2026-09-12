@@ -1,0 +1,119 @@
+---
+- name: Record Construct boot identity before an acknowledged guest outage
+  hosts: construct
+  become: true
+  any_errors_fatal: true
+  tasks:
+    - name: Require an acknowledged guest outage
+      ansible.builtin.assert:
+        that:
+          - maintenance_ack | default(false) | bool
+          - ansible_facts.hostname == 'construct'
+    - name: Read the current guest boot ID
+      ansible.builtin.command: cat /proc/sys/kernel/random/boot_id
+      register: before_boot
+      changed_when: false
+    - name: Record the ready guest
+      ansible.builtin.set_fact:
+        construct_test_ready: true
+
+- name: Test guest shutdown and restart from the independent Monolith runner
+  hosts: monolith
+  become: true
+  any_errors_fatal: true
+  tasks:
+    - name: Require guest preflight and maintenance acknowledgement
+      ansible.builtin.assert:
+        that:
+          - maintenance_ack | default(false) | bool
+          - hostvars['construct'].construct_test_ready | default(false) | bool
+          - ansible_facts.hostname == 'monolith'
+    - name: Create the verification directory
+      ansible.builtin.file:
+        path: /var/lib/lwa-ups
+        state: directory
+        owner: root
+        group: root
+        mode: '0700'
+    - name: Invalidate any previous test result
+      ansible.builtin.file:
+        path: /var/lib/lwa-ups/construct-tested.json
+        state: absent
+    - name: Probe before the test
+      ansible.builtin.command: /usr/local/sbin/construct-stop --probe
+      changed_when: false
+    - name: Stop and recover the guest
+      block:
+        - name: Stop only Construct through its installed graceful helper
+          ansible.builtin.command: systemctl stop construct.service
+          register: guest_stop
+        - name: Inspect stop result before starting again
+          ansible.builtin.command: systemctl show construct.service --property=Result --property=ExecStop --property=ActiveState
+          register: guest_stop_result
+          changed_when: false
+        - name: Require a successful graceful helper exit
+          ansible.builtin.assert:
+            that:
+              - "'Result=success' in guest_stop_result.stdout_lines"
+              - "'ActiveState=inactive' in guest_stop_result.stdout_lines"
+              - "'/usr/local/sbin/construct-stop' in guest_stop_result.stdout"
+              - "'status=0' in guest_stop_result.stdout"
+      always:
+        - name: Restore Construct even if the stop test failed
+          ansible.builtin.systemd_service:
+            name: construct.service
+            state: started
+    - name: Record successful host-side test
+      ansible.builtin.set_fact:
+        construct_stop_test_passed: true
+
+- name: Verify recovery before recording acceptance
+  hosts: construct
+  become: true
+  gather_facts: false
+  any_errors_fatal: true
+  tasks:
+    - name: Require successful host-side shutdown
+      ansible.builtin.assert:
+        that: hostvars['monolith'].construct_stop_test_passed | default(false) | bool
+    - name: Discard the old SSH connection
+      ansible.builtin.meta: reset_connection
+    - name: Wait for guest SSH recovery
+      ansible.builtin.wait_for_connection:
+        timeout: 180
+    - name: Read new guest boot ID
+      ansible.builtin.command: cat /proc/sys/kernel/random/boot_id
+      register: after_boot
+      changed_when: false
+    - name: Verify a new boot occurred
+      ansible.builtin.assert:
+        that: before_boot.stdout != after_boot.stdout
+    - name: Verify DNS after recovery
+      ansible.builtin.command: getent hosts watchtower.littlewolfacres.com
+      changed_when: false
+    - name: Record recovered guest
+      ansible.builtin.set_fact:
+        construct_recovery_passed: true
+
+- name: Save acceptance evidence on Monolith
+  hosts: monolith
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Require completed shutdown and recovery
+      ansible.builtin.assert:
+        that:
+          - construct_stop_test_passed | default(false) | bool
+          - hostvars['construct'].construct_recovery_passed | default(false) | bool
+    - name: Hash installed lifecycle helper
+      ansible.builtin.stat:
+        path: /usr/local/sbin/construct-stop
+        checksum_algorithm: sha256
+      register: helper_hash
+    - name: Save test evidence tied to the helper version
+      ansible.builtin.copy:
+        dest: /var/lib/lwa-ups/construct-tested.json
+        content: "{{ {'helper_sha256': helper_hash.stat.checksum, 'guest_boot_id': hostvars['construct'].after_boot.stdout, 'stop_duration': guest_stop.delta} | to_nice_json }}\n"
+        owner: root
+        group: root
+        mode: '0600'

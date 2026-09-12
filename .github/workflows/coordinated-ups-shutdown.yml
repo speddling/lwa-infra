@@ -1,0 +1,168 @@
+name: Coordinated UPS shutdown
+
+on:
+  pull_request:
+    branches: [master]
+    paths:
+      - 'services/ups/**'
+      - '.github/workflows/coordinated-ups-shutdown.yml'
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'prepare is nondisruptive; apply-kubelet and test-construct require maintenance acknowledgement'
+        type: choice
+        options: [prepare, apply-kubelet, test-construct, activate, disarm]
+        default: prepare
+        required: true
+      maintenance_ack:
+        description: 'Approve the selected k3s/logind restart or Construct shutdown/recovery outage now'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: coordinated-ups-${{ github.event.pull_request.number || 'production' }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python -m pip install ansible-core==2.18.6
+      - name: Test policy, configuration and activation gates without real power commands
+        run: python services/ups/ansible/tests/test_coordinated.py
+      - name: Syntax-check every coordinated playbook with fixture variables
+        working-directory: services/ups/ansible
+        run: |
+          for play in prepare-shutdown apply-kubelet test-construct readiness activate-shutdown disarm-shutdown; do
+            ansible-playbook "playbooks/$play.yml" --syntax-check -e ups_target=monolith -e ups_vault_file=../tests/vault-fixture.yml
+          done
+
+  prepare-watchtower:
+    needs: validate
+    if: github.ref == 'refs/heads/master' && github.event_name == 'workflow_dispatch' && inputs.action == 'prepare'
+    runs-on: [self-hosted, watchtower]
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify local runner identity
+        run: test "$(hostname -s)/$(id -un)" = watchtower/speddling
+      - name: Prepare Watchtower without arming shutdown
+        working-directory: services/ups/ansible
+        env:
+          UPS_VAULT_PASSWORD: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}
+        run: |
+          set -euo pipefail
+          umask 077
+          vault_file=$(mktemp "$RUNNER_TEMP/ups-vault.XXXXXX")
+          trap 'rm -f "$vault_file"' EXIT
+          printf '%s' "$UPS_VAULT_PASSWORD" > "$vault_file"
+          ansible-playbook playbooks/prepare-shutdown.yml -e ups_target=watchtower --vault-password-file "$vault_file"
+
+  prepare-monolith:
+    needs: prepare-watchtower
+    if: github.ref == 'refs/heads/master' && inputs.action == 'prepare'
+    runs-on: [self-hosted, monolith]
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify local runner identity
+        run: test "$(hostname -s)/$(id -un)" = monolith/gh-runner
+      - name: Prepare Monolith client and kubelet files without restarting services
+        working-directory: services/ups/ansible
+        env:
+          UPS_VAULT_PASSWORD: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}
+        run: |
+          set -euo pipefail
+          umask 077
+          vault_file=$(mktemp "$RUNNER_TEMP/ups-vault.XXXXXX")
+          trap 'rm -f "$vault_file"' EXIT
+          printf '%s' "$UPS_VAULT_PASSWORD" > "$vault_file"
+          ansible-playbook playbooks/prepare-shutdown.yml -e ups_target=monolith --vault-password-file "$vault_file"
+
+  maintenance:
+    needs: validate
+    if: github.ref == 'refs/heads/master' && github.event_name == 'workflow_dispatch' && (inputs.action == 'apply-kubelet' || inputs.action == 'test-construct')
+    runs-on: [self-hosted, monolith]
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require the explicit maintenance acknowledgement and correct runner
+        env:
+          MAINTENANCE_ACK: ${{ inputs.maintenance_ack }}
+        run: |
+          test "$MAINTENANCE_ACK" = true
+          test "$(hostname -s)/$(id -un)" = monolith/gh-runner
+      - name: Run the chosen maintenance operation
+        working-directory: services/ups/ansible
+        env:
+          UPS_ACTION: ${{ inputs.action }}
+        run: |
+          case "$UPS_ACTION" in
+            apply-kubelet) ansible-playbook playbooks/apply-kubelet.yml -e maintenance_ack=true ;;
+            test-construct) ansible-playbook playbooks/test-construct.yml -e maintenance_ack=true ;;
+            *) exit 1 ;;
+          esac
+
+  check-watchtower:
+    needs: validate
+    if: github.ref == 'refs/heads/master' && github.event_name == 'workflow_dispatch' && inputs.action == 'activate'
+    runs-on: [self-hosted, watchtower]
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - run: test "$(hostname -s)/$(id -un)" = watchtower/speddling
+      - name: Read-only primary readiness check
+        working-directory: services/ups/ansible
+        run: ansible-playbook playbooks/readiness.yml -e ups_target=watchtower
+
+  activate-monolith:
+    needs: check-watchtower
+    if: github.ref == 'refs/heads/master' && inputs.action == 'activate'
+    runs-on: [self-hosted, monolith]
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - run: test "$(hostname -s)/$(id -un)" = monolith/gh-runner
+      - name: Verify guest acceptance and live kubelet settings before enabling the secondary
+        working-directory: services/ups/ansible
+        run: ansible-playbook playbooks/activate-shutdown.yml -e ups_target=monolith -e activate_shutdown=true
+
+  activate-watchtower:
+    needs: activate-monolith
+    if: github.ref == 'refs/heads/master' && inputs.action == 'activate'
+    runs-on: [self-hosted, watchtower]
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - run: test "$(hostname -s)/$(id -un)" = watchtower/speddling
+      - name: Enable primary coordination and arm the five-minute policy last
+        working-directory: services/ups/ansible
+        run: ansible-playbook playbooks/activate-shutdown.yml -e ups_target=watchtower -e activate_shutdown=true
+
+  disarm-watchtower:
+    needs: validate
+    if: github.ref == 'refs/heads/master' && github.event_name == 'workflow_dispatch' && inputs.action == 'disarm'
+    runs-on: [self-hosted, watchtower]
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - run: test "$(hostname -s)/$(id -un)" = watchtower/speddling
+      - name: Disable the primary timer and monitor on mains
+        working-directory: services/ups/ansible
+        run: ansible-playbook playbooks/disarm-shutdown.yml -e ups_target=watchtower -e disarm_shutdown=true
+
+  disarm-monolith:
+    needs: disarm-watchtower
+    if: github.ref == 'refs/heads/master' && inputs.action == 'disarm'
+    runs-on: [self-hosted, monolith]
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - run: test "$(hostname -s)/$(id -un)" = monolith/gh-runner
+      - name: Disable the secondary monitor on mains
+        working-directory: services/ups/ansible
+        run: ansible-playbook playbooks/disarm-shutdown.yml -e ups_target=monolith -e disarm_shutdown=true

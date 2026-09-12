@@ -1,0 +1,31 @@
+---
+- name: Apply prepared kubelet shutdown settings during an acknowledged maintenance window
+  hosts: monolith
+  become: true
+  any_errors_fatal: true
+  tasks:
+    - name: Require maintenance acknowledgement
+      ansible.builtin.assert:
+        that:
+          - maintenance_ack | default(false) | bool
+          - ansible_facts.hostname == 'monolith'
+    - name: Require prepared configuration
+      ansible.builtin.stat:
+        path: /var/lib/rancher/k3s/agent/etc/kubelet.conf.d/20-lwa-ups.conf
+      register: prepared_config
+    - name: Verify preparation is present
+      ansible.builtin.assert:
+        that: prepared_config.stat.exists
+    - name: Reload logind configuration by restarting its service
+      ansible.builtin.systemd_service:
+        name: systemd-logind.service
+        state: restarted
+    - name: Restart k3s to load kubelet configuration
+      ansible.builtin.systemd_service:
+        name: k3s.service
+        state: restarted
+    - name: Check live graceful shutdown configuration
+      ansible.builtin.import_tasks: check-kubelet.yml
+    - name: Verify the node returns Ready
+      ansible.builtin.command: k3s kubectl --request-timeout=15s wait node/monolith --for=condition=Ready --timeout=120s
+      changed_when: false

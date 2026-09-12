@@ -126,6 +126,6 @@ SSH authentication settings are not altered during retirement.
 ## Graceful guest shutdown
 
 See [Construct shutdown](construct-shutdown.md) for the prepared SSH-based lifecycle
-change. It is not deployed yet; current live stop behavior remains immediate SIGKILL
-until the configuration workflow succeeds. This is a prerequisite for coordinated
+change. Run 34663861718 installed and probed it without restarting the guest.
+A real shutdown/recovery test remains pending. This is a prerequisite for coordinated
 UPS shutdown of Monolith and Watchtower.

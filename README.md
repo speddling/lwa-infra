@@ -40,7 +40,7 @@ Local domain: `littlewolfacres.com`, all hosts resolve as `hostname.littlewolfac
 - **IaC** - Ansible for host configuration; Terraform Cloud workspaces for each server. Monolith declares a k3s bootstrap `null_resource`; Watchtower declares only the backend
 - **Automation** - GitHub Actions + Ansible (modular role structure)
 - **Secrets** - Ansible Vault, GitHub Actions secrets, generated Kubernetes secrets and workstation-local credentials; see `docs/architecture.md` for ownership exceptions
-- **Monitoring** - Prometheus, Grafana, Alertmanager, Loki, Promtail, Netdata, node_exporter, blackbox_exporter, snmp_exporter, adguard_exporter, tmobile_exporter (custom), reolink_exporter (custom), NUT (UPS installed and USB-connected; role disabled pending configuration review)
+- **Monitoring** - Prometheus, Grafana, Alertmanager, Loki, Promtail, Netdata, node_exporter, blackbox_exporter, snmp_exporter, adguard_exporter, tmobile_exporter (custom), reolink_exporter (custom), NUT (Watchtower telemetry active; coordinated shutdown prepared, not yet armed)
 - **OS** - Ubuntu Server 24.04 LTS (monolith + watchtower), macOS Sequoia (apex)
 
 ## CI/CD
@@ -110,7 +110,7 @@ All development work has moved from Apex to Construct (owner confirmed 2026-09-1
 | Loki | watchtower | Log aggregation |
 | Promtail | watchtower | Log shipping agent |
 | Netdata | watchtower | Real-time system monitoring |
-| NUT | watchtower | USB UPS installed; `nut_enabled: false`, software activation unverified |
+| NUT | watchtower; Monolith client prepared | USB telemetry active; [coordinated shutdown](docs/ups-shutdown-runbook.md) awaiting deployment and activation |
 | Synapse MCP | monolith | Claude infrastructure read access |
 | Scribe MCP | Runtime location awaiting confirmation | Git control plane; deployment code under `services/apex/` |
 | Argus MCP | watchtower | Claude monitoring read access |
