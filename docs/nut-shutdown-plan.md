@@ -22,10 +22,27 @@ QEMU has no QMP/monitor control arguments.
 
 The separate `deploy-ups-telemetry.yml` workflow prepares local telemetry only;
 see `../services/ups/README.md`. It does not activate the five-minute shutdown
-policy. Deployment and runtime verification are pending. Review measured telemetry
-before setting the graceful shutdown timeout; adding QMP to the current QEMU
-process will require a planned guest restart, unless a different control path is
-chosen. Do not restart Construct while active development depends on it.
+policy. Telemetry deployment run 34660864596 succeeded on 2026-09-12: mains (`OL`),
+22% load, 100% charge and 1700 seconds estimated runtime. The monitor was verified
+masked/inactive. This is a telemetry estimate at the sampled load, not an endurance test.
+
+The next prepared change uses the existing SSH forward for graceful Construct
+shutdown, avoiding a QMP retrofit/restart; see `construct-shutdown.md`. Installation
+is nondisruptive, but a real guest shutdown acceptance test still needs an outage window.
+
+## Agreed implementation order
+
+1. Construct: install and probe the restricted SSH stop handler, then test guest
+   shutdown/recovery in an agreed window.
+2. Monolith: install its NUT client and coordinate k3s workloads with guest shutdown.
+3. Watchtower: configure primary coordination and the five-minute timer; activate
+   only after the two preceding shutdown paths are verified.
+
+The owner approved this ordering work and confirms the network remains on battery.
+The planned GPU/PSU upgrade will require a new load/runtime assessment. Disconnecting
+from services does not establish that background inference has stopped. Plan explicit
+inference suspension when that workload is deployed; do not assume it already exists.
+The owner may add battery capacity if needed; no additional UPS is presently verified.
 
 ## Proposed behavior
 

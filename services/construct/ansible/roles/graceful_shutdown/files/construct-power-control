@@ -1,0 +1,17 @@
+#!/bin/sh
+# Forced command for Monolith's dedicated lifecycle key; never eval client input.
+set -eu
+[ "$(/bin/hostname -s)" = construct ] || exit 1
+case "${SSH_ORIGINAL_COMMAND:-}" in
+    probe)
+        /usr/bin/sudo -n -l /usr/bin/systemctl --no-block poweroff >/dev/null
+        printf '%s\n' construct-power-control-ready
+        ;;
+    poweroff)
+        exec /usr/bin/sudo -n /usr/bin/systemctl --no-block poweroff
+        ;;
+    *)
+        printf '%s\n' 'Only probe and poweroff are permitted.' >&2
+        exit 64
+        ;;
+esac
