@@ -24,6 +24,7 @@
 - name: Require sufficient inhibitor time for Kubernetes
   ansible.builtin.assert:
     that: (inhibitor_limit.stdout.split() | last | int) >= 120000000
+    fail_msg: "Live InhibitDelayMaxUSec is {{ inhibitor_limit.stdout }}; require at least 120000000. Run Inspect UPS and shutdown prerequisites to inspect logind fragment precedence."
 - name: Verify kubelet holds a shutdown-delay inhibitor
   ansible.builtin.command: systemd-inhibit --list --no-pager --no-legend
   register: inhibitors
