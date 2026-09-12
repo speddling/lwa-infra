@@ -45,7 +45,7 @@
       when: ups_target == 'monolith'
     - name: Check k3s version supports the configuration directory
       ansible.builtin.assert:
-        that: "(k3s_version.stdout | regex_search('v1\\.([0-9]+)', '\\1') | first | int) >= 32"
+        that: "(k3s_version.stdout | regex_findall('(?m)^k3s version v1[.]([0-9]+)[.]') | first | default('0') | int) >= 32"
       when: ups_target == 'monolith'
     - name: Require no stale UPS output-poweroff flags
       ansible.builtin.stat:

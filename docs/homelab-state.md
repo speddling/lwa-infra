@@ -503,7 +503,9 @@ Apex was the original development host. The owner confirms all development work 
   shut down after 300 seconds continuously on battery. All data-connected equipment
   is owner-confirmed battery-backed. Typical outages last 2–3 minutes; runtime must
   be measured and reassessed after Monolith’s PSU/GPU upgrade. Coordinated shutdown
-  is prepared, not deployed; see `ups-shutdown-runbook.md`. Construct’s graceful
+  is partially deployed: Watchtower preparation passed run 34712198245; Monolith
+  stopped before changes on a version-check error. Both remain unarmed; see
+  `ups-shutdown-runbook.md`. Construct’s graceful
   handler is installed (run 34663861718), with its real acceptance test pending.
 - **Firewall:** UFW tables above include historical live rules. The current
   Monolith role lacks the documented Studio dock, broad temporary SSH and Minecraft
