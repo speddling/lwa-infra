@@ -1,8 +1,9 @@
 # UPS commissioning and coordinated shutdown
 
 Watchtower telemetry is live (run 34660864596). Construct’s graceful handler is
-installed and probed (run 34663861718). Both-host coordination is prepared, not yet
-armed. See [the operational runbook](../../docs/ups-shutdown-runbook.md) for the
+installed and probed (run 34663861718). Watchtower preparation passed run
+34712198245; Monolith stopped before changes on a version-check error. Neither
+host is armed. See [the operational runbook](../../docs/ups-shutdown-runbook.md) for the
 complete prepare → maintenance tests → activate workflow and weekend test procedure.
 
 The telemetry-only workflow below is the initial commissioning path. Once the

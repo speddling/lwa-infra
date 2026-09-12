@@ -138,6 +138,15 @@ class ConfigTests(unittest.TestCase):
         self.run_gate(gate, {'ansible_facts': {'hostname': 'monolith'}}, False)
         self.run_gate(gate, {'ansible_facts': {'hostname': 'monolith'}, 'maintenance_ack': True}, True)
 
+    def test_k3s_version_gate(self):
+        plays = yaml.safe_load((root / 'playbooks/prepare-shutdown.yml').read_text())
+        gate = next(t for t in plays[0]['pre_tasks'] if t['name'] == 'Check k3s version supports the configuration directory')
+        for version, allowed in [('k3s version v1.32.0+k3s1\ngo version go1.23.4', True),
+                                 ('k3s version v1.34.1+k3s1', True),
+                                 ('k3s version v1.31.9+k3s1', False),
+                                 ('unrecognized output', False), ('', False)]:
+            self.run_gate(gate, {'ups_target': 'monolith', 'k3s_version': {'stdout': version}}, allowed)
+
     def test_outage_and_fsd_block_readiness(self):
         plays = yaml.safe_load((root / 'playbooks/readiness.yml').read_text())
         gate = next(t for t in plays[0]['tasks'] if t['name'] == 'Reject activation during an outage or committed shutdown')

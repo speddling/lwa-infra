@@ -1,6 +1,9 @@
 # Coordinated UPS shutdown
 
-Prepared 2026-09-12. The implementation below is not deployed or armed yet.
+Preparation run [34712198245](https://github.com/speddling/lwa-infra/actions/runs/34712198245)
+on 2026-09-12 completed Watchtower configuration, authentication and masked-monitor
+verification. Monolith stopped at a version-check expression error with zero changes;
+rerun preparation after the fix is merged. Neither host is armed.
 Watchtower telemetry is live; Construct's graceful stop handler is installed and
 its nondisruptive probe passed. A real guest shutdown test is still pending.
 
