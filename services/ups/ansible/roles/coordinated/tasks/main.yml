@@ -138,9 +138,13 @@
         owner: root
         group: root
         mode: '0644'
+    - name: Remove the superseded early-sorting managed logind fragment
+      ansible.builtin.file:
+        path: /etc/systemd/logind.conf.d/90-lwa-ups.conf
+        state: absent
     - name: Allow the kubelet's shutdown inhibitor sufficient time
       ansible.builtin.copy:
-        dest: /etc/systemd/logind.conf.d/90-lwa-ups.conf
+        dest: /etc/systemd/logind.conf.d/zz-lwa-ups.conf
         content: "[Login]\nInhibitDelayMaxSec=150s\n"
         owner: root
         group: root

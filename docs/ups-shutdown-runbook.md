@@ -1,11 +1,18 @@
 # Coordinated UPS shutdown
 
-Preparation run [34712198245](https://github.com/speddling/lwa-infra/actions/runs/34712198245)
-on 2026-09-12 completed Watchtower configuration, authentication and masked-monitor
-verification. Monolith stopped at a version-check expression error with zero changes;
-rerun preparation after the fix is merged. Neither host is armed.
-Watchtower telemetry is live; Construct's graceful stop handler is installed and
-its nondisruptive probe passed. A real guest shutdown test is still pending.
+Preparation completed on both hosts in [run 34715399533](https://github.com/speddling/lwa-infra/actions/runs/34715399533).
+Both NUT monitors are masked and inactive. Construct's graceful handler is installed
+and probed; its shutdown/recovery test remains pending.
+
+Maintenance [run 34720746270](https://github.com/speddling/lwa-infra/actions/runs/34720746270)
+restarted logind and k3s and verified the live kubelet grace periods, but the live
+logind inhibitor limit was below 120 seconds. Activation remains blocked. The
+managed fragment now sorts as `zz-lwa-ups.conf` to follow common vendor/kubelet
+fragments; the old `90-lwa-ups.conf` is removed during preparation. A later fragment
+is a suspected cause, not yet confirmed on Monolith. Use **Inspect UPS and shutdown
+prerequisites** to report the live limit, source directives, inhibitors and node Ready
+status. After merge, inspect, rerun preparation, then repeat the acknowledged
+maintenance action and verify the effective limit before activation.
 
 ## Policy and sequence
 

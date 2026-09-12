@@ -66,5 +66,19 @@ else:
         except OSError as exc:
             report["construct_control_options"] = {"error": str(exc)}
     report["watchtower_route"] = run(["ip", "route", "get", "192.168.30.11"])
+    report["logind_limit"] = run(["busctl", "get-property", "org.freedesktop.login1",
+        "/org/freedesktop/login1", "org.freedesktop.login1.Manager", "InhibitDelayMaxUSec"])
+    report["shutdown_inhibitors"] = run(["systemd-inhibit", "--list", "--no-pager", "--no-legend"])
+    # Selected public directives and source filenames only; omit other configuration.
+    config = run(["systemd-analyze", "cat-config", "systemd/logind.conf"])
+    report["logind_delay_sources"] = {
+        "exit_code": config.get("exit_code"),
+        "lines": [line for line in config.get("stdout", "").splitlines()
+                  if line.startswith("# /") or line.strip().startswith("InhibitDelayMaxSec=")],
+        "stderr": config.get("stderr", ""),
+    }
+    report["node_ready"] = run(["k3s", "kubectl", "--request-timeout=10s", "get", "node",
+        "monolith", "-o", "jsonpath={.status.conditions[?(@.type==\"Ready\")].status}"])
+
 
 print(json.dumps(report, indent=2))
