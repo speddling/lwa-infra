@@ -1,0 +1,73 @@
+---
+- name: Verify shutdown prerequisites without triggering shutdown
+  hosts: "{{ ups_target }}"
+  become: true
+  any_errors_fatal: true
+  tasks:
+    - name: Require the intended host
+      ansible.builtin.assert:
+        that:
+          - ups_target in ['watchtower', 'monolith']
+          - ansible_facts.hostname == ups_target
+    - name: Require coordinated configuration ownership
+      ansible.builtin.stat:
+        path: /etc/nut/lwa-coordinated
+      register: owner_marker
+    - name: Verify coordinated preparation is present
+      ansible.builtin.assert:
+        that: owner_marker.stat.exists
+    - name: Verify NUT authentication
+      ansible.builtin.command: /usr/local/sbin/lwa-ups-auth-check
+      changed_when: false
+    - name: Require mains power and no shutdown or low-battery state
+      ansible.builtin.command: "upsc cyberpower@{{ '127.0.0.1' if ups_target == 'watchtower' else '192.168.30.11' }} ups.status"
+      register: live_status
+      changed_when: false
+    - name: Reject activation during an outage or committed shutdown
+      ansible.builtin.assert:
+        that:
+          - "'OL' in live_status.stdout.split()"
+          - "'OB' not in live_status.stdout.split()"
+          - "'LB' not in live_status.stdout.split()"
+          - "'FSD' not in live_status.stdout.split()"
+    - name: Read current UPS runtime estimate
+      ansible.builtin.command: "upsc cyberpower@{{ '127.0.0.1' if ups_target == 'watchtower' else '192.168.30.11' }} battery.runtime"
+      register: live_runtime
+      changed_when: false
+    - name: Require at least the grace period plus shutdown reserve before activation
+      ansible.builtin.assert:
+        that: live_runtime.stdout | int >= 900
+        fail_msg: Runtime estimate below 15 minutes; review load and reserve before activation.
+    - name: Verify Monolith's live shutdown paths
+      when: ups_target == 'monolith'
+      block:
+        - name: Read Construct acceptance evidence
+          ansible.builtin.slurp:
+            src: /var/lib/lwa-ups/construct-tested.json
+          register: acceptance
+        - name: Hash current helper
+          ansible.builtin.stat:
+            path: /usr/local/sbin/construct-stop
+            checksum_algorithm: sha256
+          register: helper_hash
+        - name: Require acceptance for the installed helper
+          ansible.builtin.assert:
+            that: (acceptance.content | b64decode | from_json).helper_sha256 == helper_hash.stat.checksum
+        - name: Verify Construct is still reachable through its restricted lifecycle identity
+          ansible.builtin.command: /usr/local/sbin/construct-stop --probe
+          changed_when: false
+        - name: Verify the live stop override remains installed
+          ansible.builtin.command: systemctl show construct.service --property=ExecStop --property=ActiveState
+          register: guest_unit
+          changed_when: false
+        - name: Require the graceful stop override
+          ansible.builtin.assert:
+            that:
+              - "'/usr/local/sbin/construct-stop' in guest_unit.stdout"
+              - "'/bin/kill' not in guest_unit.stdout"
+              - "'ActiveState=active' in guest_unit.stdout_lines"
+        - name: Require review of any unmanaged QEMU guest before host shutdown activation
+          ansible.builtin.command: /usr/local/sbin/lwa-ups-check-vms
+          changed_when: false
+        - name: Verify effective Kubernetes shutdown settings
+          ansible.builtin.import_tasks: check-kubelet.yml

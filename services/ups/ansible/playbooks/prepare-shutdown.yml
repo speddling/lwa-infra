@@ -1,0 +1,63 @@
+---
+- name: Prepare coordinated shutdown with automatic actions disabled
+  hosts: "{{ ups_target }}"
+  become: true
+  any_errors_fatal: true
+  vars_files:
+    - "{{ playbook_dir }}/../../../../ansible/vars/main.yml"
+    - "{{ ups_vault_file | default(playbook_dir ~ '/../../../../ansible/vars/vault.yml') }}"
+    - ../vars/coordinated.yml
+  pre_tasks:
+    - name: Require the intended host and disabled legacy role
+      ansible.builtin.assert:
+        that:
+          - ups_target in ['watchtower', 'monolith']
+          - ansible_facts.hostname == ups_target
+          - not (nut_enabled | bool)
+    - name: Require the existing vaulted NUT seed without exposing it
+      ansible.builtin.assert:
+        that:
+          - vault_nut_monitor_password | default('') | length >= 12
+          - "'REPLACE' not in (vault_nut_monitor_password | default(''))"
+        fail_msg: A non-placeholder vault_nut_monitor_password is required in the shared vault.
+      no_log: true
+    - name: Inspect coordinated ownership and activation state
+      ansible.builtin.stat:
+        path: "/etc/nut/{{ item }}"
+      loop: [lwa-shutdown-armed, lwa-coordinated, lwa-telemetry-only, upsmon.conf]
+      register: nut_files
+    - name: Gather monitor service state
+      ansible.builtin.service_facts:
+    - name: Never replace an armed or running shutdown configuration
+      ansible.builtin.assert:
+        that:
+          - not nut_files.results[0].stat.exists
+          - ansible_facts.services.get('nut-monitor.service', {}).get('state', 'stopped') != 'running'
+          - not nut_files.results[3].stat.exists or nut_files.results[1].stat.exists or nut_files.results[2].stat.exists
+    - name: Verify the live Construct control path
+      ansible.builtin.command: /usr/local/sbin/construct-stop --probe
+      changed_when: false
+      when: ups_target == 'monolith'
+    - name: Require k3s with supported kubelet configuration fragments
+      ansible.builtin.command: k3s --version
+      register: k3s_version
+      changed_when: false
+      when: ups_target == 'monolith'
+    - name: Check k3s version supports the configuration directory
+      ansible.builtin.assert:
+        that: "(k3s_version.stdout | regex_search('v1\\.([0-9]+)', '\\1') | first | int) >= 32"
+      when: ups_target == 'monolith'
+    - name: Require no stale UPS output-poweroff flags
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      loop: [/etc/killpower, /run/nut/killpower]
+      register: power_flags
+    - name: Refuse stale flags rather than risking an output power cut
+      ansible.builtin.assert:
+        that: not item.stat.exists
+      loop: "{{ power_flags.results }}"
+      loop_control:
+        label: "{{ item.item }}"
+
+  roles:
+    - coordinated

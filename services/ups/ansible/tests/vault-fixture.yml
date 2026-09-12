@@ -1,0 +1,2 @@
+# Public test fixture only; never used by deployment.
+vault_nut_monitor_password: TEST-ONLY-not-a-production-secret

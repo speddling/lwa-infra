@@ -1,9 +1,18 @@
-# UPS commissioning
+# UPS commissioning and coordinated shutdown
+
+Watchtower telemetry is live (run 34660864596). Construct’s graceful handler is
+installed and probed (run 34663861718). Both-host coordination is prepared, not yet
+armed. See [the operational runbook](../../docs/ups-shutdown-runbook.md) for the
+complete prepare → maintenance tests → activate workflow and weekend test procedure.
+
+The telemetry-only workflow below is the initial commissioning path. Once the
+coordinated configuration owns `/etc/nut`, that workflow refuses to overwrite it.
 
 Discovery run [34629066497](https://github.com/speddling/lwa-infra/actions/runs/34629066497)
 confirmed Watchtower USB `CP1000PFCLCDa` (`0764:0601`) and no NUT packages on
-either host. Construct is running without QMP/monitor arguments and its live
-ExecStop kills QEMU with SIGKILL. Automatic host shutdown is not ready.
+either host. At discovery, Construct had no QMP/monitor arguments and its
+ExecStop killed QEMU with SIGKILL. The later graceful-handler deployment replaced
+that stop command; its shutdown/recovery acceptance test is still pending.
 
 ## Telemetry phase
 

@@ -1,0 +1,17 @@
+# Managed by coordinated UPS shutdown. Do not enable the legacy NUT role.
+MONITOR cyberpower@{{ nut_server_address }} 1 {{ nut_login }} {{ nut_login_password }} {{ 'primary' if inventory_hostname == 'watchtower' else 'secondary' }}
+MINSUPPLIES 1
+SHUTDOWNCMD "/usr/bin/systemctl poweroff"
+POLLFREQ 5
+POLLFREQALERT 5
+DEADTIME 15
+HOSTSYNC 30
+FINALDELAY 5
+# Deliberately no POWERDOWNFLAG: shut down hosts, never cut UPS output power.
+# This preserves power while Monolith finishes Kubernetes and guest shutdown.
+NOTIFYFLAG ONLINE SYSLOG+WALL
+NOTIFYFLAG ONBATT SYSLOG+WALL
+NOTIFYFLAG LOWBATT SYSLOG+WALL
+NOTIFYFLAG FSD SYSLOG+WALL
+NOTIFYFLAG COMMBAD SYSLOG+WALL
+NOTIFYFLAG COMMOK SYSLOG+WALL

@@ -311,18 +311,15 @@ logs in Grafana** above.
 
 ### UPS hardware and NUT activation
 
-The owner confirmed the UPS is installed and USB-connected to Watchtower on
-2026-09-11. The owner confirms CyberPower CP1000PFCLCD; the role’s CP1500PFCLCD
-description is incorrect. Requested policy: shut down Watchtower and Monolith
-after five minutes continuously on battery. See `nut-shutdown-plan.md`.
-`nut_enabled: false` remains the declared state. No successful NUT activation is
-established by this audit.
+Watchtower USB identifies CP1000PFCLCDa. Telemetry deployment 34660864596 succeeded
+on 2026-09-12: OL, 22% load, 100% charge and 1700 seconds estimated runtime.
+The monitor remains masked/inactive; this is not shutdown protection yet.
 
-The current role installs server/client/exporter components, listens on loopback,
-and configures upsmon to shut down Watchtower. It does not coordinate Monolith or
-VM shutdown. Review the `nut_monitor_password` mapping, exporter release/flags,
-Prometheus scrape/alert rules and intended power policy before enabling it.
-The role README's claim that hardware is still pending is stale.
+Construct's graceful handler is installed and probed (run 34663861718); an actual
+guest shutdown test remains pending. The complete coordinated shutdown workflow
+is prepared under `services/ups/`, with Monolith kubelet/client setup and Watchtower
+policy staged separately from activation. Follow [the UPS shutdown runbook](ups-shutdown-runbook.md).
+Keep the old `nut_enabled` false; its legacy role/exporter is not the new deployment path.
 
 ---
 

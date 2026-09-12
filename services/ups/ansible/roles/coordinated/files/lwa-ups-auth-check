@@ -1,0 +1,52 @@
+#!/usr/bin/python3
+"""Check NUT authentication using the local protected config; never print secrets."""
+from pathlib import Path
+import shlex
+import socket
+import sys
+
+
+def check():
+    rows = [shlex.split(line, comments=True) for line in Path('/etc/nut/upsmon.conf').read_text().splitlines()]
+    monitors = [row for row in rows if row and row[0] == 'MONITOR']
+    if len(monitors) != 1:
+        raise ValueError('Expected exactly one MONITOR')
+    _, target, _, user, password, role = monitors[0]
+    ups, host = target.split('@')
+    with socket.create_connection((host, 3493), timeout=5) as connection:
+        stream = connection.makefile('rwb')
+        commands = [f'USERNAME {user}', f'PASSWORD {password}', f'LOGIN {ups}']
+        if role == 'primary':
+            commands.append(f'PRIMARY {ups}')
+        for command in commands:
+            stream.write((command + '\n').encode())
+            stream.flush()
+            if not stream.readline(1024).startswith(b'OK'):
+                raise ValueError('NUT authentication/role verification failed')
+        stream.write(b'LOGOUT\n')
+        stream.flush()
+    print('NUT authentication and monitor role verified; no shutdown requested.')
+
+
+def require_two_monitors():
+    with socket.create_connection(('127.0.0.1', 3493), timeout=5) as connection:
+        with connection.makefile('rwb') as stream:
+            stream.write(b'GET NUMLOGINS cyberpower\n')
+            stream.flush()
+            reply = stream.readline(1024).decode().split()
+            if len(reply) != 3 or reply[:2] != ['NUMLOGINS', 'cyberpower'] or int(reply[2]) < 2:
+                raise ValueError('Both persistent monitors must be logged in')
+    print('Both persistent NUT monitors are logged in.')
+
+
+if __name__ == '__main__':
+    try:
+        if sys.argv[1:] == ['--require-two-monitors']:
+            require_two_monitors()
+        elif not sys.argv[1:]:
+            check()
+        else:
+            raise ValueError('Unsupported argument')
+    except Exception:
+        print('NUT authentication check failed; inspect configuration without printing credentials.', file=sys.stderr)
+        sys.exit(1)

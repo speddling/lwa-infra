@@ -1,0 +1,39 @@
+---
+- name: Disable automatic UPS shutdown only while safely on mains
+  hosts: "{{ ups_target }}"
+  become: true
+  any_errors_fatal: true
+  tasks:
+    - name: Require explicit disarming and the intended host
+      ansible.builtin.assert:
+        that:
+          - disarm_shutdown | default(false) | bool
+          - ups_target in ['watchtower', 'monolith']
+          - ansible_facts.hostname == ups_target
+    - name: Read UPS state before disarming
+      ansible.builtin.command: "upsc cyberpower@{{ '127.0.0.1' if ups_target == 'watchtower' else '192.168.30.11' }} ups.status"
+      register: status
+      changed_when: false
+    - name: Refuse to present disarming as cancellation of an outage or committed shutdown
+      ansible.builtin.assert:
+        that:
+          - "'OL' in status.stdout.split()"
+          - "'OB' not in status.stdout.split()"
+          - "'FSD' not in status.stdout.split()"
+          - "'LB' not in status.stdout.split()"
+    - name: Stop the policy before disabling the primary monitor
+      ansible.builtin.systemd_service:
+        name: lwa-ups-policy.service
+        state: stopped
+        enabled: false
+      when: ups_target == 'watchtower'
+    - name: Stop and mask the host monitor
+      ansible.builtin.systemd_service:
+        name: nut-monitor.service
+        state: stopped
+        enabled: false
+        masked: true
+    - name: Remove activation marker
+      ansible.builtin.file:
+        path: /etc/nut/lwa-shutdown-armed
+        state: absent

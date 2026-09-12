@@ -1,6 +1,8 @@
 # Construct graceful shutdown
 
-Prepared 2026-09-12; not deployed or verified by a real shutdown yet.
+Installed 2026-09-12 by [run 34663861718](https://github.com/speddling/lwa-infra/actions/runs/34663861718).
+The dedicated SSH probe and live process checks passed; the same QEMU PID remained
+running. A real shutdown/recovery acceptance test is still pending.
 
 Construct must finish guest shutdown before Monolith terminates its QEMU process.
 Inspection run 34629066497 found an immediate `kill -9` ExecStop and no QEMU
@@ -72,4 +74,5 @@ Do not run host poweroff, unplug UPS input, or use Bootstrap Construct for this 
 
 Until acceptance passes, keep Watchtower's UPS shutdown monitor masked. Monolith's
 NUT client, k3s workload shutdown and Watchtower's five-minute coordination timer
-are the next implementation stages. Obelisk files remain preserved.
+are prepared in [the coordinated workflow](ups-shutdown-runbook.md), with explicit
+maintenance and activation gates. Obelisk files remain preserved.

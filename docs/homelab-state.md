@@ -502,8 +502,9 @@ Apex was the original development host. The owner confirms all development work 
   Do not infer active shutdown protection. Owner confirms CyberPower CP1000PFCLCD and requests both Watchtower and Monolith
   shut down after 300 seconds continuously on battery. All data-connected equipment
   is owner-confirmed battery-backed. Typical outages last 2–3 minutes; runtime must
-  be measured and reassessed after Monolith’s PSU/GPU upgrade. Implementation is pending; see
-  `nut-shutdown-plan.md` for prerequisites and verification.
+  be measured and reassessed after Monolith’s PSU/GPU upgrade. Coordinated shutdown
+  is prepared, not deployed; see `ups-shutdown-runbook.md`. Construct’s graceful
+  handler is installed (run 34663861718), with its real acceptance test pending.
 - **Firewall:** UFW tables above include historical live rules. The current
   Monolith role lacks the documented Studio dock, broad temporary SSH and Minecraft
   rules; absence from an additive role does not prove absence from the host.

@@ -1,0 +1,44 @@
+---
+- import_playbook: readiness.yml
+- name: Activate a verified host's shutdown monitor
+  hosts: "{{ ups_target }}"
+  become: true
+  any_errors_fatal: true
+  tasks:
+    - name: Require explicit coordinated activation
+      ansible.builtin.assert:
+        that: activate_shutdown | default(false) | bool
+    - name: Unmask the prepared shutdown monitor
+      ansible.builtin.systemd_service:
+        name: nut-monitor.service
+        masked: false
+        daemon_reload: true
+    - name: Start and enable the host monitor
+      ansible.builtin.systemd_service:
+        name: nut-monitor.service
+        state: started
+        enabled: true
+    - name: Verify the monitor is active
+      ansible.builtin.command: systemctl is-active nut-monitor.service
+      changed_when: false
+    - name: Require both persistent monitors before arming the primary timer
+      ansible.builtin.command: /usr/local/sbin/lwa-ups-auth-check --require-two-monitors
+      register: monitor_logins
+      changed_when: false
+      retries: 12
+      delay: 5
+      until: monitor_logins.rc == 0
+      when: ups_target == 'watchtower'
+    - name: Arm the prepared policy and protect configuration from preparation reruns
+      ansible.builtin.copy:
+        dest: /etc/nut/lwa-shutdown-armed
+        content: "Coordinated shutdown active; do not run preparation over this configuration.\n"
+        owner: root
+        group: root
+        mode: '0600'
+    - name: Ensure Watchtower's timer is running
+      ansible.builtin.systemd_service:
+        name: lwa-ups-policy.service
+        state: started
+        enabled: true
+      when: ups_target == 'watchtower'
