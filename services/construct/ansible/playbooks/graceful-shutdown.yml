@@ -1,0 +1,146 @@
+---
+# Do not import construct-vm: its provisioning tasks delete existing VM disks.
+- name: Preflight both hosts before installing lifecycle control
+  hosts: retirement
+  become: true
+  any_errors_fatal: true
+  tasks:
+    - name: Require expected host identity
+      ansible.builtin.assert:
+        that: ansible_facts.hostname == inventory_hostname
+    - name: Check existing Construct poweroff privilege without invoking it
+      ansible.builtin.command: sudo -n -l /usr/bin/systemctl --no-block poweroff
+      become_user: speddling
+      changed_when: false
+      when: inventory_hostname == 'construct'
+    - name: Record preflight completion
+      ansible.builtin.set_fact:
+        power_preflight_passed: true
+
+- name: Prepare Monolith's separate lifecycle identity
+  hosts: monolith
+  become: true
+  any_errors_fatal: true
+  tasks:
+    - name: Require both preflight results
+      ansible.builtin.assert:
+        that:
+          - hostvars['monolith'].power_preflight_passed | default(false) | bool
+          - hostvars['construct'].power_preflight_passed | default(false) | bool
+    - name: Create protected lifecycle credential directory
+      ansible.builtin.file:
+        path: /etc/construct-power
+        state: directory
+        owner: root
+        group: root
+        mode: '0700'
+    - name: Generate a dedicated lifecycle key locally on Monolith
+      ansible.builtin.command:
+        argv: [ssh-keygen, -q, -t, ed25519, -N, '', -C, construct-power-control, -f, /etc/construct-power/id_ed25519]
+        creates: /etc/construct-power/id_ed25519
+    - name: Protect the private key
+      ansible.builtin.file:
+        path: /etc/construct-power/id_ed25519
+        owner: root
+        group: root
+        mode: '0600'
+    - name: Read only the lifecycle public key
+      ansible.builtin.slurp:
+        src: /etc/construct-power/id_ed25519.pub
+      register: power_public_key
+    - name: Pin Construct host trust for the lifecycle client
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/../files/construct_known_hosts"
+        dest: /etc/construct-power/known_hosts
+        owner: root
+        group: root
+        mode: '0600'
+
+- name: Authorize restricted lifecycle commands on Construct
+  hosts: construct
+  become: true
+  any_errors_fatal: true
+  tasks:
+    - name: Require the host lifecycle key
+      ansible.builtin.assert:
+        that:
+          - hostvars['monolith'].power_public_key is defined
+          - hostvars['construct'].power_preflight_passed | default(false) | bool
+    - name: Install the forced-command dispatcher
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/../roles/graceful_shutdown/files/construct-power-control"
+        dest: /usr/local/sbin/construct-power-control
+        owner: root
+        group: root
+        mode: '0755'
+    - name: Preserve existing SSH access and authorize the restricted key
+      ansible.builtin.lineinfile:
+        path: /home/speddling/.ssh/authorized_keys
+        # Creation is deliberately disabled: preflight requires existing SSH access.
+        create: false
+        line: >-
+          restrict,command="/usr/local/sbin/construct-power-control" {{ hostvars['monolith'].power_public_key.content | b64decode | trim }}
+        owner: speddling
+        group: speddling
+        mode: '0600'
+    - name: Record guest lifecycle setup completion
+      ansible.builtin.set_fact:
+        power_guest_configured: true
+
+- name: Install and verify graceful stop without restarting the VM
+  hosts: monolith
+  become: true
+  any_errors_fatal: true
+  tasks:
+    - name: Require successful guest setup
+      ansible.builtin.assert:
+        that: hostvars['construct'].power_guest_configured | default(false) | bool
+    - name: Read the running Construct PID
+      ansible.builtin.command: systemctl show construct.service --property=MainPID --value
+      register: construct_pid_before
+      changed_when: false
+    - name: Require a running VM for nondisruptive validation
+      ansible.builtin.assert:
+        that: construct_pid_before.stdout | int > 1
+    - name: Install the synchronous guest stop helper
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/../roles/graceful_shutdown/files/construct-stop"
+        dest: /usr/local/sbin/construct-stop
+        owner: root
+        group: root
+        mode: '0755'
+    - name: Validate the live QEMU process against the helper's identity checks
+      ansible.builtin.command:
+        argv: [/usr/local/sbin/construct-stop, --check-process, "{{ construct_pid_before.stdout }}"]
+      changed_when: false
+    - name: Probe the dedicated SSH identity before changing lifecycle behavior
+      ansible.builtin.command: /usr/local/sbin/construct-stop --probe
+      changed_when: false
+    - name: Create the service override directory
+      ansible.builtin.file:
+        path: /etc/systemd/system/construct.service.d
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+    - name: Replace immediate SIGKILL with the graceful stop helper
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/../roles/graceful_shutdown/files/20-graceful-shutdown.conf"
+        dest: /etc/systemd/system/construct.service.d/20-graceful-shutdown.conf
+        owner: root
+        group: root
+        mode: '0644'
+    - name: Reload systemd without restarting Construct
+      ansible.builtin.systemd_service:
+        daemon_reload: true
+    - name: Read effective lifecycle and PID after reload
+      ansible.builtin.command: systemctl show construct.service --property=MainPID --property=ExecStop --property=ActiveState
+      register: construct_after
+      changed_when: false
+    - name: Verify the override is loaded and the same VM remains running
+      ansible.builtin.assert:
+        that:
+          - "('MainPID=' ~ construct_pid_before.stdout) in construct_after.stdout_lines"
+          - "'ActiveState=active' in construct_after.stdout_lines"
+          - "'/usr/local/sbin/construct-stop' in construct_after.stdout"
+          - "'/bin/kill' not in construct_after.stdout"

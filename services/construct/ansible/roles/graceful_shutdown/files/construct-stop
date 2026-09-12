@@ -1,0 +1,98 @@
+#!/usr/bin/python3
+"""Request Construct shutdown over a restricted SSH key; wait for its QEMU PID.
+
+No signal is sent here. On failure, systemd retains its normal termination
+fallback, so a dead guest cannot block host shutdown indefinitely.
+"""
+import os
+from pathlib import Path
+import select
+import subprocess
+import sys
+import time
+
+SSH = [
+    '/usr/bin/ssh', '-F', '/dev/null', '-T',
+    '-o', 'BatchMode=yes', '-o', 'IdentitiesOnly=yes', '-o', 'IdentityAgent=none',
+    '-o', 'StrictHostKeyChecking=yes', '-o', 'HostKeyAlgorithms=ssh-ed25519',
+    '-o', 'UserKnownHostsFile=/etc/construct-power/known_hosts',
+    '-o', 'GlobalKnownHostsFile=/dev/null', '-o', 'ConnectTimeout=5',
+    '-o', 'ServerAliveInterval=2', '-o', 'ServerAliveCountMax=2',
+    '-i', '/etc/construct-power/id_ed25519', '-p', '2222',
+    'speddling@127.0.0.1',
+]
+
+
+def probe():
+    result = subprocess.run(SSH + ['probe'], capture_output=True, text=True, timeout=15)
+    if result.returncode or result.stdout.strip() != 'construct-power-control-ready':
+        raise RuntimeError('Construct power-control probe failed')
+    print('Construct power-control probe passed; no shutdown requested.', flush=True)
+
+
+def validate_process(pid):
+    proc = Path('/proc') / str(pid)
+    executable = os.readlink(proc / 'exe')
+    arguments = (proc / 'cmdline').read_bytes().split(b'\0')
+    groups = (proc / 'cgroup').read_text().splitlines()
+    if executable != '/usr/bin/qemu-system-x86_64':
+        raise RuntimeError('Refusing a PID that is not the expected QEMU executable')
+    if not any(arg.startswith(b'file=/vm/construct/disk.img,') for arg in arguments):
+        raise RuntimeError('Refusing a QEMU PID without the Construct disk')
+    if not any(line.endswith('/construct.service') for line in groups):
+        raise RuntimeError('Refusing a PID outside construct.service')
+
+
+def exited(fd, timeout=0):
+    return bool(select.select([fd], [], [], max(0, timeout))[0])
+
+
+def stop(pid, timeout=120):
+    if pid <= 1:
+        raise ValueError('Invalid QEMU PID')
+    try:
+        fd = os.pidfd_open(pid)
+    except ProcessLookupError:
+        print('Construct QEMU has already exited.', flush=True)
+        return
+    try:
+        if exited(fd):
+            return
+        try:
+            validate_process(pid)
+        except FileNotFoundError:
+            if exited(fd):
+                return
+            raise
+        # pidfd tracks the original process even if the numeric PID is reused.
+        if exited(fd):
+            return
+        deadline = time.monotonic() + timeout
+        print('Requesting orderly Construct guest shutdown.', flush=True)
+        try:
+            result = subprocess.run(SSH + ['poweroff'], capture_output=True, timeout=15)
+            if result.returncode:
+                print('SSH did not acknowledge shutdown; waiting for the original QEMU process.', flush=True)
+        except subprocess.TimeoutExpired:
+            print('SSH timed out; waiting for the original QEMU process.', flush=True)
+        if not exited(fd, deadline - time.monotonic()):
+            raise RuntimeError('Construct did not exit within 120 seconds; systemd termination fallback follows')
+        print('Construct QEMU exited after the guest shutdown request.', flush=True)
+    finally:
+        os.close(fd)
+
+
+if __name__ == '__main__':
+    try:
+        if sys.argv[1:] == ['--probe']:
+            probe()
+        elif len(sys.argv) == 3 and sys.argv[1] == '--check-process':
+            validate_process(int(sys.argv[2]))
+            print('Construct process identity verified; no shutdown requested.')
+        elif len(sys.argv) == 2:
+            stop(int(sys.argv[1]))
+        else:
+            raise ValueError('Usage: construct-stop --probe | MAINPID')
+    except (OSError, ValueError, RuntimeError, subprocess.TimeoutExpired) as exc:
+        print(str(exc), file=sys.stderr)
+        sys.exit(1)

@@ -122,3 +122,10 @@ QEMU processes. Use provisioning only as an explicitly reviewed rebuild operatio
 Git, GitHub CLI, Node 22, Python, Go, tmux and Pi remain in first-boot provisioning.
 Fresh provisioning uses SSH keys and disables password authentication. Existing
 SSH authentication settings are not altered during retirement.
+
+## Graceful guest shutdown
+
+See [Construct shutdown](construct-shutdown.md) for the prepared SSH-based lifecycle
+change. It is not deployed yet; current live stop behavior remains immediate SIGKILL
+until the configuration workflow succeeds. This is a prerequisite for coordinated
+UPS shutdown of Monolith and Watchtower.
