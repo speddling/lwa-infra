@@ -1,0 +1,23 @@
+---
+# Existing guest only: never invoke the destructive construct-vm provisioning role.
+- name: Authorize Studio's owner-provided key on the existing Construct guest
+  hosts: construct
+  become: true
+  any_errors_fatal: true
+  tasks:
+    - name: Verify guest identity
+      ansible.builtin.assert:
+        that: ansible_facts.hostname == 'construct'
+    - name: Add Studio key while preserving existing human and lifecycle access
+      ansible.builtin.lineinfile:
+        path: /home/speddling/.ssh/authorized_keys
+        create: false
+        line: "{{ lookup('ansible.builtin.file', playbook_dir ~ '/../files/studio_ed25519.pub') | trim }}"
+        owner: speddling
+        group: speddling
+        mode: '0600'
+    - name: Reconnect using the runner's existing identity
+      ansible.builtin.meta: reset_connection
+    - name: Verify existing SSH access still works
+      ansible.builtin.wait_for_connection:
+        timeout: 60
