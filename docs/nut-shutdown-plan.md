@@ -1,6 +1,6 @@
 # UPS shutdown implementation status
 
-Updated 2026-09-12. Use [the coordinated shutdown runbook](ups-shutdown-runbook.md)
+Updated 2026-09-13. Use [the coordinated shutdown runbook](ups-shutdown-runbook.md)
 for the current implementation, workflow actions and weekend test procedure.
 
 Owner policy: CP1000PFCLCD on Watchtower USB; all data-connected equipment remains
@@ -17,9 +17,12 @@ planned Monolith PSU/GPU upgrade. Additional battery capacity is only a future o
   100% charge and 1700 seconds estimated runtime. This was not an endurance test.
 - [Construct lifecycle deployment 34663861718](https://github.com/speddling/lwa-infra/actions/runs/34663861718):
   graceful SSH stop handler installed; process identity and restricted SSH probe
-  passed without changing the running QEMU PID. Actual shutdown/recovery remains untested.
+  passed without changing the running QEMU PID. Shutdown/recovery later passed run 34723605172.
 
-## Prepared, not yet deployed
+## Deployed and active
+
+Activation passed run 34723961571. Physical outage simulation was owner-completed
+on 2026-09-13; recovery inspection passed, previous-boot host-log review is pending.
 
 The coordinated workflow implements both host monitors, Watchtower's five-minute
 policy, Monolith's kubelet shutdown configuration, a guest acceptance test, and
@@ -27,7 +30,7 @@ staged activation/disarming. It replaces the earlier upssched proposal with a
 single polling service whose monotonic timer survives service restarts within a
 boot. NUT still handles primary/secondary FSD coordination and native emergencies.
 
-Order after human merge: `prepare`, acknowledged `apply-kubelet`, acknowledged
+Commissioning order (already completed): `prepare`, acknowledged `apply-kubelet`, acknowledged
 `test-construct`, then `activate`. Preparation keeps monitors masked and the policy
 in observation mode. It uses the existing shared vaulted NUT secret and each host's
 own runner identity. Activation requires live kubelet/inhibitor evidence, guest

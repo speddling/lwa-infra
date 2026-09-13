@@ -311,14 +311,12 @@ logs in Grafana** above.
 
 ### UPS hardware and NUT activation
 
-Watchtower USB identifies CP1000PFCLCDa. Telemetry deployment 34660864596 succeeded
-on 2026-09-12: OL, 22% load, 100% charge and 1700 seconds estimated runtime.
-The monitor remains masked/inactive; this is not shutdown protection yet.
-
-Construct's graceful handler is installed and probed (run 34663861718); an actual
-guest shutdown test remains pending. The complete coordinated shutdown workflow
-is prepared under `services/ups/`, with Monolith kubelet/client setup and Watchtower
-policy staged separately from activation. Follow [the UPS shutdown runbook](ups-shutdown-runbook.md).
+Coordinated shutdown is active on Watchtower and Monolith (run 34723961571).
+Construct shutdown/recovery and live Kubernetes/logind acceptance passed.
+After the owner's 2026-09-13 physical test, recovery inspection 34733935325 confirms
+both monitors running, Monolith Ready, and OL/100% charge/22% load/1700 seconds runtime.
+Previous-boot host logs still need review before full outage acceptance.
+Use **Inspect UPS and shutdown prerequisites** and [the UPS shutdown runbook](ups-shutdown-runbook.md).
 Keep the old `nut_enabled` false; its legacy role/exporter is not the new deployment path.
 
 ---

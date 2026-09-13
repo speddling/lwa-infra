@@ -20,8 +20,8 @@ and migration status; verify addresses against fresh Omada evidence before chang
   according to the owner (2026-09-11). Files and redeployment artifacts must be retained; runtime retirement is unverified.
 
 The UPS is installed and USB-connected to Watchtower (owner confirmation,
-2026-09-11). Watchtower NUT telemetry is active; automatic shutdown remains disabled.
-The coordinated host configuration is prepared in `services/ups/`; see
+2026-09-11). Coordinated NUT shutdown is active on both hosts (run 34723961571).
+Post-outage recovery passed inspection; shutdown-log review remains pending. See
 `ups-shutdown-runbook.md` for deployment and activation gates. Owner confirms CyberPower CP1000PFCLCD and requests Watchtower and Monolith shutdown after five minutes on battery. All data-connected equipment, including the inter-host network, is owner-confirmed battery-backed; see `nut-shutdown-plan.md`.
 
 ## Network and DNS

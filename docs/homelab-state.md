@@ -494,19 +494,18 @@ Apex was the original development host. The owner confirms all development work 
   runs as `speddling`. Main inventories SSH as `speddling`, then use sudo. Inspect
   the runner user's key/trust files for client-side SSH failures, not the target
   account's files. Construct trusts a separately pinned host key for the port forward.
-- **UPS:** hardware is installed and USB-connected. `nut_enabled` remains false.
-  Inspection run 34629066497 confirms USB CP1000PFCLCDa (`0764:0601`) on
-  Watchtower. Subsequent telemetry deployment 34660864596 succeeded on 2026-09-12:
-  NUT driver/server run on Watchtower, monitor masked/inactive; sampled OL, 22% load,
-  100% charge, 1700 seconds estimated runtime. Monolith's client is still absent.
-  Do not infer active shutdown protection. Owner confirms CyberPower CP1000PFCLCD and requests both Watchtower and Monolith
-  shut down after 300 seconds continuously on battery. All data-connected equipment
-  is owner-confirmed battery-backed. Typical outages last 2–3 minutes; runtime must
-  be measured and reassessed after Monolith’s PSU/GPU upgrade. Coordinated shutdown
-  is partially deployed: Watchtower preparation passed run 34712198245; Monolith
-  stopped before changes on a version-check error. Both remain unarmed; see
-  `ups-shutdown-runbook.md`. Construct’s graceful
-  handler is installed (run 34663861718), with its real acceptance test pending.
+- **UPS:** CyberPower CP1000PFCLCD (USB identifies CP1000PFCLCDa, `0764:0601`)
+  on Watchtower. Coordinated NUT shutdown is active on both hosts (run 34723961571);
+  legacy `nut_enabled` remains false. Five-minute on-battery grace, earlier action
+  on low battery or estimated runtime <=600 seconds. All data-connected equipment
+  is owner-confirmed battery-backed. Construct graceful shutdown/recovery passed
+  run 34723605172; Kubernetes/logind acceptance passed run 34723553105.
+  Owner completed the physical outage simulation on 2026-09-13. Recovery inspection
+  34733935325 confirms both monitors active, Construct/k3s running, node Ready,
+  a live kubelet inhibitor and 150-second logind limit; OL, 22% load, 100% charge,
+  1700 seconds estimated runtime. Previous-boot host log review is still required
+  before declaring full outage acceptance. See `ups-shutdown-runbook.md`.
+  Reassess runtime after the planned PSU/GPU upgrade.
 - **Firewall:** UFW tables above include historical live rules. The current
   Monolith role lacks the documented Studio dock, broad temporary SSH and Minecraft
   rules; absence from an additive role does not prove absence from the host.
