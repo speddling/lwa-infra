@@ -49,11 +49,26 @@ try:
     shutdown_since = (shutdown_end - timedelta(minutes=10)).astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
 except (KeyError, IndexError, ValueError):
     shutdown_since = None
+report["current_nut_log"] = run(["journalctl", "-b", "0", "--no-pager",
+    "-o", "short-iso-precise", "-n", "100", "-u", "nut-monitor.service",
+    "-u", "nut-server.service"])
 report["shutdown_armed"] = Path("/etc/nut/lwa-shutdown-armed").is_file()
 report["failed_units"] = run(["systemctl", "--failed", "--no-pager", "--no-legend"])
 report["dns_recovery"] = run(["getent", "hosts", "watchtower.littlewolfacres.com"])
 
 if host == "watchtower":
+    # GET is unauthenticated/read-only; no probe LOGIN inflates the count.
+    try:
+        with socket.create_connection(("127.0.0.1", 3493), timeout=5) as connection:
+            with connection.makefile("rwb") as stream:
+                stream.write(b"GET NUMLOGINS cyberpower\n")
+                stream.flush()
+                reply = stream.readline(1024).decode().split()
+        if len(reply) != 3 or reply[:2] != ["NUMLOGINS", "cyberpower"]:
+            raise ValueError("Unexpected NUMLOGINS response")
+        report["nut_login_count"] = {"count": int(reply[2])}
+    except (OSError, UnicodeError, ValueError) as exc:
+        report["nut_login_count"] = {"error": type(exc).__name__}
     probe = Path("/usr/local/sbin/lwa-ups-auth-check")
     if probe.is_file():
         report["persistent_monitors"] = run([str(probe), "--require-two-monitors"])
