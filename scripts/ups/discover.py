@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Read-only UPS/shutdown inventory. Never read credential files or send UPS commands."""
 import json
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 import shutil
 import socket
@@ -38,6 +39,16 @@ report["previous_shutdown"] = run(["journalctl", "-b", "-1", "--no-pager",
     "-u", "lwa-ups-policy.service", "-u", "construct.service"])
 report["previous_systemd_shutdown"] = run(["journalctl", "-b", "-1", "--no-pager",
     "-o", "short-iso-precise", "-n", "100", "_PID=1"])
+report["previous_logind_shutdown"] = run(["journalctl", "-b", "-1", "--no-pager",
+    "-o", "short-iso-precise", "-n", "100", "-u", "systemd-logind.service"])
+# Bound expensive kubelet searches to the final ten minutes of the previous boot.
+# A line limit alone still scans a long boot when few lines match the expression.
+try:
+    last_systemd_line = report["previous_systemd_shutdown"]["stdout"].splitlines()[-1]
+    shutdown_end = datetime.fromisoformat(last_systemd_line.split()[0])
+    shutdown_since = (shutdown_end - timedelta(minutes=10)).astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+except (KeyError, IndexError, ValueError):
+    shutdown_since = None
 report["shutdown_armed"] = Path("/etc/nut/lwa-shutdown-armed").is_file()
 report["failed_units"] = run(["systemctl", "--failed", "--no-pager", "--no-legend"])
 report["dns_recovery"] = run(["getent", "hosts", "watchtower.littlewolfacres.com"])
@@ -67,9 +78,12 @@ if host == "watchtower":
     else:
         report["ups_telemetry"] = "upsc unavailable; no packages installed by this inspection"
 else:
-    report["previous_kubelet_shutdown"] = run(["journalctl", "-b", "-1", "--no-pager",
-        "-o", "short-iso-precise", "-n", "100", "-u", "k3s.service", "--grep",
-        "(?i)shutdown|shutting down|inhibit|kill|timed out"])
+    if shutdown_since:
+        report["previous_kubelet_shutdown"] = run(["journalctl", "-b", "-1", "--no-pager",
+            "--since", shutdown_since, "-o", "short-iso-precise", "-n", "100",
+            "-u", "k3s.service", "--grep", "(?i)shutdown|shutting down|inhibit|kill|timed out"])
+    else:
+        report["previous_kubelet_shutdown"] = {"error": "Cannot determine previous boot's final journal timestamp"}
     report["pods"] = run(["k3s", "kubectl", "--request-timeout=10s", "get", "pods", "-A",
         "-o", "custom-columns=NAMESPACE:.metadata.namespace,NAME:.metadata.name,PHASE:.status.phase,READY:.status.containerStatuses[*].ready,RESTARTS:.status.containerStatuses[*].restartCount"])
     report["persistent_volume_claims"] = run(["k3s", "kubectl", "--request-timeout=10s", "get", "pvc", "-A",

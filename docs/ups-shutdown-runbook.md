@@ -17,8 +17,24 @@ NUT monitors active, Construct/k3s running, Monolith Ready and its kubelet inhib
 present. UPS telemetry is OL, 100% charge, 22% load, 1700 seconds estimated runtime.
 Construct's local previous-boot log records the poweroff request at 01:00:10 UTC
 and shutdown activity, with a new boot at approximately 01:04 UTC.
-**Full outage acceptance remains pending previous-boot host log review** to establish
-the OB-to-FSD interval, host shutdown progression and any forced fallback.
+[Evidence run 34738504187](https://github.com/speddling/lwa-infra/actions/runs/34738504187)
+confirms Watchtower observed OB at 00:58:08 and requested FSD at 01:03:09 UTC
+(5m01s). Monolith instead started stopping services at 01:00:10, before that FSD;
+its NUT log shows exit on SIGTERM, not an automatic shutdown request. Construct
+exited gracefully at 01:00:14 and Monolith unmounted its storage and reached
+poweroff at 01:00:18. Both monitors are connected and armed after recovery.
+
+**Full coordinated outage acceptance remains unresolved:** the owner moved Monolith
+to reach the UPS plug and cannot rule out an accidental power-button press. Its
+120-second kubelet delay makes that timing plausible, but logind evidence is
+needed before assigning the cause. The previous kubelet log query timed out;
+it now searches only the previous boot's final ten minutes. Inspection also collects
+logind's previous-boot records. Do not declare Monolith's FSD response verified
+from this test; a repeat may be needed once the earlier trigger is understood.
+
+Recovery also shows `unbound-resolvconf.service` failed on Watchtower, two Plane API
+pods running but not Ready, and Firecrawl RabbitMQ with 57 restarts. DNS resolution
+and all PVC bindings passed. These findings are not yet attributed to the outage.
 
 **Inspect UPS and shutdown prerequisites** now collects selected previous-boot NUT,
 policy, Construct, kubelet and systemd records, plus current policy logs, arming
