@@ -1,0 +1,50 @@
+#!/usr/bin/python3
+"""Bounded readiness checks; never authenticate or send power commands."""
+import socket
+import sys
+import time
+
+ADDRESS = '192.168.30.11'
+
+
+def address_ready():
+    # Binding an ephemeral port requires the configured address to exist locally.
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as connection:
+        connection.bind((ADDRESS, 0))
+
+
+def listeners_ready():
+    for address in ('127.0.0.1', ADDRESS):
+        with socket.create_connection((address, 3493), timeout=2):
+            pass
+
+
+def wait(check, seconds, clock=time.monotonic, pause=time.sleep):
+    deadline = clock() + seconds
+    while True:
+        try:
+            check()
+            return
+        except OSError:
+            if clock() >= deadline:
+                raise
+            pause(1)
+
+
+def main(args):
+    if args == ['--address']:
+        check, seconds = address_ready, 90
+    elif args == ['--listeners']:
+        check, seconds = listeners_ready, 15
+    else:
+        return 2
+    try:
+        wait(check, seconds)
+    except OSError:
+        print('NUT network readiness failed: ' + args[0], file=sys.stderr)
+        return 1
+    return 0
+
+
+if __name__ == '__main__':
+    sys.exit(main(sys.argv[1:]))

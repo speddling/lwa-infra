@@ -153,6 +153,12 @@ class ConfigTests(unittest.TestCase):
         for status, allowed in [('OL', True), ('OB', False), ('OL FSD', False), ('OL LB', False), ('', False)]:
             self.run_gate(gate, {'live_status': {'stdout': status}}, allowed)
 
+    def test_network_repair_requires_mains_without_shutdown_flags(self):
+        plays = yaml.safe_load((root / 'playbooks/repair-network.yml').read_text())
+        gate = next(t for t in plays[0]['tasks'] if t['name'] == 'Refuse repair during an outage or committed shutdown')
+        for status, allowed in [('OL', True), ('OL CHRG', True), ('OB', False), ('OL FSD', False), ('OL LB', False), ('', False)]:
+            self.run_gate(gate, {'repair_status': {'stdout': status}}, allowed)
+
     def run_gate(self, gate, variables, expected):
         with tempfile.TemporaryDirectory(prefix='ups-gate-') as directory:
             play = Path(directory) / 'test.yml'

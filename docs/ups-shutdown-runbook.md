@@ -28,6 +28,38 @@ estimated runtime. Existing Watchtower unbound-resolvconf failure and Plane API
 pods not Ready remain separate unresolved findings. Allow the battery to recharge
 before considering another physical discharge test.
 
+## LAN listener recovery correction
+
+[Inspection 34783301802](https://github.com/speddling/lwa-infra/actions/runs/34783301802)
+identified the post-reboot failure: Watchtower upsd bound 127.0.0.1 but logged
+`not listening on 192.168.30.11 port 3493`. Login count was one (the local primary),
+and Monolith repeatedly received connection refused. Credentials are not the
+observed failure; the LAN listener is missing. Early startup before address
+assignment is the likely cause. Older infrastructure files predate the UPS purchase;
+the deployed configuration and commissioning evidence define this installation.
+
+The correction is prepared, not deployed yet. `nut-server.service` now waits for
+network-online and a bounded, explicit local-address check. A post-start check
+requires both TCP listeners. Failures cause systemd to retry, retaining the same
+loopback/Infra addresses and firewall boundary. The helper binds only an ephemeral
+port to test local address availability and opens TCP connections to test listeners;
+it never authenticates or sends UPS commands.
+
+After human merge, run **Coordinated UPS shutdown → repair-network** from master.
+It requires OL without OB/LB/FSD and coordinated ownership, installs the override,
+restarts only nut-server, and waits for both existing monitors to reconnect. It
+preserves credentials, active monitors and the arming policy. A failure leaves
+recovery unverified; inspect the server log rather than repeatedly cycling services.
+Normal disarmed preparation installs the same override for future deployments.
+
+After the repair passes, run **Inspect UPS and shutdown prerequisites** to verify
+Monolith communications and two persistent logins. A separately scheduled Watchtower
+reboot on mains is required to verify boot recovery; this repair action itself
+neither reboots a host nor repeats the battery-discharge test.
+
+References: [upstream NUT startup ordering](https://raw.githubusercontent.com/networkupstools/nut/v2.8.1/scripts/systemd/nut-server.service.in),
+[network-online semantics](https://wiki.freedesktop.org/www/Software/systemd/NetworkTarget/).
+
 ## Earlier commissioning and first-test history
 
 Coordinated shutdown is **active** following [activation 34723961571](https://github.com/speddling/lwa-infra/actions/runs/34723961571).

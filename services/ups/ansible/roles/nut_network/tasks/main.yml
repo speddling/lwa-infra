@@ -1,0 +1,22 @@
+---
+- name: Install address and listener readiness checks
+  ansible.builtin.copy:
+    src: lwa-nut-network-ready
+    dest: /usr/local/sbin/lwa-nut-network-ready
+    owner: root
+    group: root
+    mode: '0755'
+- name: Create NUT server override directory
+  ansible.builtin.file:
+    path: /etc/systemd/system/nut-server.service.d
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+- name: Require the LAN address and both listeners at every NUT server start
+  ansible.builtin.copy:
+    src: 30-lwa-network.conf
+    dest: /etc/systemd/system/nut-server.service.d/30-lwa-network.conf
+    owner: root
+    group: root
+    mode: '0644'
