@@ -1,18 +1,30 @@
 # Coordinated UPS shutdown
 
-Preparation completed on both hosts in [run 34715399533](https://github.com/speddling/lwa-infra/actions/runs/34715399533).
-Both NUT monitors are masked and inactive. Construct's graceful handler is installed
-and probed; its shutdown/recovery test remains pending.
+Coordinated shutdown is **active** following [activation 34723961571](https://github.com/speddling/lwa-infra/actions/runs/34723961571).
+Both persistent NUT monitors were connected and the five-minute policy was armed.
+[Maintenance 34723553105](https://github.com/speddling/lwa-infra/actions/runs/34723553105)
+verified live Kubernetes grace periods, the logind limit, kubelet inhibitor and node Ready.
+[Construct acceptance 34723605172](https://github.com/speddling/lwa-infra/actions/runs/34723605172)
+verified successful graceful stop, a new boot ID, SSH and DNS recovery.
 
-Maintenance [run 34720746270](https://github.com/speddling/lwa-infra/actions/runs/34720746270)
-restarted logind and k3s and verified the live kubelet grace periods, but the live
-logind inhibitor limit was below 120 seconds. Activation remains blocked. The
-managed fragment now sorts as `zz-lwa-ups.conf` to follow common vendor/kubelet
-fragments; the old `90-lwa-ups.conf` is removed during preparation. A later fragment
-is a suspected cause, not yet confirmed on Monolith. Use **Inspect UPS and shutdown
-prerequisites** to report the live limit, source directives, inhibitors and node Ready
-status. After merge, inspect, rerun preparation, then repeat the acknowledged
-maintenance action and verify the effective limit before activation.
+Inspection 34721300124 confirmed that unattended-upgrades' later-sorting fragment
+had overridden the earlier managed setting with 30 seconds. Preparation 34721344590
+installed `zz-lwa-ups.conf`; the effective 150-second limit now survives reboot.
+
+The owner completed the physical outage simulation on 2026-09-13. [Recovery inspection
+34733935325](https://github.com/speddling/lwa-infra/actions/runs/34733935325) confirms both
+NUT monitors active, Construct/k3s running, Monolith Ready and its kubelet inhibitor
+present. UPS telemetry is OL, 100% charge, 22% load, 1700 seconds estimated runtime.
+Construct's local previous-boot log records the poweroff request at 01:00:10 UTC
+and shutdown activity, with a new boot at approximately 01:04 UTC.
+**Full outage acceptance remains pending previous-boot host log review** to establish
+the OB-to-FSD interval, host shutdown progression and any forced fallback.
+
+**Inspect UPS and shutdown prerequisites** now collects selected previous-boot NUT,
+policy, Construct, kubelet and systemd records, plus current policy logs, arming
+markers, persistent monitor count, failed units, DNS, pod status and PVC status.
+Missing journals or nonzero embedded command results are missing/failed evidence;
+the inspection workflow completing is not itself proof that every check passed.
 
 ## Policy and sequence
 

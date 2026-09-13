@@ -27,10 +27,27 @@ report["packages"] = run(["dpkg-query", "-W", "-f=${Package} ${Version} ${Status
 report["tools"] = {tool: shutil.which(tool) for tool in ("upsc", "upsmon", "upssched", "qemu-system-x86_64")}
 properties = ["LoadState", "ActiveState", "SubState", "TimeoutStopUSec", "KillMode", "KillSignal", "SendSIGKILL"]
 report["services"] = {}
-for unit in ("nut-server", "nut-monitor", "nut-driver.target", "construct", "k3s"):
+for unit in ("nut-server", "nut-monitor", "nut-driver.target", "construct", "k3s", "lwa-ups-policy"):
     report["services"][unit] = run(["systemctl", "show", unit, *["--property=" + p for p in properties]])
 
+# Previous-boot evidence is read-only and scoped to shutdown-related services.
+# Missing persistent journals are reported as missing evidence, not a passing test.
+report["boot_history"] = run(["journalctl", "--list-boots", "--no-pager"])
+report["previous_shutdown"] = run(["journalctl", "-b", "-1", "--no-pager",
+    "-o", "short-iso-precise", "-n", "300", "-u", "nut-monitor.service",
+    "-u", "lwa-ups-policy.service", "-u", "construct.service"])
+report["previous_systemd_shutdown"] = run(["journalctl", "-b", "-1", "--no-pager",
+    "-o", "short-iso-precise", "-n", "100", "_PID=1"])
+report["shutdown_armed"] = Path("/etc/nut/lwa-shutdown-armed").is_file()
+report["failed_units"] = run(["systemctl", "--failed", "--no-pager", "--no-legend"])
+report["dns_recovery"] = run(["getent", "hosts", "watchtower.littlewolfacres.com"])
+
 if host == "watchtower":
+    probe = Path("/usr/local/sbin/lwa-ups-auth-check")
+    if probe.is_file():
+        report["persistent_monitors"] = run([str(probe), "--require-two-monitors"])
+    report["current_policy_log"] = run(["journalctl", "-b", "0", "--no-pager",
+        "-o", "short-iso-precise", "-n", "30", "-u", "lwa-ups-policy.service"])
     # USB manufacturer/product IDs and model text only; omit serial identifiers.
     report["usb_devices"] = []
     for device in sorted(Path("/sys/bus/usb/devices").glob("*")):
@@ -50,6 +67,13 @@ if host == "watchtower":
     else:
         report["ups_telemetry"] = "upsc unavailable; no packages installed by this inspection"
 else:
+    report["previous_kubelet_shutdown"] = run(["journalctl", "-b", "-1", "--no-pager",
+        "-o", "short-iso-precise", "-n", "100", "-u", "k3s.service", "--grep",
+        "(?i)shutdown|shutting down|inhibit|kill|timed out"])
+    report["pods"] = run(["k3s", "kubectl", "--request-timeout=10s", "get", "pods", "-A",
+        "-o", "custom-columns=NAMESPACE:.metadata.namespace,NAME:.metadata.name,PHASE:.status.phase,READY:.status.containerStatuses[*].ready,RESTARTS:.status.containerStatuses[*].restartCount"])
+    report["persistent_volume_claims"] = run(["k3s", "kubectl", "--request-timeout=10s", "get", "pvc", "-A",
+        "-o", "custom-columns=NAMESPACE:.metadata.namespace,NAME:.metadata.name,PHASE:.status.phase"])
     # Read only selected lifecycle directives. Do not dump unit environments.
     report["construct_stop"] = run(["systemctl", "show", "construct", "--property=ExecStop"])
     pid_result = run(["systemctl", "show", "construct", "--property=MainPID", "--value"])

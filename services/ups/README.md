@@ -1,19 +1,13 @@
 # UPS commissioning and coordinated shutdown
 
-Watchtower telemetry is live (run 34660864596). Construct’s graceful handler is
-installed and probed (run 34663861718). Watchtower preparation passed run
-34712198245; Monolith stopped before changes on a version-check error. Neither
-host is armed. See [the operational runbook](../../docs/ups-shutdown-runbook.md) for the
-complete prepare → maintenance tests → activate workflow and weekend test procedure.
+Coordinated shutdown is active (run 34723961571). Construct's graceful stop/recovery
+and Monolith's live Kubernetes/logind checks passed. The owner completed the physical
+outage simulation on 2026-09-13; recovery checks passed, with previous-boot host-log
+review still pending. See [the operational runbook](../../docs/ups-shutdown-runbook.md).
 
-The telemetry-only workflow below is the initial commissioning path. Once the
-coordinated configuration owns `/etc/nut`, that workflow refuses to overwrite it.
-
-Discovery run [34629066497](https://github.com/speddling/lwa-infra/actions/runs/34629066497)
-confirmed Watchtower USB `CP1000PFCLCDa` (`0764:0601`) and no NUT packages on
-either host. At discovery, Construct had no QMP/monitor arguments and its
-ExecStop killed QEMU with SIGKILL. The later graceful-handler deployment replaced
-that stop command; its shutdown/recovery acceptance test is still pending.
+The telemetry-only workflow below is the historical initial commissioning path.
+Coordinated configuration now owns `/etc/nut`; telemetry-only preparation refuses
+to overwrite it. Do not run preparation over the active shutdown configuration.
 
 ## Telemetry phase
 
