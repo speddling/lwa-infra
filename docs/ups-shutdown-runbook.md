@@ -1,5 +1,35 @@
 # Coordinated UPS shutdown
 
+## Latest acceptance result: repeat physical test
+
+[Inspection 34778571656](https://github.com/speddling/lwa-infra/actions/runs/34778571656)
+confirms the 2026-09-13 repeat test's coordinated shutdown sequence:
+
+| UTC | Evidence |
+|---|---|
+| 19:34:19 | Watchtower policy observed OB. |
+| 19:39:20 | Policy requested FSD after approximately 5m01s. |
+| 19:39:23 | Monolith received FSD and initiated automatic power-fail shutdown. |
+| 19:39:28 | Monolith kubelet reported the node shutting down. |
+| 19:39:39 | Watchtower reached its poweroff target. |
+| 19:40:30–34 | Construct received orderly poweroff and QEMU exited successfully. |
+| 19:40:35 | Monolith reached its poweroff target after unmounting storage. |
+
+**Shutdown sequence passed; recovery acceptance remains open.** Both monitors are
+running and arming markers persist, but the persistent-monitor probe failed in
+both the initial inspection and [follow-up 34778641337](https://github.com/speddling/lwa-infra/actions/runs/34778641337).
+A running process alone does not establish NUT login/coordination. Inspection now
+includes current-boot NUT logs and a numeric unauthenticated login-count query to
+resolve that failure without changing the policy or restarting services.
+
+Monolith is Ready, Construct is running, DNS resolves, and all PVCs are Bound.
+The initial recovery sample reported OL CHRG, 69% charge, 23% load and 1076 seconds
+estimated runtime. Existing Watchtower unbound-resolvconf failure and Plane API
+pods not Ready remain separate unresolved findings. Allow the battery to recharge
+before considering another physical discharge test.
+
+## Earlier commissioning and first-test history
+
 Coordinated shutdown is **active** following [activation 34723961571](https://github.com/speddling/lwa-infra/actions/runs/34723961571).
 Both persistent NUT monitors were connected and the five-minute policy was armed.
 [Maintenance 34723553105](https://github.com/speddling/lwa-infra/actions/runs/34723553105)
@@ -24,13 +54,12 @@ its NUT log shows exit on SIGTERM, not an automatic shutdown request. Construct
 exited gracefully at 01:00:14 and Monolith unmounted its storage and reached
 poweroff at 01:00:18. Both monitors are connected and armed after recovery.
 
-**Full coordinated outage acceptance remains unresolved:** the owner moved Monolith
-to reach the UPS plug and cannot rule out an accidental power-button press. Its
-120-second kubelet delay makes that timing plausible, but logind evidence is
-needed before assigning the cause. The previous kubelet log query timed out;
-it now searches only the previous boot's final ten minutes. Inspection also collects
-logind's previous-boot records. Do not declare Monolith's FSD response verified
-from this test; a repeat may be needed once the earlier trigger is understood.
+**First-test limitation (resolved by the repeat shutdown test above):**
+[Inspection 34739134859](https://github.com/speddling/lwa-infra/actions/runs/34739134859)
+confirmed a short power-key press on Monolith at 00:57:39 UTC. Logind waited
+150 seconds, with unattended-upgrades still holding an inhibitor at timeout,
+before stopping services. The first test therefore did not exercise Monolith's
+FSD response. The later repeat test did.
 
 Recovery also shows `unbound-resolvconf.service` failed on Watchtower, two Plane API
 pods running but not Ready, and Firecrawl RabbitMQ with 57 restarts. DNS resolution
