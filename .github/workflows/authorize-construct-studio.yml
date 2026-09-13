@@ -1,0 +1,41 @@
+name: Authorize Studio SSH access to Construct
+
+on:
+  pull_request:
+    branches: [master]
+    paths:
+      - 'services/construct/ansible/playbooks/authorize-studio.yml'
+      - 'services/construct/ansible/files/studio_ed25519.pub'
+      - '.github/workflows/authorize-construct-studio.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: construct-lifecycle-${{ github.event.pull_request.number || 'production' }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python -m pip install ansible-core==2.18.6
+      - name: Validate the public key
+        run: ssh-keygen -lf services/construct/ansible/files/studio_ed25519.pub
+      - name: Syntax-check additive access playbook
+        working-directory: services/construct/ansible
+        run: ansible-playbook playbooks/authorize-studio.yml --syntax-check
+  authorize:
+    needs: validate
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master'
+    runs-on: [self-hosted, monolith]
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify runner identity
+        run: test "$(hostname -s)/$(id -un)" = monolith/gh-runner
+      - name: Authorize Studio on the running guest
+        working-directory: services/construct/ansible
+        run: ansible-playbook playbooks/authorize-studio.yml

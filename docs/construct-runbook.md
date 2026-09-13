@@ -129,3 +129,26 @@ See [Construct shutdown](construct-shutdown.md) for the prepared SSH-based lifec
 change. Run 34663861718 installed and probed it without restarting the guest.
 A real shutdown/recovery test remains pending. This is a prerequisite for coordinated
 UPS shutdown of Monolith and Watchtower.
+
+## Studio key access
+
+Studio reached Construct over the LAN forward on 2026-09-13, but password
+attempts failed. Its owner-provided ED25519 public key is recorded in
+`services/construct/ansible/files/studio_ed25519.pub`, fingerprint
+`SHA256:GtrazzahdVluQ15QD0JdM8Wt95gg3kC61oo4Ln9qB9g`.
+
+After human merge, run **Authorize Studio SSH access to Construct** from `master`.
+This appends the key on the existing guest and verifies the runner can reconnect;
+it does not exercise Studio's private key. Studio deployment and client acceptance
+are pending until those actions complete. The workflow runs as `gh-runner` on
+Monolith and SSHes as `speddling` through the pinned localhost port 2222 forward.
+
+From Studio, verify explicitly without password fallback:
+
+```bash
+ssh -o IdentitiesOnly=yes -o PasswordAuthentication=no -i ~/.ssh/id_ed25519 -p 2222 speddling@monolith.littlewolfacres.com
+```
+
+The private key stays on Studio. No SSH service restart or password change is
+needed. This additive playbook targets the existing VM; a future rebuild must
+reapply it before Studio login is expected to work.
