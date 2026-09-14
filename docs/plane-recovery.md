@@ -1,6 +1,19 @@
 # Plane startup investigation
 
-## Verified 2026-09-14
+## Acceptance completed 2026-09-14
+
+[Final inspection 34903276474](https://github.com/speddling/lwa-infra/actions/runs/34903276474)
+passed after PR #270. ArgoCD reports Healthy/Synced with a successful operation.
+All 11 running pods are Ready, and their names are unchanged from the prior
+post-rollout observation. There are zero pending migrations. The actual hook pod
+`plane-api-migrate-1-nwm8t`, created at 21:52:09 UTC, completed successfully with
+the pinned v1.4.2 backend digest, no restarts and no migrations to apply.
+The independent HTTPS instance endpoint returned HTTP 200 with valid JSON.
+The expected duplicate-Job warning remains documented below. Operational recovery,
+release pinning, timestamp suppression and migration-hook execution are verified;
+owner confirmation of login and normal workspace use is still outstanding.
+
+## Initial findings 2026-09-14
 
 Owner reports Plane has never been stable and currently displays “Looks like
 Plane didn't start up correctly”. Read-only Synapse inspection confirms both API
@@ -121,15 +134,15 @@ confirmed zero pending migrations. All running Plane pods subsequently became
 Ready, and ArgoCD logged Healthy at 16:03:05 UTC on 2026-09-14. Later reconciliations
 at 16:04:19 and 16:05:16 found the application Synced without another rollout.
 
-Hook acceptance remains open. The initial conversion from a normal Job into a
+The initial hook conversion required a follow-up. The initial conversion from a normal Job into a
 same-name hook produced both a prune task and a hook task. Controller logs show
 the hook inherited the prune task's `Pruned/Succeeded` result; no new migration
 pod ran. This is not successful hook execution, despite the overall sync result.
 The old normal Job is now absent. Explicit wave 0 on the hook and wave 1 on the
 API Deployment establish the intended migration-before-API order and trigger a
 new sync through the Deployment metadata change. These annotations do not change
-the API pod template. After merge, require an actual completed hook pod before
-closing this acceptance item; do not repeat schema recovery just to test a hook.
+the API pod template. PR #270 deployed this ordering and the completed hook above
+closes the acceptance item; no emergency schema recovery was repeated.
 
 For future upgrades, capture and verify a fresh database/secret backup before
 merging the version change. Update the Helm application version and matching
