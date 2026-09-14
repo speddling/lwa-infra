@@ -202,11 +202,21 @@ spec:
           ports:
             - containerPort: 5672
             - containerPort: 15672
-          livenessProbe:
-            exec:
-              command: ["rabbitmq-diagnostics", "check_running"]
-            initialDelaySeconds: 15
-            periodSeconds: 30
+          # CLI probes start an Erlang process and were timing out after the
+          # implicit one-second timeout, repeatedly killing a healthy broker.
+          # RabbitMQ recommends AMQP TCP readiness and no liveness probe.
+          startupProbe:
+            tcpSocket:
+              port: 5672
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 60
+          readinessProbe:
+            tcpSocket:
+              port: 5672
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
           resources:
             requests:
               memory: "256Mi"
