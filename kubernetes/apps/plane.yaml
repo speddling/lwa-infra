@@ -72,6 +72,12 @@ spec:
             app_env_existingSecret: plane-app-env-secret
             live_env_existingSecret: plane-live-env-secret
 
+          # Complete the wave-0 migration hook before rolling out the API.
+          # This annotates the Deployment itself, not its pod template.
+          api:
+            annotations:
+              argocd.argoproj.io/sync-wave: "1"
+
           # plane-worker OOMKilled (exitCode 137) against the chart's default
           # 1000Mi limit. Its Celery banner showed "concurrency: 16 (prefork)"
           # — 16 separate full-Python-process workers, not threads, each

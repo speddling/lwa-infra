@@ -29,6 +29,7 @@ def validate():
     annotations = hook["metadata"]["annotations"]
     assert annotations["argocd.argoproj.io/hook"] == "Sync"
     assert annotations["argocd.argoproj.io/hook-delete-policy"] == "BeforeHookCreation"
+    assert annotations["argocd.argoproj.io/sync-wave"] == "0"
     assert hook["spec"]["backoffLimit"] == 0
     container = hook["spec"]["template"]["spec"]["containers"][0]
     assert container["image"] == (
@@ -71,6 +72,8 @@ def validate():
         combined[identity(hook)] = hook
         for resource in combined.values():
             if resource["kind"] == "Deployment":
+                if resource["metadata"]["name"] == "plane-api-wl":
+                    assert resource["metadata"]["annotations"]["argocd.argoproj.io/sync-wave"] == "1"
                 template = resource["spec"]["template"]
                 template["metadata"]["annotations"].pop("timestamp")
                 for c in template["spec"]["containers"]:

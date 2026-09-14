@@ -115,7 +115,21 @@ from the stable tag to the equivalent version tag, plus replacement of the old
 migration Job. After merge, require a successful hook, healthy API/workers,
 zero pending migrations and an HTTPS API response. Compare pod identities across
 later reconciliation to verify there are no timestamp-only replacements.
-This follow-up is prepared; its production acceptance is still pending.
+Release pin and timestamp suppression were deployed by PR #269. Inspection
+[34866110751](https://github.com/speddling/lwa-infra/actions/runs/34866110751)
+confirmed zero pending migrations. All running Plane pods subsequently became
+Ready, and ArgoCD logged Healthy at 16:03:05 UTC on 2026-09-14. Later reconciliations
+at 16:04:19 and 16:05:16 found the application Synced without another rollout.
+
+Hook acceptance remains open. The initial conversion from a normal Job into a
+same-name hook produced both a prune task and a hook task. Controller logs show
+the hook inherited the prune task's `Pruned/Succeeded` result; no new migration
+pod ran. This is not successful hook execution, despite the overall sync result.
+The old normal Job is now absent. Explicit wave 0 on the hook and wave 1 on the
+API Deployment establish the intended migration-before-API order and trigger a
+new sync through the Deployment metadata change. These annotations do not change
+the API pod template. After merge, require an actual completed hook pod before
+closing this acceptance item; do not repeat schema recovery just to test a hook.
 
 For future upgrades, capture and verify a fresh database/secret backup before
 merging the version change. Update the Helm application version and matching
