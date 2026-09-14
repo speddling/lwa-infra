@@ -34,42 +34,11 @@ jobs:
           # sync cycle or repo-server cache refresh.
           kubectl apply -f kubernetes/apps/firecrawl.yaml -n argocd
 
-      - name: Wait for pods to stabilize
+      - name: Verify every deployment rollout
         run: |
-          echo "Waiting for pods to stabilize..."
-          sleep 30
-
-      - name: Verify deployment
-        run: |
-          echo "=== Namespace ==="
-          kubectl get namespace firecrawl
-          echo ""
-
-          echo "=== Pods ==="
+          for component in api redis postgres rabbitmq; do
+            kubectl rollout status "deployment/firecrawl-$component" -n firecrawl --timeout=600s
+          done
           kubectl get pods -n firecrawl
-          echo ""
-
-          echo "=== Services ==="
-          kubectl get svc -n firecrawl
-          echo ""
-
-          echo "=== Ingress ==="
-          kubectl get ingress -n firecrawl
-          echo ""
-
-          echo "=== ArgoCD Application ==="
-          kubectl get application firecrawl -n argocd -o wide 2>/dev/null || echo "(ArgoCD Application not found — may not be synced yet)"
-          echo ""
-
-          # If firecrawl-api is not ready, capture logs for debugging
-          API_READY=$(kubectl get pods -n firecrawl -l app=firecrawl,component=api -o jsonpath='{.items[0].status.containerStatuses[0].ready}' 2>/dev/null || echo "false")
-          if [ "$API_READY" != "true" ]; then
-            echo "=== Firecrawl API pod not ready — capturing logs ==="
-            kubectl logs -n firecrawl -l app=firecrawl,component=api --tail=50 --previous 2>/dev/null || true
-            echo ""
-            echo "=== Describe pod ==="
-            kubectl describe pod -n firecrawl -l app=firecrawl,component=api 2>/dev/null || true
-            echo "=== FAIL: firecrawl-api pod not ready ==="
-            exit 1
-          fi
-          echo "=== PASS: firecrawl-api pod ready ==="
+          kubectl get application firecrawl -n argocd -o wide
+          echo "Deployment rollouts passed; a real scrape is still required for commissioning."

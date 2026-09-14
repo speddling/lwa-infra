@@ -1,0 +1,41 @@
+name: Inspect Firecrawl commissioning
+
+on:
+  pull_request:
+    branches: [master]
+    paths:
+      - 'scripts/firecrawl/**'
+      - 'services/firecrawl/kubernetes/deployment.yaml'
+      - '.github/workflows/inspect-firecrawl.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check inspection syntax without contacting production
+        run: python -m py_compile scripts/firecrawl/inspect.py
+      - name: Validate embedded runtime JavaScript syntax
+        run: |
+          python -c 'import runpy; print(runpy.run_path("scripts/firecrawl/inspect.py")["RUNTIME"])' > /tmp/firecrawl-runtime.js
+          node --check /tmp/firecrawl-runtime.js
+
+  inspect:
+    needs: validate
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master'
+    runs-on: [self-hosted, monolith]
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify runner identity
+        run: test "$(hostname -s)/$(id -un)" = monolith/gh-runner
+      - name: Inspect through the existing speddling SSH login
+        run: |
+          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes \
+            -o ConnectTimeout=10 -o IdentitiesOnly=yes \
+            -i "$HOME/.ssh/id_ed25519" speddling@192.168.30.10 \
+            'sudo -n /usr/bin/python3 -' < scripts/firecrawl/inspect.py
