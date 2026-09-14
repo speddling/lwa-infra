@@ -22,9 +22,9 @@ The repository pins chart 1.5.1 but overrides its application version with
 installation do not establish the current image version or service health.
 Existing Job immutability workarounds also require review before changing versions.
 
-## Next diagnostic
+## Read-only diagnostic
 
-After merge, dispatch **Inspect Plane startup** on master. It runs on Monolith as
+Dispatch **Inspect Plane startup** on master. It runs on Monolith as
 `gh-runner`, using the runner's existing key to SSH as `speddling` with sudo.
 It reports selected pod metadata, ArgoCD health/sync state, and a migration plan
 from the newest running API container. `showmigrations --plan` runs with PostgreSQL
@@ -74,8 +74,55 @@ Celery processes in worker and beat-worker, and HTTP 200 from `/api/instances/`
 through the internal API Service. Check the external HTTPS page and user login
 afterward. Existing volumes and Secrets are retained; the old Job is not deleted.
 
-Recovery is not deployed or verified yet. Once serving again, pin the application
-to the verified release and correct Job replacement for future migrations.
-Also suppress only the chart's generated pod-template timestamp drift: fresh pod
-replacements were observed during ordinary reconciliation. Do not treat this
-one-time migration repair as the completed long-term stability correction.
+Recovery [34865073606](https://github.com/speddling/lwa-infra/actions/runs/34865073606)
+passed on 2026-09-14. Backup is on Monolith at
+`/var/backups/lwa-plane/20260914T155329Z-yxq5mb3r`. Both migrations completed;
+API/worker rollouts, actual Celery processes and the internal instance endpoint
+passed. An independent Construct request to
+`https://plane.littlewolfacres.com/api/instances/` returned HTTP 200 and a JSON
+object with `instance` and `config`. User login and normal workspace interaction
+still need owner confirmation.
+
+## Release and reconciliation correction
+
+The follow-up pins all chart application images to `v1.4.2`. Registry comparisons
+confirmed that backend, frontend, admin, space and live v1.4.2 image digests match
+the stable images inspected during recovery; this is not another application upgrade.
+The chart remains pinned at 1.5.1.
+
+A second Application source, `kubernetes/plane-overrides`, replaces only
+`plane-api-migrate-1` with a Sync hook using the exact recovered backend digest.
+`BeforeHookCreation` replaces the old completed Job before each full sync and
+retains the latest Job/logs afterward. There is no generated timestamp in this
+Job. A failed migration command or remaining migration causes the hook to fail,
+and therefore fails the sync. Do not use selective sync for application upgrades:
+ArgoCD does not execute hooks during selective sync.
+
+ArgoCD intentionally reports `RepeatedResourceWarning` for this one Job because
+both sources declare its identity; the Git override wins. This is expected only
+for `Job/plane/plane-api-migrate-1`, not a blanket exemption for warnings.
+The override retains the chart's service account and existing secret/config references.
+The five Secrets, data volumes and bootstrap-managed Certificate retain their owners.
+
+For Deployments, ignore only `/spec/template/metadata/annotations/timestamp`,
+with `RespectIgnoreDifferences=true`. This prevents the upstream chart's `now()`
+from triggering pod replacements during routine rendering/sync. Image changes,
+resource changes and all other annotations remain managed. The existing WEB_URL
+HTTPS exception remains, pending a separate declarative replacement.
+
+Merge deploys this correction through ArgoCD. Expect one rollout for the change
+from the stable tag to the equivalent version tag, plus replacement of the old
+migration Job. After merge, require a successful hook, healthy API/workers,
+zero pending migrations and an HTTPS API response. Compare pod identities across
+later reconciliation to verify there are no timestamp-only replacements.
+This follow-up is prepared; its production acceptance is still pending.
+
+For future upgrades, capture and verify a fresh database/secret backup before
+merging the version change. Update the Helm application version and matching
+migration-hook version/digest together, review the migration path, and validate
+full sync and API/worker operation. The emergency recovery script is deliberately
+restricted to the reviewed v1.4.2 digest and migration set; it is not a generic
+upgrade tool. Preserve backups until recovery and normal user operations are verified.
+
+References: [ArgoCD multi-source overrides](https://argo-cd.readthedocs.io/en/stable/user-guide/multiple_sources/),
+[ArgoCD hook lifecycle and selective-sync limitation](https://argo-cd.readthedocs.io/en/stable/user-guide/sync-waves/).

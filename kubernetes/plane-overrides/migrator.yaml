@@ -1,0 +1,49 @@
+# Replaces the upstream resource with the same group/kind/namespace/name.
+# ArgoCD's last source wins; RepeatedResourceWarning for this one Job is expected.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: plane-api-migrate-1
+  namespace: plane
+  annotations:
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: 600
+  template:
+    metadata:
+      labels:
+        app.name: plane-plane-api-migrate
+    spec:
+      restartPolicy: Never
+      serviceAccountName: plane-srv-account
+      containers:
+        - name: plane-api-migrate
+          # Exact backend already recovered and verified on 2026-09-14.
+          image: artifacts.plane.so/makeplane/plane-backend:v1.4.2@sha256:90032ce088708889b60c00d491897916f4deb882facda27db59fd10fb68729ef
+          imagePullPolicy: IfNotPresent
+          command:
+            - /bin/bash
+            - -ec
+            - |
+              python manage.py wait_for_db
+              python manage.py migrate --noinput
+              python manage.py migrate --check
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: "1"
+              memory: 1000Mi
+          envFrom:
+            - configMapRef:
+                name: plane-app-vars
+                optional: false
+            - secretRef:
+                name: plane-app-env-secret
+                optional: false
+            - secretRef:
+                name: plane-docstore-secret
+                optional: false

@@ -15,7 +15,7 @@ name: Bootstrap Plane
 # re-run this workflow to generate new ones.
 #
 # Service hostnames below assume the Helm release name "plane" in the
-# "plane" namespace (set explicitly via source.helm.releaseName in
+# "plane" namespace (set explicitly via sources[0].helm.releaseName in
 # kubernetes/apps/plane.yaml) — e.g. plane-pgdb.plane.svc.cluster.local.
 #
 # What this does:

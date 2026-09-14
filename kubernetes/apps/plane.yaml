@@ -1,30 +1,7 @@
-# Plane — self-hosted project/issue tracker (Community Edition, open source)
-#
-# Automated sync enabled. Confirmed healthy through a real first install:
-# all 13 components (Postgres, Redis, RabbitMQ, MinIO, web, space, admin,
-# live, api, worker, beat-worker) survived an OOMKill fix, a TLS
-# misconfiguration, a missing secret key, and a Jinja2 templating bug
-# upstream of this file — manual sync was the right call for that first
-# boot, not for steady-state operation afterward. (PRs #142/#144/#145/#146/#147
-# fixed issues along the way.)
-#
-# Secret field names confirmed via `helm show values makeplane/plane-ce`:
-# a top-level `external_secrets:` map takes the literal NAME of a
-# pre-existing Kubernetes Secret per logical group. The five secrets
-# referenced below are created by bootstrap-plane.yml, never committed
-# to git, and live only as Kubernetes Secret objects going forward.
-#
-# TLS: explicit cert-manager Certificate resource (kubernetes/apps/
-# plane-certificate.yaml), applied by bootstrap-plane.yml — NOT the
-# cert-manager.io/cluster-issuer annotation pattern used elsewhere in
-# this repo. That annotation only works on standard Kubernetes Ingress
-# objects (cert-manager's ingress-shim watches for it specifically);
-# this chart generates a Traefik-native IngressRoute instead, a
-# different CRD entirely, which ingress-shim never sees. An annotation
-# under ingress.ingress_annotations here would silently do nothing.
-# Also still deliberately not using the chart's own ssl.createIssuer
-# automation, since that requires embedding the Cloudflare API token
-# directly in this committed values block.
+# Plane Community Edition: fixed application release on the upstream 1.5.1 chart.
+# The second source replaces only the chart's fixed-name migration Job with a
+# Sync hook. See docs/plane-recovery.md for backup and upgrade requirements.
+# TLS Certificate remains applied by bootstrap-plane.yml.
 
 apiVersion: argoproj.io/v1alpha1
 kind: Application
@@ -35,77 +12,80 @@ metadata:
     - resources-finalizer.argocd.argoproj.io
 spec:
   project: default
-  source:
-    repoURL: https://helm.plane.so/
-    chart: plane-ce
-    targetRevision: "1.5.1"  # chart 1.5.1 = app 1.3.1; confirmed running via helm search repo makeplane/plane-ce -l
-    helm:
-      releaseName: plane   # explicit, not left to default inference — service DNS names below depend on this
-      values: |
-        planeVersion: stable
+  sources:
+    - repoURL: https://helm.plane.so/
+      chart: plane-ce
+      targetRevision: "1.5.1"  # chart version; application release is pinned below
+      helm:
+        releaseName: plane   # explicit, not left to default inference — service DNS names below depend on this
+        values: |
+          planeVersion: v1.4.2
 
-        ingress:
-          enabled: true
-          appHost: plane.littlewolfacres.com
-          ingressClass: traefik
-          ingress_annotations:
-            nginx.ingress.kubernetes.io/proxy-body-size: "5m"
+          ingress:
+            enabled: true
+            appHost: plane.littlewolfacres.com
+            ingressClass: traefik
+            ingress_annotations:
+              nginx.ingress.kubernetes.io/proxy-body-size: "5m"
 
-        ssl:
-          createIssuer: false
-          tls_secret_name: plane-tls
+          ssl:
+            createIssuer: false
+            tls_secret_name: plane-tls
 
-        postgres:
-          local_setup: true
-          storageClass: local-path
-          volumeSize: 5Gi
+          postgres:
+            local_setup: true
+            storageClass: local-path
+            volumeSize: 5Gi
 
-        redis:
-          local_setup: true
-          storageClass: local-path
-          volumeSize: 1Gi
+          redis:
+            local_setup: true
+            storageClass: local-path
+            volumeSize: 1Gi
 
-        rabbitmq:
-          local_setup: true
-          storageClass: local-path
-          volumeSize: 100Mi
+          rabbitmq:
+            local_setup: true
+            storageClass: local-path
+            volumeSize: 100Mi
 
-        minio:
-          local_setup: true
-          storageClass: local-path
-          volumeSize: 5Gi
+          minio:
+            local_setup: true
+            storageClass: local-path
+            volumeSize: 5Gi
 
-        env:
-          default_cluster_domain: cluster.local
-          docstore_bucket: uploads
-          doc_upload_size_limit: 5242880
-          # Chart hardcodes WEB_URL as http://<appHost> with no override
-          # field anywhere in values.yaml (confirmed via helm show values,
-          # grepping for web_url/base_url/protocol/scheme/https — nothing).
-          # cors_allowed_origins IS a real documented override, so fix that
-          # one properly here. WEB_URL itself needs the ignoreDifferences
-          # entry below plus a one-time live kubectl patch, since there's
-          # no clean way to express "this is https-only" to this chart.
-          cors_allowed_origins: "https://plane.littlewolfacres.com"
+          env:
+            default_cluster_domain: cluster.local
+            docstore_bucket: uploads
+            doc_upload_size_limit: 5242880
+            # Chart hardcodes WEB_URL as http://<appHost> with no override
+            # field anywhere in values.yaml (confirmed via helm show values,
+            # grepping for web_url/base_url/protocol/scheme/https — nothing).
+            # cors_allowed_origins IS a real documented override, so fix that
+            # one properly here. WEB_URL itself needs the ignoreDifferences
+            # entry below plus a one-time live kubectl patch, since there's
+            # no clean way to express "this is https-only" to this chart.
+            cors_allowed_origins: "https://plane.littlewolfacres.com"
 
-        external_secrets:
-          pgdb_existingSecret: plane-pgdb-secret
-          rabbitmq_existingSecret: plane-rabbitmq-secret
-          doc_store_existingSecret: plane-docstore-secret
-          app_env_existingSecret: plane-app-env-secret
-          live_env_existingSecret: plane-live-env-secret
+          external_secrets:
+            pgdb_existingSecret: plane-pgdb-secret
+            rabbitmq_existingSecret: plane-rabbitmq-secret
+            doc_store_existingSecret: plane-docstore-secret
+            app_env_existingSecret: plane-app-env-secret
+            live_env_existingSecret: plane-live-env-secret
 
-        # plane-worker OOMKilled (exitCode 137) against the chart's default
-        # 1000Mi limit. Its Celery banner showed "concurrency: 16 (prefork)"
-        # — 16 separate full-Python-process workers, not threads, each
-        # loading the entire Django app independently. Celery's default
-        # concurrency is the CPU count it detects, which on Monolith's
-        # 8c/16t host is 16. Rather than fight that indirectly via CPU
-        # limits (uncertain whether cgroup CPU quota reliably changes what
-        # Celery detects), just give it real headroom — Monolith has it.
-        worker:
-          memoryLimit: 4096Mi
-          memoryRequest: 512Mi
+          # plane-worker OOMKilled (exitCode 137) against the chart's default
+          # 1000Mi limit. Its Celery banner showed "concurrency: 16 (prefork)"
+          # — 16 separate full-Python-process workers, not threads, each
+          # loading the entire Django app independently. Celery's default
+          # concurrency is the CPU count it detects, which on Monolith's
+          # 8c/16t host is 16. Rather than fight that indirectly via CPU
+          # limits (uncertain whether cgroup CPU quota reliably changes what
+          # Celery detects), just give it real headroom — Monolith has it.
+          worker:
+            memoryLimit: 4096Mi
+            memoryRequest: 512Mi
+    - repoURL: https://github.com/speddling/lwa-infra
+      targetRevision: master
+      path: kubernetes/plane-overrides
   destination:
     server: https://kubernetes.default.svc
     namespace: plane
@@ -115,63 +95,19 @@ spec:
       selfHeal: true
     syncOptions:
       - CreateNamespace=true
-      # RespectIgnoreDifferences=true is the actual missing piece behind
-      # the whole WEB_URL saga. ignoreDifferences alone (with or without
-      # Replace=true, with either jqPathExpressions or jsonPointers
-      # syntax) only suppresses the OutOfSync *status display* — per
-      # ArgoCD's own docs, it does NOT by itself stop the field from
-      # being overwritten during an actual sync/apply. That's a separate
-      # opt-in, and this was the step missing the whole time.
-      # Replace=true was tried and removed — it's incompatible with
-      # ignoreDifferences below. ignoreDifferences only affects PATCH
-      # computation; Replace does a full delete-and-recreate from
-      # exactly what's rendered from git, so it silently wiped out the
-      # live WEB_URL fix on every sync. That's a worse failure mode than
-      # what Replace was solving (a loud, clear error) since it broke
-      # the site silently instead.
-      #
-      # The tradeoff accepted instead: the plane-api-migrate Job embeds
-      # a fresh timestamp annotation on every Helm render, and Job pod
-      # templates are immutable post-creation, so a normal patch-based
-      # sync will fail with "field is immutable" if that Job already
-      # exists and the chart/values change in a way that re-triggers a
-      # sync touching it. When that happens (rare — only on an actual
-      # chart/values change, not routine reconciliation):
-      #   kubectl delete job plane-api-migrate-1 -n plane
-      # selfHeal will recreate it cleanly afterward, since creating a
-      # missing Job doesn't hit the immutability conflict — only
-      # patching an existing one does.
       - RespectIgnoreDifferences=true
   ignoreDifferences:
-    # WEB_URL has no Helm override field in this chart (confirmed via
-    # helm show values) — it's hardcoded to http://<appHost>, which
-    # breaks self-referential redirects since this is HTTPS-only
-    # (IngressRoute has no plain-HTTP entrypoint at all). Live-patched
-    # to https:// once; ignored here so ArgoCD doesn't revert it back
-    # to the chart's hardcoded default on the next sync.
+    # Chart hardcodes HTTP; preserve the previously verified live HTTPS value.
     - group: ""
       kind: ConfigMap
       name: plane-app-vars
       namespace: plane
       jsonPointers:
         - /data/WEB_URL
-    # plane-api-migrate-1's pod template gets a fresh timestamp
-    # annotation on every Helm render, and a Job's .spec.template is
-    # immutable post-creation as a whole — so any values change
-    # anywhere in this chart (even ones with nothing to do with the
-    # migrate job, e.g. the worker memory bump) causes the next sync
-    # to fail with "field is immutable", which then blocks ArgoCD from
-    # retrying that revision at all until someone manually runs
-    # `kubectl delete job plane-api-migrate-1 -n plane` and re-syncs.
-    # Masking the template annotations from diff computation stops
-    # ArgoCD from attempting that patch in the first place, so routine
-    # values changes elsewhere in the chart no longer trip this. A
-    # genuine change to the migrate job itself (new image/command from
-    # an actual chart version bump) will still need the manual delete
-    # — that's real drift, not noise, and this entry doesn't mask it.
-    - group: "batch"
-      kind: Job
-      name: plane-api-migrate-1
+    # Helm's now() changes at each render. Ignore only this generated field;
+    # actual image, configuration and other annotation changes still reconcile.
+    - group: apps
+      kind: Deployment
       namespace: plane
-      jqPathExpressions:
-        - .spec.template.metadata.annotations
+      jsonPointers:
+        - /spec/template/metadata/annotations/timestamp
