@@ -48,5 +48,33 @@ class ReadinessTests(unittest.TestCase):
         self.assertEqual(network.main(['--unknown']), 2)
 
 
+class RebootGuardTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        loader = importlib.machinery.SourceFileLoader('reboot_guard', str(path.parent / 'lwa-ups-reboot-test'))
+        spec = importlib.util.spec_from_loader(loader.name, loader)
+        cls.guard = importlib.util.module_from_spec(spec)
+        loader.exec_module(cls.guard)
+
+    def test_fresh_mains_check_precedes_reboot(self):
+        for status, allowed in [('OL', True), ('OL CHRG', True), ('OB', False), ('OL FSD', False), ('OL LB', False), ('', False)]:
+            with self.subTest(status=status), patch.object(self.guard.socket, 'gethostname', return_value='watchtower'), patch.object(self.guard.subprocess, 'run', return_value=Mock(stdout=status)) as run:
+                self.assertEqual(self.guard.main(), 0 if allowed else 1)
+                commands = [call.args[0] for call in run.call_args_list]
+                self.assertEqual(commands[0], ['/usr/bin/upsc', 'cyberpower@127.0.0.1', 'ups.status'])
+                self.assertEqual(['/usr/bin/systemctl', 'reboot'] in commands, allowed)
+
+    def test_wrong_host_never_calls_reboot(self):
+        with patch.object(self.guard.socket, 'gethostname', return_value='monolith'), patch.object(self.guard.subprocess, 'run') as run:
+            self.assertEqual(self.guard.main(), 1)
+            run.assert_not_called()
+
+    def test_missing_telemetry_never_calls_reboot(self):
+        with patch.object(self.guard.socket, 'gethostname', return_value='watchtower'), patch.object(self.guard.subprocess, 'run', side_effect=OSError('unavailable')) as run:
+            with self.assertRaises(OSError):
+                self.guard.main()
+            self.assertEqual(run.call_count, 1)
+
+
 if __name__ == '__main__':
     unittest.main()

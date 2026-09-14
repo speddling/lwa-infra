@@ -159,6 +159,12 @@ class ConfigTests(unittest.TestCase):
         for status, allowed in [('OL', True), ('OL CHRG', True), ('OB', False), ('OL FSD', False), ('OL LB', False), ('', False)]:
             self.run_gate(gate, {'repair_status': {'stdout': status}}, allowed)
 
+    def test_watchtower_reboot_requires_acknowledgement(self):
+        plays = yaml.safe_load((root / 'playbooks/schedule-watchtower-reboot.yml').read_text())
+        gate = plays[0]['tasks'][0]
+        self.run_gate(gate, {'ansible_facts': {'hostname': 'watchtower'}}, False)
+        self.run_gate(gate, {'ansible_facts': {'hostname': 'watchtower'}, 'maintenance_ack': True}, True)
+
     def run_gate(self, gate, variables, expected):
         with tempfile.TemporaryDirectory(prefix='ups-gate-') as directory:
             play = Path(directory) / 'test.yml'

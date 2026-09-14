@@ -226,3 +226,27 @@ References: [NUT monitor semantics](https://networkupstools.org/docs/man/upsmon.
 [Kubernetes graceful node shutdown](https://kubernetes.io/docs/concepts/cluster-administration/node-shutdown/),
 [K3s kubelet configuration](https://docs.k3s.io/installation/configuration),
 [NUT authentication protocol](https://networkupstools.org/historic/v2.8.1/docs/developer-guide.chunked/net-protocol.html).
+
+## Controlled Watchtower reboot acceptance
+
+Listener repair [34793431909](https://github.com/speddling/lwa-infra/actions/runs/34793431909)
+and independent verification [34793521978](https://github.com/speddling/lwa-infra/actions/runs/34793521978)
+passed on 2026-09-14. Both persistent monitors are logged in and armed; Monolith
+communications are restored. UPS was OL, 100% charge, 21% load, 1250 seconds
+estimated runtime. Boot recovery still requires the controlled test below.
+
+After merge, use **Coordinated UPS shutdown → test-watchtower-reboot** with
+`maintenance_ack=true`. The owner authorized this test on 2026-09-14. It briefly
+interrupts Watchtower DNS and monitoring; keep mains connected. The trusted
+Watchtower runner verifies current connectivity, records its boot ID and schedules
+a reboot 60 seconds later so its scheduling job can finish. A root-owned helper
+rechecks OL/no OB/LB/FSD immediately before reboot and aborts if unsafe.
+
+A GitHub-hosted job waits 120 seconds before sending verification to Watchtower's
+runner. Verification requires a changed boot ID, both listeners, two monitor
+logins, active policy/monitor, an arming marker and DNS resolution. It never
+restarts or repairs a service. If Watchtower or its runner fails to return, the
+verification job remains queued; this is not a pass and requires inspection.
+If scheduling-job cleanup fails after the timer was created, the reboot may still
+occur; inspect the test timer/job state before any retry. To cancel a pending test
+before it fires, an operator on Watchtower can stop `lwa-ups-reboot-test.timer`.
