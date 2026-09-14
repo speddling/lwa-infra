@@ -1,0 +1,46 @@
+name: Recover Plane migrations
+
+on:
+  pull_request:
+    branches: [master]
+    paths:
+      - 'scripts/plane/**'
+      - '.github/workflows/recover-plane.yml'
+  workflow_dispatch:
+    inputs:
+      maintenance_ack:
+        description: Back up Plane and apply the reviewed v1.4.2 migration gap
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: plane-recovery-${{ github.event.pull_request.number || 'production' }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test backup and migration gates without production access
+        run: python -m unittest discover -s scripts/plane -p 'test_*.py'
+
+  recover:
+    needs: validate
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master' && inputs.maintenance_ack
+    runs-on: [self-hosted, monolith]
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify runner identity
+        run: test "$(hostname -s)/$(id -un)" = monolith/gh-runner
+      - name: Back up and recover through the existing speddling SSH login
+        run: |
+          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes \
+            -o ConnectTimeout=10 -o IdentitiesOnly=yes \
+            -i "$HOME/.ssh/id_ed25519" speddling@192.168.30.10 \
+            'sudo -n /usr/bin/python3 - --maintenance-ack' < scripts/plane/recover.py
