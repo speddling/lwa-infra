@@ -90,8 +90,10 @@ v1.20.2 controller/CRD installations; the cert-manager Application owns local
 configuration such as ClusterIssuers, not the upstream installation itself.
 
 Direct Actions applies remain for media applications, Synapse, Firecrawl and
-kube-state-metrics. Plane uses a remote Helm chart with generated secrets and
-a separately bootstrapped Certificate. That Certificate is also inside the root
+kube-state-metrics. Plane combines remote Helm chart 1.5.1 with a Git-managed
+migration Sync hook, pins application v1.4.2, and ignores generated Deployment
+timestamps. Its existing generated secrets and separately bootstrapped Certificate
+are retained; see `plane-recovery.md` for verified acceptance. That Certificate is also inside the root
 Application's watched directory, so bootstrap-only ownership is not established.
 Plane's `WEB_URL` and ArgoCD repo-secret data have deliberate ignore-difference
 exceptions; preserve those until their original causes are resolved.

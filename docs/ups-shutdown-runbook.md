@@ -33,8 +33,9 @@ a running process alone does not establish NUT login/coordination.
 The repeat physical-test inspection found Monolith Ready, Construct running, DNS
 resolving, and all PVCs Bound.
 The initial recovery sample reported OL CHRG, 69% charge, 23% load and 1076 seconds
-estimated runtime. Existing Watchtower unbound-resolvconf failure and Plane API
-pods not Ready remain separate unresolved findings. Allow the battery to recharge
+estimated runtime. The Watchtower unbound-resolvconf failure remains a separate
+unresolved finding. Plane was subsequently recovered and verified on 2026-09-14;
+see [Plane recovery](plane-recovery.md). Allow the battery to recharge
 before considering another physical discharge test.
 
 ## LAN listener recovery correction

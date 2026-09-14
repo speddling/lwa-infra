@@ -277,7 +277,7 @@ k3s single-node cluster host. Runs all household and client services.
 | hdd-d mirror | Nightly rsync hdd-c -> hdd-d via systemd timer at 02:00 | ✅ Running |
 | Obelisk | QEMU/KVM Win11 VM -- RDP `192.168.30.10:33389` | ⚠️ Present but unused; retain files and redeployment artifacts; runtime retirement unverified |
 | Construct | QEMU/KVM Debian 12 dev VM -- SSH `monolith:2222` | ✅ Running |
-| Plane | Project management -- `plane.littlewolfacres.com` | ✅ Running (via ArgoCD) |
+| Plane | Project management -- `plane.littlewolfacres.com` | v1.4.2; Healthy/Synced, API and migration hook verified 2026-09-14; see `plane-recovery.md` |
 
 ### Samba Shares
 
@@ -349,7 +349,7 @@ GitOps controller for k3s. Watches `speddling/lwa-infra` on `master` and reconci
 | firecrawl | `services/firecrawl/kubernetes/` | firecrawl |
 | minecraft | `services/minecraft/kubernetes/` | minecraft |
 | synapse | `services/synapse/kubernetes/` | synapse |
-| plane | Helm chart, `helm.plane.so` | plane |
+| plane | Helm chart 1.5.1 plus Git migration-hook override; app v1.4.2 | plane |
 | kube-state-metrics | `kubernetes/manifests/` | kube-system |
 | cert-manager | `kubernetes/cluster/cert-manager/` | cert-manager |
 | apps | `kubernetes/apps/` | -- (apps-of-apps) |
