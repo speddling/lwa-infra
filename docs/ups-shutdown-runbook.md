@@ -1,6 +1,6 @@
 # Coordinated UPS shutdown
 
-## Latest acceptance result: repeat physical test
+## Latest acceptance result: shutdown and recovery verified
 
 [Inspection 34778571656](https://github.com/speddling/lwa-infra/actions/runs/34778571656)
 confirms the 2026-09-13 repeat test's coordinated shutdown sequence:
@@ -15,14 +15,23 @@ confirms the 2026-09-13 repeat test's coordinated shutdown sequence:
 | 19:40:30–34 | Construct received orderly poweroff and QEMU exited successfully. |
 | 19:40:35 | Monolith reached its poweroff target after unmounting storage. |
 
-**Shutdown sequence passed; recovery acceptance remains open.** Both monitors are
-running and arming markers persist, but the persistent-monitor probe failed in
-both the initial inspection and [follow-up 34778641337](https://github.com/speddling/lwa-infra/actions/runs/34778641337).
-A running process alone does not establish NUT login/coordination. Inspection now
-includes current-boot NUT logs and a numeric unauthenticated login-count query to
-resolve that failure without changing the policy or restarting services.
+**Shutdown and recovery acceptance passed.** The repeat physical test verified
+coordinated shutdown. Its recovery exposed a missing Watchtower LAN listener,
+which was repaired by [34793431909](https://github.com/speddling/lwa-infra/actions/runs/34793431909).
+[Controlled reboot 34796267359](https://github.com/speddling/lwa-infra/actions/runs/34796267359)
+then passed on 2026-09-14: Watchtower had a new boot ID, both NUT listeners returned,
+both persistent monitors reconnected, the monitor and outage policy were active,
+the arming marker persisted, DNS resolved and the UPS reported OL. Verification
+completed with 13 successful tasks, zero changes and zero failures. No service
+repair was needed after this reboot. Another physical discharge test is not
+required to close this commissioning issue.
 
-Monolith is Ready, Construct is running, DNS resolves, and all PVCs are Bound.
+The earlier [follow-up 34778641337](https://github.com/speddling/lwa-infra/actions/runs/34778641337)
+failed the persistent-monitor probe despite running processes and arming markers;
+a running process alone does not establish NUT login/coordination.
+
+The repeat physical-test inspection found Monolith Ready, Construct running, DNS
+resolving, and all PVCs Bound.
 The initial recovery sample reported OL CHRG, 69% charge, 23% load and 1076 seconds
 estimated runtime. Existing Watchtower unbound-resolvconf failure and Plane API
 pods not Ready remain separate unresolved findings. Allow the battery to recharge
@@ -38,14 +47,16 @@ observed failure; the LAN listener is missing. Early startup before address
 assignment is the likely cause. Older infrastructure files predate the UPS purchase;
 the deployed configuration and commissioning evidence define this installation.
 
-The correction is prepared, not deployed yet. `nut-server.service` now waits for
-network-online and a bounded, explicit local-address check. A post-start check
+The correction was deployed successfully on 2026-09-14 by
+[repair run 34793431909](https://github.com/speddling/lwa-infra/actions/runs/34793431909).
+`nut-server.service` now waits for network-online and a bounded, explicit
+local-address check. A post-start check
 requires both TCP listeners. Failures cause systemd to retry, retaining the same
 loopback/Infra addresses and firewall boundary. The helper binds only an ephemeral
 port to test local address availability and opens TCP connections to test listeners;
 it never authenticates or sends UPS commands.
 
-After human merge, run **Coordinated UPS shutdown → repair-network** from master.
+For a future repair, run **Coordinated UPS shutdown → repair-network** from master.
 It requires OL without OB/LB/FSD and coordinated ownership, installs the override,
 restarts only nut-server, and waits for both existing monitors to reconnect. It
 preserves credentials, active monitors and the arming policy. A failure leaves
@@ -233,10 +244,12 @@ Listener repair [34793431909](https://github.com/speddling/lwa-infra/actions/run
 and independent verification [34793521978](https://github.com/speddling/lwa-infra/actions/runs/34793521978)
 passed on 2026-09-14. Both persistent monitors are logged in and armed; Monolith
 communications are restored. UPS was OL, 100% charge, 21% load, 1250 seconds
-estimated runtime. Boot recovery still requires the controlled test below.
+estimated runtime. Controlled reboot acceptance subsequently passed in
+[34796267359](https://github.com/speddling/lwa-infra/actions/runs/34796267359),
+with both monitors reconnecting automatically and UPS OL.
 
-After merge, use **Coordinated UPS shutdown → test-watchtower-reboot** with
-`maintenance_ack=true`. The owner authorized this test on 2026-09-14. It briefly
+For future authorized maintenance tests, use **Coordinated UPS shutdown → test-watchtower-reboot** with
+`maintenance_ack=true`. The completed 2026-09-14 test was owner-authorized. It briefly
 interrupts Watchtower DNS and monitoring; keep mains connected. The trusted
 Watchtower runner verifies current connectivity, records its boot ID and schedules
 a reboot 60 seconds later so its scheduling job can finish. A root-owned helper

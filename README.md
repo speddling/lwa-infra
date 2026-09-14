@@ -40,7 +40,7 @@ Local domain: `littlewolfacres.com`, all hosts resolve as `hostname.littlewolfac
 - **IaC** - Ansible for host configuration; Terraform Cloud workspaces for each server. Monolith declares a k3s bootstrap `null_resource`; Watchtower declares only the backend
 - **Automation** - GitHub Actions + Ansible (modular role structure)
 - **Secrets** - Ansible Vault, GitHub Actions secrets, generated Kubernetes secrets and workstation-local credentials; see `docs/architecture.md` for ownership exceptions
-- **Monitoring** - Prometheus, Grafana, Alertmanager, Loki, Promtail, Netdata, node_exporter, blackbox_exporter, snmp_exporter, adguard_exporter, tmobile_exporter (custom), reolink_exporter (custom), NUT (coordinated shutdown active; physical-test log review pending)
+- **Monitoring** - Prometheus, Grafana, Alertmanager, Loki, Promtail, Netdata, node_exporter, blackbox_exporter, snmp_exporter, adguard_exporter, tmobile_exporter (custom), reolink_exporter (custom), NUT (coordinated shutdown active; physical shutdown and reboot recovery verified)
 - **OS** - Ubuntu Server 24.04 LTS (monolith + watchtower), macOS Sequoia (apex)
 
 ## CI/CD
@@ -110,7 +110,7 @@ All development work has moved from Apex to Construct (owner confirmed 2026-09-1
 | Loki | watchtower | Log aggregation |
 | Promtail | watchtower | Log shipping agent |
 | Netdata | watchtower | Real-time system monitoring |
-| NUT | Watchtower primary; Monolith secondary | [Coordinated shutdown active](docs/ups-shutdown-runbook.md); post-outage recovery checked, shutdown-log review pending |
+| NUT | Watchtower primary; Monolith secondary | [Coordinated shutdown active](docs/ups-shutdown-runbook.md); physical shutdown and automatic reboot recovery verified |
 | Synapse MCP | monolith | Claude infrastructure read access |
 | Scribe MCP | Runtime location awaiting confirmation | Git control plane; deployment code under `services/apex/` |
 | Argus MCP | watchtower | Claude monitoring read access |

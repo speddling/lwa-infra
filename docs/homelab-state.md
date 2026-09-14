@@ -500,11 +500,14 @@ Apex was the original development host. The owner confirms all development work 
   on low battery or estimated runtime <=600 seconds. All data-connected equipment
   is owner-confirmed battery-backed. Construct graceful shutdown/recovery passed
   run 34723605172; Kubernetes/logind acceptance passed run 34723553105.
-  Owner completed the physical outage simulation on 2026-09-13. Recovery inspection
-  34733935325 confirms both monitors active, Construct/k3s running, node Ready,
-  a live kubelet inhibitor and 150-second logind limit; OL, 22% load, 100% charge,
-  1700 seconds estimated runtime. Previous-boot host log review is still required
-  before declaring full outage acceptance. See `ups-shutdown-runbook.md`.
+  Repeat physical test on 2026-09-13 passed (inspection 34778571656): FSD after
+  approximately 5m01s, both hosts shut down, and Construct exited gracefully.
+  The test exposed a Watchtower NUT LAN listener failure after boot; repair
+  34793431909 deployed explicit address readiness and listener checks.
+  Controlled Watchtower reboot 34796267359 passed on 2026-09-14: changed boot ID,
+  both listeners and monitor logins restored automatically, policy active and
+  armed, DNS resolving, UPS OL. Verification made no changes. Shutdown and
+  recovery acceptance are complete; see `ups-shutdown-runbook.md` for evidence.
   Reassess runtime after the planned PSU/GPU upgrade.
 - **Firewall:** UFW tables above include historical live rules. The current
   Monolith role lacks the documented Studio dock, broad temporary SSH and Minecraft
