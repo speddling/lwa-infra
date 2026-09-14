@@ -1,0 +1,26 @@
+name: Validate Plane release
+
+on:
+  pull_request:
+    branches: [master]
+    paths:
+      - 'kubernetes/apps/plane.yaml'
+      - 'kubernetes/plane-overrides/**'
+      - 'scripts/plane/validate_release.py'
+      - '.github/workflows/validate-plane-release.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4.3.1
+        with:
+          version: v3.17.3
+      - name: Install YAML parser on the disposable CI runner
+        run: python -m pip install PyYAML==6.0.2
+      - name: Verify chart integrity and repeat-render stability
+        run: python scripts/plane/validate_release.py

@@ -10,8 +10,8 @@
 # to a self-signed cert (hence the browser's "Not Secure" warning).
 #
 # Applied directly by bootstrap-plane.yml via kubectl, not by ArgoCD's
-# Helm source — the plane Application's source is a remote chart only,
-# with no local path component to add a sibling manifest to.
+# sources. The new local source contains only the migration Job override;
+# certificate ownership remains with bootstrap-plane.yml.
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
