@@ -68,3 +68,38 @@ stable, and Healthy/Synced in ArgoCD. Optional LLM-backed extraction is separate
 from basic scraping; do not configure paid provider access as part of this test.
 
 Reference: [RabbitMQ health-check guidance](https://www.rabbitmq.com/docs/monitoring#health-checks-as-readiness-probes).
+
+## Confirmed commissioning gaps and Secret handoff
+
+Corrected inspection `34909942525` succeeded on 2026-09-14 at 23:41 UTC:
+
+- RabbitMQ 3.13.7 remains Ready with zero restarts; ArgoCD is Healthy/Synced.
+- API build matches the revision above. Its only service process is `index.js`.
+- Database `firecrawl` has no tables in `public` or `nuq`, no `nuq` schema,
+  and only the `plpgsql` extension. Its volume is retained.
+- The API's database URLs and credential variables contain placeholders.
+  Its broker URL has neither username nor password. The browser URL points
+  back to the API, and there is no browser deployment.
+
+The next rollout adds `Prune=false,Delete=false` to the existing Secret and
+stops the deployment workflow from applying its placeholder manifest. This is
+the **first stage** of a handoff, not credential rotation: ArgoCD still manages
+the manifest and can still reapply its data until the second stage is deployed.
+Do not generate new passwords yet. After merge, run the inspection and verify
+both retention flags on the live Secret. Record its UID so the next stage can
+confirm it was retained rather than deleted and recreated.
+
+Only after that verification, exclude the legacy Secret manifest from ArgoCD
+and provision credentials outside Git using a reviewed, backup-gated workflow.
+Preserve the PostgreSQL volume and coordinate database password changes with
+the connection URLs. Reapplying a Secret alone does not change an existing
+PostgreSQL role password. The deployment workflow must never resume applying
+the legacy manifest. On a fresh cluster, secret provisioning must precede
+workload startup; the legacy file is not a production credential source.
+
+Subsequent commissioning needs version-matched NuQ initialization and pg_cron,
+the harness workers, a separate Playwright service, compatible image pins, and
+bounded scrape/crawl acceptance tests. Do not call the service commissioned
+until those tests pass.
+
+Reference: [ArgoCD resource retention options](https://argo-cd.readthedocs.io/en/stable/user-guide/sync-options/).

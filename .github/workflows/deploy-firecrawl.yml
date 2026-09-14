@@ -19,7 +19,8 @@ jobs:
         run: |
           kubectl apply -f services/firecrawl/kubernetes/namespace.yaml
           kubectl apply -f services/firecrawl/kubernetes/configmap.yaml
-          kubectl apply -f services/firecrawl/kubernetes/secret.yaml
+          # ArgoCD retains ownership of the legacy Secret until the staged
+          # handoff is verified. CI must not reapply placeholder credentials.
           kubectl apply -f services/firecrawl/kubernetes/postgres-pvc.yaml
           kubectl apply -f services/firecrawl/kubernetes/service.yaml
           kubectl apply -f services/firecrawl/kubernetes/deployment.yaml

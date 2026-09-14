@@ -5,7 +5,7 @@ on:
     branches: [master]
     paths:
       - 'scripts/firecrawl/**'
-      - 'services/firecrawl/kubernetes/deployment.yaml'
+      - 'services/firecrawl/kubernetes/**'
       - '.github/workflows/inspect-firecrawl.yml'
   workflow_dispatch:
 

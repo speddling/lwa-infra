@@ -80,6 +80,16 @@ def main():
         'sync': status.get('sync', {}).get('status'),
         'operation': status.get('operationState', {}).get('phase'),
     }}), flush=True)
+    # Report retention metadata only, never the Secret's data or annotations
+    # containing a last-applied manifest.
+    secret = json.loads(run('get', 'secret', 'firecrawl-secret', '-n', 'firecrawl', '-o', 'json'))
+    options = {x.strip() for x in secret['metadata'].get('annotations', {}).get(
+        'argocd.argoproj.io/sync-options', '').split(',')}
+    print(json.dumps({'secret_retention': {
+        'uid': secret['metadata']['uid'],
+        'prune_disabled': 'Prune=false' in options,
+        'application_delete_disabled': 'Delete=false' in options,
+    }}), flush=True)
     errors = []
     def check(name, action):
         try:
