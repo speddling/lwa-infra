@@ -45,12 +45,22 @@ is infrastructure readiness only, not end-to-end commissioning.
 After merge and broker rollout, dispatch **Inspect Firecrawl commissioning** on
 master. The Monolith runner is `gh-runner`; it SSHes as `speddling` with sudo using
 its existing trusted key. Inspection reports pod images/restarts, ArgoCD state,
-API package version and worker entrypoints, connection hosts and credential
+API build revision and worker entrypoints, connection hosts and credential
 presence/placeholder flags, PostgreSQL schema/table names, and RabbitMQ version.
 It never prints credential values, queries user data, changes the schema, or submits
 a scrape. SQL runs in a PostgreSQL read-only session. Errors fail the workflow.
 
-This correction is prepared, not yet verified in production. After inspection,
+PR #272 deployed successfully in Actions run `34905117177`. RabbitMQ is Ready
+with zero restarts and ArgoCD reports Healthy/Synced. Inspection run `34905198676`
+failed because the runtime probe assumed `/app/package.json` existed. The image
+only copies built output and `BUILD_SHA`; the corrected probe reads that file
+and allows independent database and broker checks to finish even if one fails.
+A Node fixture test covers the absent package metadata and credential redaction.
+
+The deployed image's public `BUILD_SHA` is
+`0344bc87a64b455d6e06c7d1eb74ba5ebe007b1c`. Use that upstream revision when
+checking harness, browser and NuQ requirements. Infrastructure readiness does
+not yet establish successful scraping. After the corrected inspection,
 prepare matching worker/browser startup and queue configuration, establish proper
 credential ownership, and pin compatible images. Acceptance requires a successful
 plain-page scrape and crawl, worker processing, broker restart counts remaining

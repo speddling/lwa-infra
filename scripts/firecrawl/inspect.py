@@ -15,8 +15,8 @@ def run(*args, timeout=90):
 
 RUNTIME = r"""
 const fs = require('fs');
-const targets = ['index.js', 'harness.js', 'worker.js', 'nuq-worker.js',
-  'nuq-prefetch-worker.js', 'extract-worker.js', 'cclog-worker.js'];
+const targets = ['index.js', 'harness.js', 'queue-worker.js', 'nuq-worker.js',
+  'nuq-prefetch-worker.js', 'nuq-reconciler-worker.js', 'extract-worker.js', 'cclog-worker.js'];
 const processes = [];
 for (const pid of fs.readdirSync('/proc').filter(x => /^\d+$/.test(x))) {
   try {
@@ -43,7 +43,9 @@ for (const key of ['POSTGRES_PASSWORD', 'RABBITMQ_PASSWORD', 'BULL_AUTH_KEY',
   const value = process.env[key] || '';
   credentials[key] = {present: !!value, placeholder: value.startsWith('changeme')};
 }
-console.log(JSON.stringify({version: require('./package.json').version,
+// Production image copies dist and BUILD_SHA, but does not include package.json.
+const buildSha = fs.existsSync('BUILD_SHA') ? fs.readFileSync('BUILD_SHA', 'utf8').trim() : null;
+console.log(JSON.stringify({build_sha: /^[0-9a-f]{40}$/.test(buildSha || '') ? buildSha : null,
   processes, connections, credentials,
   entrypoint_files: fs.readdirSync('dist/src').filter(x => /harness|worker|index/.test(x))}));
 """
@@ -78,18 +80,25 @@ def main():
         'sync': status.get('sync', {}).get('status'),
         'operation': status.get('operationState', {}).get('phase'),
     }}), flush=True)
-    runtime = json.loads(run('exec', '-n', 'firecrawl', 'deployment/firecrawl-api',
-                             '-c', 'api', '--', 'node', '-e', RUNTIME))
-    print(json.dumps({'api_runtime': runtime}), flush=True)
+    errors = []
+    def check(name, action):
+        try:
+            print(json.dumps({name: action()}), flush=True)
+        except (RuntimeError, ValueError, subprocess.TimeoutExpired) as error:
+            # Continue independent checks; report no raw subprocess output.
+            errors.append(name)
+            print(json.dumps({name: {'error_type': type(error).__name__}}), flush=True)
+    check('api_runtime', lambda: json.loads(run('exec', '-n', 'firecrawl', 'deployment/firecrawl-api',
+                             '-c', 'api', '--', 'node', '-e', RUNTIME)))
     # SELECT only, with a server-side read-only session and no application rows.
-    schema = json.loads(run('exec', '-n', 'firecrawl', 'deployment/firecrawl-postgres',
+    check('database_schema', lambda: json.loads(run('exec', '-n', 'firecrawl', 'deployment/firecrawl-postgres',
         '-c', 'postgres', '--', 'sh', '-c',
         'PGOPTIONS="-c default_transaction_read_only=on" exec psql -X -U "$POSTGRES_USER" '
-        '-d "$POSTGRES_DB" -At -v ON_ERROR_STOP=1 -c "$1"', 'inspect', SCHEMA))
-    print(json.dumps({'database_schema': schema}), flush=True)
-    version = run('exec', '-n', 'firecrawl', 'deployment/firecrawl-rabbitmq', '-c', 'rabbitmq',
-                  '--', 'rabbitmq-diagnostics', '-q', 'server_version').strip()
-    print(json.dumps({'rabbitmq_version': version}))
+        '-d "$POSTGRES_DB" -At -v ON_ERROR_STOP=1 -c "$1"', 'inspect', SCHEMA)))
+    check('rabbitmq_version', lambda: run('exec', '-n', 'firecrawl', 'deployment/firecrawl-rabbitmq', '-c', 'rabbitmq',
+                  '--', 'rabbitmq-diagnostics', '-q', 'server_version').strip())
+    if errors:
+        raise RuntimeError('Incomplete commissioning checks: ' + ', '.join(errors))
 
 
 if __name__ == '__main__':
