@@ -85,9 +85,13 @@
         owner: root
         group: nut
         mode: '0640'
+    - name: Install NUT network startup safeguards
+      ansible.builtin.include_role:
+        name: nut_network
     - name: Restart only the NUT data server
       ansible.builtin.systemd_service:
         name: nut-server.service
+        daemon_reload: true
         state: restarted
         enabled: true
     - name: Install five-minute policy

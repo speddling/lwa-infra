@@ -1,0 +1,45 @@
+---
+- name: Repair NUT server startup on mains without disarming host protection
+  hosts: watchtower
+  become: true
+  any_errors_fatal: true
+  tasks:
+    - name: Require Watchtower
+      ansible.builtin.assert:
+        that: ansible_facts.hostname == 'watchtower'
+    - name: Require coordinated configuration ownership
+      ansible.builtin.stat:
+        path: /etc/nut/lwa-coordinated
+      register: coordinated_owner
+    - name: Verify this is the coordinated deployment
+      ansible.builtin.assert:
+        that: coordinated_owner.stat.exists
+    - name: Read current UPS status
+      ansible.builtin.command: upsc cyberpower@127.0.0.1 ups.status
+      register: repair_status
+      changed_when: false
+    - name: Refuse repair during an outage or committed shutdown
+      ansible.builtin.assert:
+        that:
+          - "'OL' in repair_status.stdout.split()"
+          - "'OB' not in repair_status.stdout.split()"
+          - "'LB' not in repair_status.stdout.split()"
+          - "'FSD' not in repair_status.stdout.split()"
+    - name: Install persistent startup correction
+      ansible.builtin.include_role:
+        name: nut_network
+    - name: Reload units and restart only the NUT data server
+      ansible.builtin.systemd_service:
+        name: nut-server.service
+        daemon_reload: true
+        state: restarted
+    - name: Verify both local and LAN listeners
+      ansible.builtin.command: /usr/local/sbin/lwa-nut-network-ready --listeners
+      changed_when: false
+    - name: Wait for both existing monitors to reconnect automatically
+      ansible.builtin.command: /usr/local/sbin/lwa-ups-auth-check --require-two-monitors
+      register: repair_logins
+      changed_when: false
+      retries: 18
+      delay: 5
+      until: repair_logins.rc == 0
