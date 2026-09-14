@@ -11,11 +11,11 @@ on:
       action:
         description: 'prepare is nondisruptive; apply-kubelet and test-construct require maintenance acknowledgement'
         type: choice
-        options: [prepare, apply-kubelet, test-construct, activate, disarm, repair-network]
+        options: [prepare, apply-kubelet, test-construct, activate, disarm, repair-network, test-watchtower-reboot]
         default: prepare
         required: true
       maintenance_ack:
-        description: 'Approve the selected k3s/logind restart or Construct shutdown/recovery outage now'
+        description: 'Approve the selected k3s/logind restart or Construct shutdown/recovery or Watchtower reboot outage now'
         type: boolean
         default: false
 
@@ -39,7 +39,7 @@ jobs:
       - name: Syntax-check every coordinated playbook with fixture variables
         working-directory: services/ups/ansible
         run: |
-          for play in prepare-shutdown apply-kubelet test-construct readiness activate-shutdown disarm-shutdown repair-network; do
+          for play in prepare-shutdown apply-kubelet test-construct readiness activate-shutdown disarm-shutdown repair-network schedule-watchtower-reboot verify-watchtower-reboot; do
             ansible-playbook "playbooks/$play.yml" --syntax-check -e ups_target=monolith -e ups_vault_file=../tests/vault-fixture.yml
           done
 
@@ -180,3 +180,38 @@ jobs:
       - name: Repair the NUT listener on mains and verify both monitors reconnect
         working-directory: services/ups/ansible
         run: ansible-playbook playbooks/repair-network.yml
+
+  schedule-watchtower-reboot:
+    needs: validate
+    if: github.ref == 'refs/heads/master' && github.event_name == 'workflow_dispatch' && inputs.action == 'test-watchtower-reboot'
+    runs-on: [self-hosted, watchtower]
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require acknowledgement and the expected runner
+        env:
+          MAINTENANCE_ACK: ${{ inputs.maintenance_ack }}
+        run: |
+          test "$MAINTENANCE_ACK" = true
+          test "$(hostname -s)/$(id -un)" = watchtower/speddling
+      - name: Schedule guarded reboot from the trusted runner
+        working-directory: services/ups/ansible
+        run: ansible-playbook playbooks/schedule-watchtower-reboot.yml -e maintenance_ack=true
+
+  wait-watchtower-reboot:
+    needs: schedule-watchtower-reboot
+    runs-on: ubuntu-latest
+    steps:
+      - name: Allow the scheduled reboot to occur before dispatching verification
+        run: sleep 120
+
+  verify-watchtower-reboot:
+    needs: wait-watchtower-reboot
+    runs-on: [self-hosted, watchtower]
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - run: test "$(hostname -s)/$(id -un)" = watchtower/speddling
+      - name: Verify reboot and automatic NUT recovery without remediation
+        working-directory: services/ups/ansible
+        run: ansible-playbook playbooks/verify-watchtower-reboot.yml

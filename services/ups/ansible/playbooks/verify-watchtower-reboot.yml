@@ -1,0 +1,50 @@
+---
+- name: Verify Watchtower reboot recovery without restarting or repairing services
+  hosts: watchtower
+  become: true
+  any_errors_fatal: true
+  tasks:
+    - name: Require Watchtower
+      ansible.builtin.assert:
+        that: ansible_facts.hostname == 'watchtower'
+    - name: Read pre-test boot identity
+      ansible.builtin.slurp:
+        src: /var/lib/lwa-ups/watchtower-reboot-before
+      register: reboot_before_saved
+    - name: Read current boot identity
+      ansible.builtin.command: cat /proc/sys/kernel/random/boot_id
+      register: reboot_after
+      changed_when: false
+    - name: Require an actual reboot
+      ansible.builtin.assert:
+        that: (reboot_before_saved.content | b64decode | trim) != reboot_after.stdout
+    - name: Verify both NUT listeners came back automatically
+      ansible.builtin.command: /usr/local/sbin/lwa-nut-network-ready --listeners
+      changed_when: false
+    - name: Wait for both persistent monitors to reconnect
+      ansible.builtin.command: /usr/local/sbin/lwa-ups-auth-check --require-two-monitors
+      register: reboot_logins
+      changed_when: false
+      retries: 18
+      delay: 5
+      until: reboot_logins.rc == 0
+    - name: Verify the monitor and outage policy are running
+      ansible.builtin.command: systemctl is-active nut-monitor.service lwa-ups-policy.service
+      changed_when: false
+    - name: Inspect the persistent arming marker
+      ansible.builtin.stat:
+        path: /etc/nut/lwa-shutdown-armed
+      register: reboot_armed
+    - name: Require shutdown protection to remain armed
+      ansible.builtin.assert:
+        that: reboot_armed.stat.exists
+    - name: Verify DNS recovery
+      ansible.builtin.command: getent hosts watchtower.littlewolfacres.com
+      changed_when: false
+    - name: Read recovered UPS telemetry
+      ansible.builtin.command: upsc cyberpower@127.0.0.1 ups.status
+      register: reboot_ups
+      changed_when: false
+    - name: Report recovered status
+      ansible.builtin.debug:
+        msg: "New boot {{ reboot_after.stdout }}; both monitors connected; policy active and armed; UPS {{ reboot_ups.stdout }}"

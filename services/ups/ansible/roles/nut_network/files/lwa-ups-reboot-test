@@ -1,0 +1,20 @@
+#!/usr/bin/python3
+"""Recheck mains immediately before an explicitly scheduled Watchtower test reboot."""
+import socket
+import subprocess
+
+
+def main():
+    if socket.gethostname().split('.')[0] != 'watchtower':
+        return 1
+    status = subprocess.run(['/usr/bin/upsc', 'cyberpower@127.0.0.1', 'ups.status'],
+                            capture_output=True, text=True, timeout=5, check=True).stdout.split()
+    if 'OL' not in status or set(status) & {'OB', 'LB', 'FSD'}:
+        print('Reboot test cancelled: UPS is not safely on mains.', flush=True)
+        return 1
+    subprocess.run(['/usr/bin/systemctl', 'reboot'], check=True, timeout=15)
+    return 0
+
+
+if __name__ == '__main__':
+    raise SystemExit(main())

@@ -1,0 +1,61 @@
+---
+- name: Schedule the acknowledged Watchtower reboot with a fresh mains guard
+  hosts: watchtower
+  become: true
+  any_errors_fatal: true
+  tasks:
+    - name: Require the acknowledged Watchtower interruption
+      ansible.builtin.assert:
+        that:
+          - maintenance_ack | default(false) | bool
+          - ansible_facts.hostname == 'watchtower'
+    - name: Require working listeners before testing reboot persistence
+      ansible.builtin.command: /usr/local/sbin/lwa-nut-network-ready --listeners
+      changed_when: false
+    - name: Require both connected monitors
+      ansible.builtin.command: /usr/local/sbin/lwa-ups-auth-check --require-two-monitors
+      changed_when: false
+    - name: Read current UPS state
+      ansible.builtin.command: upsc cyberpower@127.0.0.1 ups.status
+      register: reboot_status
+      changed_when: false
+    - name: Require mains power before scheduling
+      ansible.builtin.assert:
+        that:
+          - "'OL' in reboot_status.stdout.split()"
+          - "'OB' not in reboot_status.stdout.split()"
+          - "'LB' not in reboot_status.stdout.split()"
+          - "'FSD' not in reboot_status.stdout.split()"
+    - name: Read pre-test boot identity
+      ansible.builtin.command: cat /proc/sys/kernel/random/boot_id
+      register: reboot_before
+      changed_when: false
+    - name: Create test evidence directory
+      ansible.builtin.file:
+        path: /var/lib/lwa-ups
+        state: directory
+        owner: root
+        group: root
+        mode: '0700'
+    - name: Save the pre-test boot identity
+      ansible.builtin.copy:
+        dest: /var/lib/lwa-ups/watchtower-reboot-before
+        content: "{{ reboot_before.stdout }}\n"
+        owner: root
+        group: root
+        mode: '0600'
+    - name: Install the delayed test's mains guard
+      ansible.builtin.copy:
+        src: ../roles/nut_network/files/lwa-ups-reboot-test
+        dest: /usr/local/sbin/lwa-ups-reboot-test
+        owner: root
+        group: root
+        mode: '0700'
+    - name: Schedule reboot after the runner has time to finish this job
+      ansible.builtin.command:
+        argv:
+          - systemd-run
+          - --unit=lwa-ups-reboot-test
+          - --on-active=60s
+          - --collect
+          - /usr/local/sbin/lwa-ups-reboot-test
