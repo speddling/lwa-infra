@@ -167,3 +167,11 @@ workflow intentionally refuses a newly created Secret UID. Fresh installation
 bootstrap and normal post-commissioning rotation need separate reviewed paths.
 Workers, NuQ initialization, the browser service, and end-to-end scraping remain
 the next commissioning stage.
+
+Provisioning attempt `34922672623` on 2026-09-15 stopped before credential writes
+or consumer reloads: its arbitrary 1 KiB backup minimum rejected the empty
+database's archive. The corrected gate requires a nonempty archive and successful
+full `pg_restore --file=/dev/null` decoding. Hosted CI covers a real empty database
+archive plus corrupt and zero-byte inputs. The recovery directory is now reported
+as soon as it is created, including for failures before archive validation. Rerun
+provisioning after merging this correction; credentials are not yet provisioned.
