@@ -130,6 +130,7 @@ def backup(secret):
     if BACKUP_ROOT.is_symlink() or info.st_uid != 0 or info.st_mode & 0o077:
         raise RuntimeError('Backup root must be private and root-owned')
     directory = Path(tempfile.mkdtemp(prefix=datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ-'), dir=BACKUP_ROOT))
+    print(f'Private recovery directory: {directory}', flush=True)
     (directory / 'secret-before.json').write_text(json.dumps(secret))
     with (directory / 'roles-before.sql').open('xb') as output:
         run('exec', '-n', 'firecrawl', 'deployment/firecrawl-postgres', '-c', 'postgres',
@@ -138,15 +139,20 @@ def backup(secret):
         run('exec', '-n', 'firecrawl', 'deployment/firecrawl-postgres', '-c', 'postgres',
             '--', 'pg_dump', '-U', 'firecrawl', '-d', 'firecrawl', '--format=custom', stdout=output, timeout=600)
     archive = directory / 'database.dump'
-    if archive.stat().st_size < 1024:
-        raise RuntimeError('Database backup is unexpectedly small')
-    # Decode every archive entry without restoring into a database.
-    run('exec', '-i', '-n', 'firecrawl', 'deployment/firecrawl-postgres', '-c', 'postgres',
-        '--', 'pg_restore', '--file=/dev/null', input=archive.read_bytes(), timeout=600)
+    validate_archive(archive)
     (directory / 'sha256-before.json').write_text(json.dumps({
         path.name: hashlib.sha256(path.read_bytes()).hexdigest() for path in directory.iterdir()}))
     print(f'Private backup saved and archive decoded: {directory}', flush=True)
     return directory
+
+
+def validate_archive(archive):
+    # A valid custom archive of an empty database can be smaller than 1 KiB.
+    # Its format and complete decoding, not an arbitrary size, are the gate.
+    if not archive.stat().st_size:
+        raise RuntimeError('Database backup is empty')
+    run('exec', '-i', '-n', 'firecrawl', 'deployment/firecrawl-postgres', '-c', 'postgres',
+        '--', 'pg_restore', '--file=/dev/null', input=archive.read_bytes(), timeout=600)
 
 
 def set_password(password):

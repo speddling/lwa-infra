@@ -122,6 +122,29 @@ class CredentialsTests(unittest.TestCase):
 
 @unittest.skipUnless(os.environ.get('FIRECRAWL_TEST_POSTGRES_CONTAINER'), 'Hosted CI disposable PostgreSQL only')
 class PostgreSQLTests(unittest.TestCase):
+    def test_empty_database_archive_and_corrupt_archive(self):
+        container = os.environ['FIRECRAWL_TEST_POSTGRES_CONTAINER']
+        archive = subprocess.run(['docker', 'exec', container, 'pg_dump', '-U', 'firecrawl',
+                                  '-d', 'firecrawl', '--format=custom'], capture_output=True, check=True).stdout
+
+        def restore(*args, input=None, **kwargs):
+            result = subprocess.run(['docker', 'exec', '-i', container, *args[args.index('--') + 1:]],
+                                    input=input, capture_output=True)
+            if result.returncode:
+                raise RuntimeError('Archive decode failed')
+            return result.stdout
+
+        with tempfile.TemporaryDirectory() as directory, patch.object(credentials, 'run', side_effect=restore):
+            path = Path(directory) / 'database.dump'
+            path.write_bytes(archive)
+            credentials.validate_archive(path)
+            path.write_bytes(b'not a PostgreSQL archive')
+            with self.assertRaises(RuntimeError):
+                credentials.validate_archive(path)
+            path.write_bytes(b'')
+            with self.assertRaisesRegex(RuntimeError, 'backup is empty'):
+                credentials.validate_archive(path)
+
     def test_real_password_change_and_rollback(self):
         container = os.environ['FIRECRAWL_TEST_POSTGRES_CONTAINER']
 
