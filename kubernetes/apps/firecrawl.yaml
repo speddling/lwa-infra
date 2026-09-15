@@ -13,6 +13,10 @@ spec:
     repoURL: https://github.com/speddling/lwa-infra
     targetRevision: master
     path: services/firecrawl/kubernetes
+    directory:
+      # Live retention was verified before this handoff. Credentials are
+      # maintained by the backup-gated provisioning workflow, outside Git.
+      exclude: secret.yaml
   destination:
     server: https://kubernetes.default.svc
     namespace: firecrawl

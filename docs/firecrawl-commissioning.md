@@ -103,3 +103,67 @@ bounded scrape/crawl acceptance tests. Do not call the service commissioned
 until those tests pass.
 
 Reference: [ArgoCD resource retention options](https://argo-cd.readthedocs.io/en/stable/user-guide/sync-options/).
+
+## Credential provisioning procedure
+
+Retention inspection `34910249760` passed on 2026-09-14 at 23:45 UTC. Both
+retention flags are present on Secret UID
+`c511c3ba-ce83-4db6-a3c5-d4bad0db88d3`. The second stage excludes `secret.yaml`
+from the ArgoCD directory source; the file remains a legacy example only.
+CI checks the live Secret exists but never reapplies its data. A retained Secret
+may temporarily appear as an extraneous resource until provisioning removes its
+ArgoCD tracking metadata. Do not delete it to resolve that difference.
+
+After merging and waiting for deployment/ArgoCD synchronization to finish, run
+**Provision Firecrawl credentials** on master with `maintenance_ack=true`.
+This is a one-time commissioning workflow, not a general password rotation tool.
+It checks the original Secret UID, retention, source exclusion, fixed database
+identity, pinned API/broker images, API-only startup, no application tables, and
+no queued broker messages. It refuses to run against a commissioned installation.
+
+The root process on Monolith verifies the old database password over TCP, saves
+the Secret, PostgreSQL roles and a custom database archive under
+`/var/backups/lwa-firecrawl/<timestamp>-<suffix>/`, and decodes the archive before
+making any changes. The directory is root-only. This is a local recovery copy,
+not an off-host backup or a full production restore test. Generated credentials
+are saved in `secret-planned.json` before the first database write; no credential
+values are printed to Actions logs or committed to Git.
+
+The workflow changes the database role password and replaces the same Secret
+using its resource version. Database URLs and the authenticated RabbitMQ URL
+are updated together. It generates broker, dashboard, test and webhook secrets,
+and clears only placeholder OpenAI/proxy credentials; it does not enable a paid
+provider. On a rejected Secret update, it checks the live data before restoring
+the original database password. A timeout after a successful Secret update does
+not trigger an incorrect rollback.
+
+It then replaces the unused broker and API pods to load their new environment,
+without changing deployment templates. Broker queues are ephemeral, hence the
+empty-queue gate. PostgreSQL's volume and process remain in place; its
+`POSTGRES_PASSWORD` environment can remain stale until its next restart, but the
+actual database role password is changed by SQL and tested over TCP. The database
+Deployment uses `Recreate` to avoid overlapping processes on its existing PVC.
+API/broker images are pinned to the already-inspected digests for these reloads.
+
+Acceptance for this stage is successful PostgreSQL and AMQP authentication from
+the refreshed API container, a `success.json` recovery marker, and a subsequent
+read-only inspection showing the retained Secret UID and non-placeholder runtime
+credentials. A repeat run verifies the already-provisioned credentials instead
+of generating another set, and can finish an interrupted consumer reload.
+
+If interrupted before the Secret update, keep all files in the reported private
+backup directory. Compare `secret-before.json`, `secret-planned.json`, and the
+live Secret locally without printing their data. Do not blindly restore just the
+Secret: the database role may already have its new password. The workflow can
+retry only after the original database authentication check passes; otherwise
+coordinate role-password recovery using the saved role/credential files first.
+If the Secret update completed, preserve the new credentials and retry the
+consumer verification. Uncertain concurrent changes require inspection, not an
+automatic overwrite. Never use `kubectl apply` on the legacy placeholder file.
+
+For disaster recovery, restore the database and matching private Secret from a
+verified backup before starting dependent workloads; this existing-installation
+workflow intentionally refuses a newly created Secret UID. Fresh installation
+bootstrap and normal post-commissioning rotation need separate reviewed paths.
+Workers, NuQ initialization, the browser service, and end-to-end scraping remain
+the next commissioning stage.
