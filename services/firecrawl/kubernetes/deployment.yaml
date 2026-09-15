@@ -21,7 +21,7 @@ spec:
       terminationGracePeriodSeconds: 180
       containers:
         - name: api
-          image: ghcr.io/firecrawl/firecrawl:latest
+          image: ghcr.io/firecrawl/firecrawl@sha256:20ea02d51fb5e1063637d7e43b5dcdf429bf69b7e1c1615b48b24bff1d0c13ae
           imagePullPolicy: IfNotPresent
           command: ["node"]
           args: ["--max-old-space-size=6144", "dist/src/index.js"]
@@ -119,6 +119,9 @@ metadata:
     component: postgres
 spec:
   replicas: 1
+  # Never run two database processes against the same local-path volume.
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: firecrawl
@@ -187,7 +190,7 @@ spec:
     spec:
       containers:
         - name: rabbitmq
-          image: rabbitmq:3-management
+          image: rabbitmq@sha256:e582c0bc7766f3342496d8485efb5a1df782b5ce3886ad017e2eaae442311f69
           env:
             - name: RABBITMQ_DEFAULT_USER
               valueFrom:
