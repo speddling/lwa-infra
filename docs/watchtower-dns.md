@@ -36,3 +36,8 @@ ensures it is not enabled again. It leaves systemd-resolved, AdGuard, Unbound,
 Watchtower configuration and rerun the inspection. Acceptance requires the
 helper to be masked/inactive, Unbound and AdGuard active, all three DNS probes
 successful, and no failed units attributable to this helper.
+
+The first post-deployment inspection `35544331895` confirmed the mask and all
+DNS probes, but systemd still listed the historical failure in `systemctl
+--failed`. The follow-up clears that stale result with `systemctl reset-failed`
+after masking. This does not start, reload, or otherwise change the helper.

@@ -46,6 +46,12 @@
   # attempts to register lo with resolvconf and fails because lo is not a
   # link that can receive DNS configuration. It is not part of this design.
 
+- name: Clear stale resolvconf helper failure state
+  ansible.builtin.command: systemctl reset-failed unbound-resolvconf.service
+  changed_when: false
+  # Masking prevents future starts; reset-failed removes the historical failed
+  # result so systemd --failed reflects the current service state.
+
 - name: Enable and start unbound
   systemd:
     name: unbound
