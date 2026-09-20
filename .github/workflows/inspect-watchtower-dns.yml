@@ -1,0 +1,36 @@
+name: Inspect Watchtower DNS
+
+on:
+  pull_request:
+    branches: [master]
+    paths:
+      - 'scripts/watchtower/inspect_dns.py'
+      - '.github/workflows/inspect-watchtower-dns.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate inspection syntax without contacting Watchtower
+        run: python -c 'import ast; from pathlib import Path; ast.parse(Path("scripts/watchtower/inspect_dns.py").read_text())'
+
+  inspect:
+    needs: validate
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master'
+    runs-on: [self-hosted, watchtower]
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify runner identity
+        run: test "$(hostname -s)/$(id -un)" = watchtower/speddling
+      - name: Inspect through the existing speddling SSH login
+        run: |
+          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes \
+            -o ConnectTimeout=10 -o IdentitiesOnly=yes \
+            -i "$HOME/.ssh/id_ed25519" speddling@192.168.30.11 \
+            'sudo -n /usr/bin/python3 -' < scripts/watchtower/inspect_dns.py
