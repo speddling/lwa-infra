@@ -35,6 +35,17 @@
     mode: '0644'
   notify: restart unbound
 
+- name: Disable Debian resolvconf helper
+  ansible.builtin.systemd:
+    name: unbound-resolvconf.service
+    enabled: false
+    masked: true
+    state: stopped
+  # Watchtower deliberately uses systemd-resolved for /etc/resolv.conf,
+  # AdGuard Home on :53, and Unbound on loopback :5335. The package helper
+  # attempts to register lo with resolvconf and fails because lo is not a
+  # link that can receive DNS configuration. It is not part of this design.
+
 - name: Enable and start unbound
   systemd:
     name: unbound
