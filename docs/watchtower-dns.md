@@ -21,3 +21,18 @@ in the report; workflow success alone does not establish healthy DNS.
 Direct Argus access from Construct timed out on 2026-09-15. Its documented
 firewall boundary still allows Apex only. Use the existing runner path for this
 investigation; moving Argus access is a separate development migration item.
+
+## Diagnosis and repair
+
+Inspection `35543850424` on 2026-09-20 found the helper failed with:
+`Failed to set DNS configuration: Link lo is loopback device.` Unbound was
+running and valid on `127.0.0.1:5335`; AdGuard was running on `*:53`; direct
+queries to both, and host resolution through systemd-resolved, returned NOERROR.
+The helper is therefore an obsolete package integration, not a DNS outage.
+
+The repair masks and stops `unbound-resolvconf.service` in the Unbound role and
+ensures it is not enabled again. It leaves systemd-resolved, AdGuard, Unbound,
+`/etc/resolv.conf`, listeners, and NUT unchanged. After merging, deploy the
+Watchtower configuration and rerun the inspection. Acceptance requires the
+helper to be masked/inactive, Unbound and AdGuard active, all three DNS probes
+successful, and no failed units attributable to this helper.
