@@ -10,7 +10,8 @@ and migration status; verify addresses against fresh Omada evidence before chang
   and the unused Obelisk Windows VM. Its CI runner process runs as `gh-runner`.
 - **Watchtower:** Ubuntu, Celeron mini-PC, 8 GB RAM. DNS and monitoring remain
   outside k3s. Its CI runner process runs as `speddling`.
-- **Apex:** M4 MacBook Air client workstation; former host for development and local AI tooling. All development work has moved to Construct.
+- **Apex:** M4 MacBook Air client workstation; former host for development and local AI tooling. All development authoring moved to Construct; Chewy is the planned replacement Users VLAN workstation.
+- **Chewy:** Chuwi Hi13 Users VLAN client (`192.168.20.4`, owner-reported DHCP reservation). Planned school/general/development workstation and headless CPU Ollama host; no deployment or LAN API exposure is defined yet.
 - **Studio:** Dell Precision workstation/DAW. WiFi on Users; wired dock on Mgmt
   provides a separate emergency access path.
 - **Construct:** Debian 12 QEMU/KVM VM on Monolith, systemd lifecycle, 8 vCPUs,
