@@ -67,6 +67,11 @@ added firewall rules are not automatically removed by these additive rules.
    the guest on 2026-09-11. The pin applies only to `[127.0.0.1]:2222`; a future
    rebuild requires verifying and committing the replacement public key.
    Ansible must already be installed (the Monolith deploy installs it).
+   Chewy's owner-provided public key is authorized by the additive
+   **Authorize Chewy SSH access to Construct** workflow. It targets the existing
+   guest through the pinned `127.0.0.1:2222` inventory entry, verifies the guest
+   hostname, preserves existing keys, and waits for a fresh runner connection.
+   It does not provision or rebuild the VM.
 5. Dispatch **Retire Tailscale and wmux** from `master`, checking
    `lan_ssh_verified` only after step 2. It runs
    `services/construct/ansible/playbooks/retire-remote-access.yml` on Monolith.
