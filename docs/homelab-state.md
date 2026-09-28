@@ -1,9 +1,6 @@
 # LWA Infra -- Current State
 > Documentation audit: 2026-09-11. Historical running/up tables below are not a fresh live survey.
 > New operator confirmations: UPS installed and USB-connected to Watchtower; EAP225-Outdoor installed; all development moved from Apex to Construct; Obelisk still exists but is unused and no longer needed.
-> Owner confirmation 2026-09-22: Chewy (Chuwi Hi13) is the planned replacement
-> for Apex as the school, general-purpose and development workstation. Headless
-> CPU Ollama is planned on Chewy; installation and service exposure are pending.
 
 ---
 
@@ -38,7 +35,6 @@ The original plan was a single 60-minute cutover across all 5 VLANs at once. Thr
 | EAP225-Outdoor -- Foyer | 192.168.10.102 | Mgmt (10) | Owner-reported address/name, 2026-09-11; SNMP unverified |
 | apex | 192.168.20.2 | Users (20) | Primary Workstation, WiFi |
 | studio | 192.168.20.3 | Users (20) | DAW / KDE Workstation, WiFi |
-| chewy | 192.168.20.4 | Users (20) | Chuwi Hi13 workstation, WiFi; DHCP reservation owner-reported, live Omada verification pending |
 | studio (wired dock) | 192.168.10.7 | Mgmt (10) | Out-of-band emergency access -- occasional/physical, not always-on |
 | monolith | 192.168.30.10 | Infra (30) | k3s Node |
 | watchtower | 192.168.30.11 | Infra (30) | DNS / Monitoring |
@@ -98,6 +94,7 @@ All three APs will broadcast all three SSIDs (`LittleWolfAcres` on Users already
 | `grafana.littlewolfacres.com` | 192.168.30.11 |
 | `monolith.littlewolfacres.com` | 192.168.30.10 |
 | `navidrome.littlewolfacres.com` | 192.168.30.10 |
+| `jellyfin.littlewolfacres.com` | 192.168.30.10 |
 | `argocd.littlewolfacres.com` | 192.168.30.10 |
 | `plane.littlewolfacres.com` | 192.168.30.10 |
 | `firecrawl.littlewolfacres.com` | 192.168.30.10 |
@@ -431,7 +428,7 @@ Automatic TLS via Cloudflare DNS-01. Issues and renews Let's Encrypt certificate
 |---|---|
 | Host | `apex` |
 | Software | Ollama |
-| Status | Historical deployment; being replaced as the interactive workstation by Chewy; retention/access from Construct pending |
+| Status | Historical deployment; retention/access from Construct pending |
 
 | Model | Size | Use |
 |---|---|---|
@@ -446,34 +443,12 @@ Automatic TLS via Cloudflare DNS-01. Issues and renews Let's Encrypt certificate
 |---|---|
 | Hostname | `apex` |
 | IP | 192.168.20.2 (Users VLAN, WiFi) |
-| Current role | Legacy workstation; owner plans to move school, general-purpose and development use to Chewy |
 
 Apex was the original development host. The owner confirms all development work has moved to Construct. Surviving Apex-hosted services must be migrated or retired; this is not proof they are already deployed on Construct. Only Apex launchd deployment exists for Scribe/Zombatron. See `construct-development-migration.md` for the dependency inventory.
 
 | Service | Port | Status |
 |---|---|---|
 | Scribe / Zombatron | 8765 / Socket Mode | Deployment code exists for Apex; live status unconfirmed |
-
-## Chewy (Chuwi Hi13)
-
-| Field | Value |
-|---|---|
-| Hostname | `chewy` |
-| IP | `192.168.20.4` (Users VLAN, WiFi; static DHCP reservation reported by owner, live Omada verification pending) |
-| Hardware | Chuwi Hi13 13.5-inch 3:2 touchscreen; Intel Celeron N3450; Intel HD Graphics 500; 4 GB soldered LPDDR3; 64 GB eMMC |
-| Firmware | `m1w6_ap135.056` x64, owner-reported final official revision |
-| OS | Ubuntu Server 24.04.4 LTS amd64, minimized installation |
-| Interactive stack | Xorg/Xinit, Openbox, Chromium, BlueZ/rfkill, Bastron MK85 Bluetooth keyboard and mouse |
-| Dock | ThinkPad Universal Thunderbolt 4 Dock (40B0), USB/display fallback |
-| Network interface | `wlp1s0` (owner-reported fixed kernel interface name) |
-| Intended role | Replacement Users VLAN workstation for school work, general use and development; headless CPU Ollama host planned |
-| Status | Hardware/software state owner-reported 2026-09-22; deployment, SSH policy, local DNS name and Ollama service are pending |
-
-Chewy is a client endpoint, not an infrastructure Ansible target. Its 4 GB RAM,
-Celeron N3450 and 64 GB eMMC impose materially tighter limits than Construct or
-the retired Apex Metal/unified-memory inference environment. Ollama model choice,
-runtime memory limits, model storage location and any LAN API exposure require a
-separate reviewed change. Do not transfer Apex's old Metal resource assumptions.
 
 ---
 
